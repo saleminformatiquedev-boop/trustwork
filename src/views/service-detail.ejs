@@ -1,112 +1,172 @@
 <%- include('partials/header', { title: service.title }) %>
 
-<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
   
-  <a href="/" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-emerald-600 mb-6 transition">
-    <i class="fa-solid fa-arrow-left"></i> Retour aux services
-  </a>
+  <!-- Fil d'ariane & retour -->
+  <div class="flex items-center justify-between gap-3 mb-6">
+    <a href="/" class="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-emerald-600 transition bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
+      <i class="fa-solid fa-arrow-left text-[10px]"></i> Retour aux services
+    </a>
+    <span class="text-[11px] font-semibold text-slate-400">Réf: #<%= service.id %></span>
+  </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
     
-    <!-- Colonne Principale : Détails du service -->
+    <!-- Colonne Principale (2/3) : Détails du service -->
     <div class="lg:col-span-2 space-y-6">
-      <div class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm">
-        <span class="inline-block text-xs font-semibold bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full mb-3">
-          <%= service.category %>
-        </span>
-        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 leading-tight mb-4">
+      
+      <div class="bg-white p-5 sm:p-8 rounded-2xl border border-slate-200 shadow-sm">
+        
+        <!-- Catégorie & Badge Sécurité -->
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <span class="inline-flex items-center gap-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100">
+            <i class="fa-solid fa-tag text-[10px]"></i> <%= service.category %>
+          </span>
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200">
+            <i class="fa-solid fa-shield-halved text-emerald-600"></i> Séquestre Garanti
+          </span>
+        </div>
+
+        <h1 class="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 leading-tight mb-6">
           <%= service.title %>
         </h1>
 
-        <!-- Vendeur info -->
-        <div class="flex items-center gap-3 py-4 border-y border-slate-100 mb-6">
-          <img src="<%= service.sellerAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + service.sellerName %>" class="w-12 h-12 rounded-full border border-slate-200">
-          <div>
-            <h4 class="font-bold text-slate-900 text-sm"><%= service.sellerName %></h4>
-            <p class="text-xs text-slate-500">Membre vérifié • Paiements via Binance Pay</p>
+        <!-- Vendeur info Pro Card -->
+        <div class="flex items-center justify-between p-4 rounded-xl bg-slate-50/80 border border-slate-100 mb-6">
+          <div class="flex items-center gap-3 min-w-0">
+            <img src="<%= service.sellerAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + service.sellerName %>" class="w-12 h-12 rounded-full border-2 border-white shadow-sm flex-shrink-0 object-cover">
+            <div class="min-w-0">
+              <h4 class="font-bold text-slate-900 text-sm truncate flex items-center gap-1.5">
+                <%= service.sellerName %>
+                <i class="fa-solid fa-circle-check text-emerald-500 text-xs" title="Profil vérifié"></i>
+              </h4>
+              <p class="text-xs text-slate-500 truncate">Travailleur Indépendant • Encaissement Binance Pay</p>
+            </div>
           </div>
+          <span class="hidden sm:inline-block text-[11px] font-bold text-emerald-700 bg-emerald-100/70 px-2.5 py-1 rounded-full">
+            Disponible
+          </span>
         </div>
 
-        <h3 class="font-bold text-slate-900 text-base mb-3">Description de la prestation</h3>
-        <div class="text-slate-600 text-sm leading-relaxed whitespace-pre-line">
+        <h3 class="font-bold text-slate-900 text-sm uppercase tracking-wider text-slate-400 mb-3">
+          Description de la prestation
+        </h3>
+        <div class="text-slate-600 text-sm sm:text-base leading-relaxed whitespace-pre-line mb-8">
           <%= service.description %>
         </div>
 
-        <!-- Garanties -->
-        <div class="mt-8 bg-slate-50 rounded-xl p-4 border border-slate-200 flex items-start gap-3">
-          <i class="fa-solid fa-shield-halved text-emerald-600 text-xl mt-0.5"></i>
-          <div class="text-xs text-slate-600 leading-relaxed">
-            <strong class="text-slate-900 font-semibold">Garantie Séquestre (Escrow) :</strong>
-            Vos <strong><%= service.price.toFixed(2) %> USDT</strong> seront mis sous séquestre sécurisé. Le travailleur ne recevra l'argent qu'une fois que vous aurez vérifié et validé le travail livré. En cas de problème, vous pouvez ouvrir une enquête pour être remboursé.
+        <!-- Étapes de réalisation transparentes -->
+        <div class="border-t border-slate-100 pt-6">
+          <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider mb-4 text-slate-500">
+            Processus de commande en 3 étapes :
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <span class="font-bold text-emerald-700 flex items-center gap-1.5 mb-1">
+                <i class="fa-solid fa-lock"></i> 1. Séquestre
+              </span>
+              <p class="text-slate-500 text-[11px] leading-relaxed">Vos USDT sont bloqués par la plateforme, pas envoyés au vendeur.</p>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <span class="font-bold text-blue-700 flex items-center gap-1.5 mb-1">
+                <i class="fa-solid fa-hammer"></i> 2. Travail & Suivi
+              </span>
+              <p class="text-slate-500 text-[11px] leading-relaxed">Le travailleur réalise la mission et communique dans le chat direct.</p>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <span class="font-bold text-purple-700 flex items-center gap-1.5 mb-1">
+                <i class="fa-solid fa-check-double"></i> 3. Validation
+              </span>
+              <p class="text-slate-500 text-[11px] leading-relaxed">Vous vérifiez le travail et validez le déblocage des fonds.</p>
+            </div>
           </div>
         </div>
+
+        <!-- Box Garantie & Litige -->
+        <div class="mt-6 bg-emerald-50/70 rounded-2xl p-4 sm:p-5 border border-emerald-100 flex items-start gap-3.5">
+          <span class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-sm flex-shrink-0 shadow-sm">
+            <i class="fa-solid fa-scale-balanced"></i>
+          </span>
+          <div class="text-xs text-emerald-900 leading-relaxed">
+            <strong class="font-bold block mb-0.5">Protection Totale Acheteur :</strong>
+            Si le travailleur ne livre pas dans le délai de <strong><%= service.deliveryDays %> jours</strong> ou si le livrable est incomplet, vous pouvez ouvrir une enquête en 1 clic pour geler et récupérer vos <strong><%= service.price.toFixed(2) %> USDT</strong>.
+          </div>
+        </div>
+
       </div>
+
     </div>
 
-    <!-- Colonne Latérale : Boîte de Commande Séquestre -->
+    <!-- Colonne Latérale (1/3) : Boîte de Commande Séquestre -->
     <div class="lg:col-span-1">
-      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm sticky top-24">
+      <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm sticky top-20 sm:top-24 space-y-5">
         
-        <div class="flex items-baseline justify-between mb-4">
-          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tarif Forfait</span>
-          <div class="text-2xl font-black text-slate-900 flex items-center gap-1">
+        <!-- Prix Forfaitaire -->
+        <div class="flex items-baseline justify-between pb-3 border-b border-slate-100">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Prix Forfaitaire</span>
+          <div class="text-2xl sm:text-3xl font-black text-slate-900 flex items-center gap-1.5">
             <%= service.price.toFixed(2) %> <span class="text-sm font-bold text-emerald-600">USDT</span>
           </div>
         </div>
 
-        <div class="space-y-3 py-3 border-y border-slate-100 text-xs text-slate-600 mb-6">
+        <!-- Détails forfait -->
+        <div class="space-y-3 text-xs text-slate-600">
           <div class="flex items-center justify-between">
-            <span class="flex items-center gap-2"><i class="fa-regular fa-clock text-slate-400"></i> Délai de livraison</span>
-            <strong class="text-slate-900"><%= service.deliveryDays %> jours</strong>
+            <span class="flex items-center gap-2"><i class="fa-regular fa-clock text-slate-400"></i> Délai garanti</span>
+            <strong class="text-slate-900 font-semibold"><%= service.deliveryDays %> jours ouvrés</strong>
           </div>
           <div class="flex items-center justify-between">
-            <span class="flex items-center gap-2"><i class="fa-solid fa-lock text-emerald-500"></i> Protection Escrow</span>
-            <strong class="text-emerald-700">100% Inclus</strong>
+            <span class="flex items-center gap-2"><i class="fa-solid fa-lock text-emerald-600"></i> Protection Escrow</span>
+            <strong class="text-emerald-700 font-semibold">100% Active</strong>
           </div>
           <div class="flex items-center justify-between">
-            <span class="flex items-center gap-2"><i class="fa-brands fa-bitcoin text-amber-500"></i> Paiement</span>
-            <strong class="text-slate-900">Binance / USDT</strong>
+            <span class="flex items-center gap-2"><i class="fa-brands fa-bitcoin text-amber-500"></i> Règlement</span>
+            <strong class="text-slate-900 font-semibold">Binance / USDT</strong>
           </div>
         </div>
 
         <% if (user) { %>
           <% if (user.id === service.sellerId) { %>
-            <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 text-center font-medium">
-              C'est votre propre service.
+            <div class="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 text-center font-medium">
+              <i class="fa-solid fa-circle-info mr-1"></i> Vous êtes l'auteur de cette prestation.
             </div>
           <% } else { %>
-            <!-- Formulaire de commande -->
-            <form action="/orders/create" method="POST" class="space-y-4">
+            <!-- Formulaire de commande instantanée avec verrouillage séquestre -->
+            <form action="/orders/create" method="POST" class="space-y-4 pt-2 border-t border-slate-100">
               <input type="hidden" name="serviceId" value="<%= service.id %>">
               
               <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">
-                  Vos consignes pour le travailleur :
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                  Consignes / Spécifications pour le travailleur :
                 </label>
-                <textarea name="requirements" rows="3" required placeholder="Expliquez ce que vous souhaitez exactement..." class="w-full text-xs p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+                <textarea name="requirements" rows="3" required placeholder="Décrivez votre besoin précis, liens ou ressources pour démarrer..." class="w-full text-xs p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50 focus:bg-white transition"></textarea>
               </div>
 
-              <!-- Solde check -->
+              <!-- Solde USDT interactif -->
               <div class="p-3 rounded-xl <%= user.walletBalance >= service.price ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200' %> text-xs">
                 <div class="flex justify-between items-center font-semibold mb-1">
                   <span>Votre solde USDT :</span>
                   <span><%= user.walletBalance.toFixed(2) %> USDT</span>
                 </div>
                 <% if (user.walletBalance < service.price) { %>
-                  <p class="text-[11px] mt-1">Solde insuffisant pour bloquer les fonds.</p>
-                  <a href="/dashboard" class="underline font-bold text-[11px] block mt-1">Recharger mon compte via Binance Pay</a>
+                  <p class="text-[11px] text-rose-700 mt-1">Solde insuffisant pour sécuriser les fonds.</p>
+                  <a href="/dashboard" class="underline font-bold text-[11px] block mt-1 hover:text-rose-900">Recharger via Binance Pay (+50 USDT)</a>
+                <% } else { %>
+                  <p class="text-[10px] text-emerald-700 mt-0.5">Solde suffisant pour engager le séquestre.</p>
                 <% } %>
               </div>
 
-              <button type="submit" <%= user.walletBalance < service.price ? 'disabled' : '' %> class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl shadow-md shadow-emerald-200 transition flex items-center justify-center gap-2">
+              <button type="submit" <%= user.walletBalance < service.price ? 'disabled' : '' %> class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-200 transition flex items-center justify-center gap-2">
                 <i class="fa-solid fa-lock"></i> Bloquer les fonds & Commander
               </button>
             </form>
           <% } %>
         <% } else { %>
-          <div class="text-center">
-            <p class="text-xs text-slate-500 mb-3">Connectez-vous pour passer commande en toute sécurité.</p>
-            <a href="/login" class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md transition">
+          <div class="text-center pt-2 border-t border-slate-100">
+            <p class="text-xs text-slate-500 mb-3">Connectez-vous pour engager une commande sécurisée.</p>
+            <a href="/login" class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition">
               Connexion / Commencer
             </a>
           </div>
