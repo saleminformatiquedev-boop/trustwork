@@ -320,6 +320,73 @@ app.get('/dashboard', ensureAuthenticated, async (req, res) => {
   }
 });
 
+// Page Historique détaillée adaptée par type de compte (Acheteur / Vendeur / Admin)
+app.get('/history', ensureAuthenticated, async (req, res) => {
+  try {
+    const uRes = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    const user = normalizeUser(uRes.rows[0]);
+
+    // Historique des achats
+    const buyerRes = await pool.query(`
+      SELECT o.*, s.title as "serviceTitle", u.name as "sellerName"
+      FROM orders o
+      JOIN services s ON o."serviceId" = s.id
+      JOIN users u ON o."sellerId" = u.id
+      WHERE o."buyerId" = $1
+      ORDER BY o."createdAt" DESC
+    `, [user.id]);
+    const buyerHistory = formatRows(buyerRes.rows);
+
+    // Historique des ventes
+    const sellerRes = await pool.query(`
+      SELECT o.*, s.title as "serviceTitle", u.name as "buyerName"
+      FROM orders o
+      JOIN services s ON o."serviceId" = s.id
+      JOIN users u ON o."buyerId" = u.id
+      WHERE o."sellerId" = $1
+      ORDER BY o."createdAt" DESC
+    `, [user.id]);
+    const sellerHistory = formatRows(sellerRes.rows);
+
+    // Historique des arbitrages si Admin
+    let adminDisputes = [];
+    if (user.role === 'ADMIN') {
+      const dispRes = await pool.query(`
+        SELECT d.*, o.amount, o."serviceId", s.title as "serviceTitle"
+        FROM disputes d
+        JOIN orders o ON d."orderId" = o.id
+        JOIN services s ON o."serviceId" = s.id
+        ORDER BY d."createdAt" DESC
+      `);
+      adminDisputes = formatRows(dispRes.rows);
+    }
+
+    // Calculs statistiques
+    const totalSpent = buyerHistory
+      .filter(o => o.status !== 'REFUNDED')
+      .reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
+    const totalEarned = sellerHistory
+      .filter(o => o.status === 'COMPLETED')
+      .reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
+    const completedCount = buyerHistory.filter(o => o.status === 'COMPLETED').length + 
+                           sellerHistory.filter(o => o.status === 'COMPLETED').length;
+
+    res.render('history', {
+      user,
+      buyerHistory,
+      sellerHistory,
+      adminDisputes,
+      totalSpent,
+      totalEarned,
+      completedCount
+    });
+  } catch (err) {
+    res.status(500).send("Erreur historique: " + err.message);
+  }
+});
+
 // API AJAX : Recharger le solde USDT sans recharger la page
 app.post('/api/wallet/deposit-test', ensureAuthenticated, async (req, res) => {
   try {

@@ -29,7 +29,6 @@
       to { transform: translateY(0); opacity: 1; }
     }
     .toast-anim { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-    /* Touch target comfort */
     button, a { -webkit-tap-highlight-color: transparent; }
   </style>
 </head>
@@ -54,6 +53,11 @@
       <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
         <a href="/" class="hover:text-emerald-600 transition">Explorer les Services</a>
         <a href="/services/new" class="hover:text-emerald-600 transition">Vendre un Service</a>
+        <% if (user) { %>
+          <a href="/history" class="hover:text-emerald-600 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-clock-rotate-left text-xs"></i> Historique
+          </a>
+        <% } %>
         <% if (user && user.role === 'ADMIN') { %>
           <a href="/admin/disputes" class="text-amber-600 hover:text-amber-700 font-semibold flex items-center gap-1.5">
             <i class="fa-solid fa-gavel"></i> Arbitrage Litiges
@@ -64,7 +68,7 @@
       <!-- User Area / Badges Solde & Profil -->
       <div class="flex items-center gap-2 sm:gap-3">
         <% if (user) { %>
-          <!-- Balances Badges (Responsive : compact sur mobile) -->
+          <!-- Balances Badges -->
           <a href="/dashboard" class="flex items-center gap-1.5 sm:gap-2 bg-slate-100 hover:bg-slate-200/80 transition py-1.5 px-2.5 sm:px-3 rounded-full text-[11px] sm:text-xs font-semibold">
             <span class="text-emerald-700 flex items-center gap-1" title="Solde disponible USDT">
               <i class="fa-solid fa-wallet text-[10px] sm:text-xs"></i> 
@@ -101,35 +105,32 @@
   </header>
 
   <!-- Barre de navigation mobile inférieure (Bottom Navigation Bar) -->
-  <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 flex items-center justify-around h-14 px-2 shadow-lg">
+  <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 flex items-center justify-around h-14 px-1 shadow-lg">
     <a href="/" class="flex flex-col items-center justify-center text-[10px] font-medium text-slate-600 hover:text-emerald-600 transition flex-1 py-1">
-      <i class="fa-solid fa-compass text-base mb-0.5"></i>
+      <i class="fa-solid fa-compass text-sm mb-0.5"></i>
       <span>Explorer</span>
     </a>
     <a href="/services/new" class="flex flex-col items-center justify-center text-[10px] font-medium text-slate-600 hover:text-emerald-600 transition flex-1 py-1">
-      <i class="fa-solid fa-circle-plus text-base mb-0.5 text-emerald-600"></i>
+      <i class="fa-solid fa-circle-plus text-sm mb-0.5 text-emerald-600"></i>
       <span>Vendre</span>
     </a>
+    <a href="/history" class="flex flex-col items-center justify-center text-[10px] font-medium text-slate-600 hover:text-emerald-600 transition flex-1 py-1">
+      <i class="fa-solid fa-clock-rotate-left text-sm mb-0.5"></i>
+      <span>Historique</span>
+    </a>
     <a href="/dashboard" class="flex flex-col items-center justify-center text-[10px] font-medium text-slate-600 hover:text-emerald-600 transition flex-1 py-1">
-      <i class="fa-solid fa-wallet text-base mb-0.5"></i>
+      <i class="fa-solid fa-wallet text-sm mb-0.5"></i>
       <span>Portefeuille</span>
     </a>
     <% if (user && user.role === 'ADMIN') { %>
       <a href="/admin/disputes" class="flex flex-col items-center justify-center text-[10px] font-medium text-amber-600 hover:text-amber-700 transition flex-1 py-1">
-        <i class="fa-solid fa-gavel text-base mb-0.5"></i>
+        <i class="fa-solid fa-gavel text-sm mb-0.5"></i>
         <span>Litiges</span>
-      </a>
-    <% } %>
-    <% if (user) { %>
-      <a href="/logout" class="flex flex-col items-center justify-center text-[10px] font-medium text-slate-400 hover:text-rose-500 transition flex-1 py-1">
-        <i class="fa-solid fa-arrow-right-from-bracket text-base mb-0.5"></i>
-        <span>Quitter</span>
       </a>
     <% } %>
   </nav>
 
   <script>
-    // Helper universel de Toast dynamique
     window.showToast = function(message, type = 'success') {
       const container = document.getElementById('toast-container');
       if (!container) return;
