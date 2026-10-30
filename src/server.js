@@ -78,6 +78,11 @@ app.get('/login', (req, res) => {
   res.render('login', { msg: req.query.msg || null });
 });
 
+// Formulaire nouveau service (placé avant /services/:id)
+app.get('/services/new', ensureAuthenticated, (req, res) => {
+  res.render('new-service');
+});
+
 // Détail d'un service
 app.get('/services/:id', async (req, res) => {
   try {
@@ -100,11 +105,6 @@ app.get('/services/:id', async (req, res) => {
 // ==========================================
 // ROUTES MEMBRE (SERVICES & COMMANDES)
 // ==========================================
-
-// Formulaire nouveau service
-app.get('/services/new', ensureAuthenticated, (req, res) => {
-  res.render('new-service');
-});
 
 // Création d'un service
 app.post('/services/new', ensureAuthenticated, async (req, res) => {
