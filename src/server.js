@@ -6,11 +6,14 @@ const session = require('express-session');
 const passport = require('passport');
 const path = require('path');
 const crypto = require('crypto');
+const fs = require('fs');
 const { Server } = require('socket.io');
+const multer = require('multer');
 
 const { pool, initDatabase } = require('./db');
 const { setupAuth, ensureAuthenticated, normalizeUser } = require('./auth');
 const escrow = require('./escrow');
+const emailService = require('./services/email');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,7 +21,26 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-// Configurations Express & Middleware
+// Configuration Upload fichiers (Livrables, Pièces jointes, Preuves de litige)
+const uploadDir = path.join(__dirname, '../public/uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const uniqueName = Date.now() + '-' + crypto.randomBytes(4).toString('hex') + ext;
+    cb(null, uniqueName);
+  }
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 25 * 1024 * 1024 } // 25 MB max
+});
+
+// Middleware Express
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
@@ -63,32 +85,31 @@ function formatRows(rows) {
 // SOCKET.IO (MESSAGERIE & SÉQUESTRE TEMPS RÉEL)
 // ==========================================
 io.on('connection', (socket) => {
-  // Rejoindre la room de la commande
   socket.on('join_order', ({ orderId }) => {
     socket.join(`order_${orderId}`);
   });
 
-  // Nouveau message de chat en direct
-  socket.on('send_message', async ({ orderId, senderId, senderName, content }) => {
+  socket.on('send_message', async ({ orderId, senderId, senderName, content, fileUrl, fileName }) => {
     try {
-      if (!content || !content.trim()) return;
+      if ((!content || !content.trim()) && !fileUrl) return;
 
       const newId = 'msg_' + crypto.randomBytes(6).toString('hex');
       const insertRes = await pool.query(`
-        INSERT INTO messages (id, "orderId", "senderId", content)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO messages (id, "orderId", "senderId", content, "fileUrl", "fileName")
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
-      `, [newId, orderId, senderId, content.trim()]);
+      `, [newId, orderId, senderId, content ? content.trim() : '', fileUrl || null, fileName || null]);
 
       const savedMsg = insertRes.rows[0];
 
-      // Diffuser à toute la room de la commande
       io.to(`order_${orderId}`).emit('new_message', {
         id: savedMsg.id,
         orderId,
         senderId,
         senderName: senderName || 'Utilisateur',
         content: savedMsg.content,
+        fileUrl: savedMsg.fileUrl,
+        fileName: savedMsg.fileName,
         createdAt: savedMsg.createdAt
       });
     } catch (err) {
@@ -105,9 +126,13 @@ io.on('connection', (socket) => {
 app.get('/', async (req, res) => {
   try {
     const srvRes = await pool.query(`
-      SELECT s.*, u.name as "sellerName", u.avatar as "sellerAvatar"
+      SELECT s.*, u.name as "sellerName", u.avatar as "sellerAvatar",
+             COALESCE(AVG(r.rating), 5.0) as "avgRating",
+             COUNT(r.id) as "reviewsCount"
       FROM services s
       JOIN users u ON s."sellerId" = u.id
+      LEFT JOIN reviews r ON s.id = r."serviceId"
+      GROUP BY s.id, u.name, u.avatar
       ORDER BY s."createdAt" DESC
     `);
     res.render('index', { services: formatRows(srvRes.rows) });
@@ -126,11 +151,11 @@ app.get('/services/new', ensureAuthenticated, (req, res) => {
   res.render('new-service');
 });
 
-// Détail d'un service
+// Détail d'un service avec avis clients
 app.get('/services/:id', async (req, res) => {
   try {
     const srvRes = await pool.query(`
-      SELECT s.*, u.name as "sellerName", u.avatar as "sellerAvatar"
+      SELECT s.*, u.name as "sellerName", u.avatar as "sellerAvatar", u.bio as "sellerBio", u.skills as "sellerSkills"
       FROM services s
       JOIN users u ON s."sellerId" = u.id
       WHERE s.id = $1
@@ -139,15 +164,68 @@ app.get('/services/:id', async (req, res) => {
     if (srvRes.rows.length === 0) return res.status(404).send("Service introuvable");
     const service = formatRows(srvRes.rows)[0];
 
-    res.render('service-detail', { service });
+    // Avis associés à ce service
+    const reviewsRes = await pool.query(`
+      SELECT r.*, u.name as "buyerName", u.avatar as "buyerAvatar"
+      FROM reviews r
+      JOIN users u ON r."buyerId" = u.id
+      WHERE r."serviceId" = $1
+      ORDER BY r."createdAt" DESC
+    `, [service.id]);
+
+    res.render('service-detail', { service, reviews: reviewsRes.rows });
   } catch (err) {
     res.status(500).send("Erreur: " + err.message);
   }
 });
 
+// Profil public d'un travailleur
+app.get('/profile/:id', async (req, res) => {
+  try {
+    const uRes = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
+    if (uRes.rows.length === 0) return res.status(404).send("Profil utilisateur introuvable");
+    const profile = normalizeUser(uRes.rows[0]);
+
+    const srvRes = await pool.query(`
+      SELECT s.*, u.name as "sellerName", u.avatar as "sellerAvatar"
+      FROM services s
+      JOIN users u ON s."sellerId" = u.id
+      WHERE s."sellerId" = $1
+      ORDER BY s."createdAt" DESC
+    `, [profile.id]);
+
+    const revRes = await pool.query(`
+      SELECT r.*, u.name as "buyerName", u.avatar as "buyerAvatar", s.title as "serviceTitle"
+      FROM reviews r
+      JOIN users u ON r."buyerId" = u.id
+      JOIN services s ON r."serviceId" = s.id
+      WHERE r."sellerId" = $1
+      ORDER BY r."createdAt" DESC
+    `, [profile.id]);
+
+    res.render('profile', { profile, services: formatRows(srvRes.rows), reviews: revRes.rows });
+  } catch (err) {
+    res.status(500).send("Erreur profil: " + err.message);
+  }
+});
+
 // ==========================================
-// ROUTES MEMBRE (SERVICES & COMMANDES)
+// ROUTES MEMBRE (SERVICES, COMMANDES & FICHIERS)
 // ==========================================
+
+// Upload de fichier dans le chat / commande
+app.post('/api/upload', ensureAuthenticated, upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: 'Aucun fichier fourni' });
+  }
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.json({
+    success: true,
+    fileUrl,
+    fileName: req.file.originalname,
+    fileSize: req.file.size
+  });
+});
 
 // Création d'un service
 app.post('/services/new', ensureAuthenticated, async (req, res) => {
@@ -220,6 +298,9 @@ app.get('/orders/:id', ensureAuthenticated, async (req, res) => {
     const dispRes = await pool.query('SELECT * FROM disputes WHERE "orderId" = $1', [order.id]);
     const dispute = dispRes.rows[0] ? formatRows(dispRes.rows)[0] : null;
 
+    const reviewRes = await pool.query('SELECT * FROM reviews WHERE "orderId" = $1', [order.id]);
+    const review = reviewRes.rows[0] || null;
+
     const msgRes = await pool.query(`
       SELECT m.*, u.name as "senderName"
       FROM messages m
@@ -228,7 +309,7 @@ app.get('/orders/:id', ensureAuthenticated, async (req, res) => {
       ORDER BY m."createdAt" ASC
     `, [order.id]);
 
-    res.render('order-detail', { order, dispute, messages: msgRes.rows });
+    res.render('order-detail', { order, dispute, review, messages: msgRes.rows });
   } catch (err) {
     res.status(500).send("Erreur: " + err.message);
   }
@@ -265,6 +346,51 @@ app.post('/orders/:id/complete', ensureAuthenticated, async (req, res) => {
   }
 });
 
+// Laisser un avis / note sur la commande complétée
+app.post('/orders/:id/review', ensureAuthenticated, async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    const ordRes = await pool.query('SELECT * FROM orders WHERE id = $1', [req.params.id]);
+    const order = ordRes.rows[0];
+
+    if (!order || order.buyerId !== req.user.id) {
+      return res.status(403).send("Seul l'acheteur peut déposer un avis.");
+    }
+    if (order.status !== 'COMPLETED') {
+      return res.status(400).send("L'avis ne peut être déposé que sur une commande terminée.");
+    }
+
+    const reviewId = 'rev_' + crypto.randomBytes(6).toString('hex');
+    await pool.query(`
+      INSERT INTO reviews (id, "orderId", "serviceId", "buyerId", "sellerId", rating, comment)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT ("orderId") DO UPDATE SET rating = $6, comment = $7
+    `, [reviewId, order.id, order.serviceId, order.buyerId, order.sellerId, parseInt(rating, 10), comment || '']);
+
+    // Notification email vendeur
+    (async () => {
+      try {
+        const uSeller = await pool.query('SELECT * FROM users WHERE id = $1', [order.sellerId]);
+        const uBuyer = await pool.query('SELECT * FROM users WHERE id = $1', [order.buyerId]);
+        if (uSeller.rows[0] && uBuyer.rows[0]) {
+          emailService.notifyReviewSubmitted({
+            review: { rating: parseInt(rating, 10), comment: comment || '' },
+            order,
+            seller: uSeller.rows[0],
+            buyer: uBuyer.rows[0]
+          });
+        }
+      } catch (e) {
+        console.warn("Erreur notification review email:", e.message);
+      }
+    })();
+
+    res.redirect('/orders/' + req.params.id);
+  } catch (err) {
+    res.status(500).send("Erreur avis: " + err.message);
+  }
+});
+
 // Ouverture d'une enquête / litige
 app.post('/orders/:id/dispute', ensureAuthenticated, async (req, res) => {
   try {
@@ -284,7 +410,7 @@ app.post('/orders/:id/dispute', ensureAuthenticated, async (req, res) => {
 });
 
 // ==========================================
-// TABLEAU DE BORD & PORTEFEUILLE BINANCE
+// TABLEAU DE BORD, PORTEFEUILLE & RETRAITS
 // ==========================================
 
 app.get('/dashboard', ensureAuthenticated, async (req, res) => {
@@ -310,23 +436,84 @@ app.get('/dashboard', ensureAuthenticated, async (req, res) => {
       ORDER BY o."createdAt" DESC
     `, [user.id]);
 
+    // Retraits demandés
+    const withRes = await pool.query(`
+      SELECT * FROM withdrawals WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 10
+    `, [user.id]);
+
     res.render('dashboard', {
       user,
       buyerOrders: formatRows(buyerRes.rows),
-      sellerOrders: formatRows(sellerRes.rows)
+      sellerOrders: formatRows(sellerRes.rows),
+      withdrawals: formatRows(withRes.rows)
     });
   } catch (err) {
     res.status(500).send("Erreur dashboard: " + err.message);
   }
 });
 
-// Page Historique détaillée adaptée par type de compte (Acheteur / Vendeur / Admin)
+// Demande de retrait vers Binance Pay
+app.post('/api/wallet/withdraw', ensureAuthenticated, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const amount = parseFloat(req.body.amount);
+
+    if (isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ success: false, error: 'Montant de retrait invalide' });
+    }
+
+    const uRes = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.user.id]);
+    const user = uRes.rows[0];
+
+    if (!user.binanceId) {
+      return res.status(400).json({ success: false, error: 'Veuillez enregistrer votre Binance Pay ID avant de demander un retrait' });
+    }
+
+    if (parseFloat(user.walletBalance) < amount) {
+      return res.status(400).json({ success: false, error: 'Solde disponible insuffisant' });
+    }
+
+    // Déduire du solde
+    await client.query('UPDATE users SET "walletBalance" = "walletBalance" - $1 WHERE id = $2', [amount, user.id]);
+
+    // Créer la demande de retrait
+    const withId = 'wth_' + crypto.randomBytes(6).toString('hex');
+    await client.query(`
+      INSERT INTO withdrawals (id, "userId", amount, "binanceId", status)
+      VALUES ($1, $2, $3, $4, 'PENDING')
+    `, [withId, user.id, amount, user.binanceId]);
+
+    await client.query('COMMIT');
+
+    // Notification email retrait
+    (async () => {
+      try {
+        emailService.notifyWithdrawalRequested({
+          user,
+          amount,
+          binanceId: user.binanceId
+        });
+      } catch (e) {
+        console.warn("Erreur notification retrait email:", e.message);
+      }
+    })();
+
+    res.json({ success: true, message: `Demande de retrait de ${amount.toFixed(2)} USDT transmise avec succès.` });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ success: false, error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Page Historique
 app.get('/history', ensureAuthenticated, async (req, res) => {
   try {
     const uRes = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
     const user = normalizeUser(uRes.rows[0]);
 
-    // Historique des achats
     const buyerRes = await pool.query(`
       SELECT o.*, s.title as "serviceTitle", u.name as "sellerName"
       FROM orders o
@@ -337,7 +524,6 @@ app.get('/history', ensureAuthenticated, async (req, res) => {
     `, [user.id]);
     const buyerHistory = formatRows(buyerRes.rows);
 
-    // Historique des ventes
     const sellerRes = await pool.query(`
       SELECT o.*, s.title as "serviceTitle", u.name as "buyerName"
       FROM orders o
@@ -348,7 +534,6 @@ app.get('/history', ensureAuthenticated, async (req, res) => {
     `, [user.id]);
     const sellerHistory = formatRows(sellerRes.rows);
 
-    // Historique des arbitrages si Admin
     let adminDisputes = [];
     if (user.role === 'ADMIN') {
       const dispRes = await pool.query(`
@@ -361,7 +546,6 @@ app.get('/history', ensureAuthenticated, async (req, res) => {
       adminDisputes = formatRows(dispRes.rows);
     }
 
-    // Calculs statistiques
     const totalSpent = buyerHistory
       .filter(o => o.status !== 'REFUNDED')
       .reduce((acc, curr) => acc + (curr.amount || 0), 0);
@@ -387,7 +571,7 @@ app.get('/history', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// API AJAX : Recharger le solde USDT sans recharger la page
+// API AJAX : Recharger le solde USDT
 app.post('/api/wallet/deposit-test', ensureAuthenticated, async (req, res) => {
   try {
     const upd = await pool.query(`
@@ -403,11 +587,17 @@ app.post('/api/wallet/deposit-test', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// API AJAX : Enregistrer Binance Pay ID sans recharger la page
+// API AJAX : Enregistrer Binance Pay ID & Bio
 app.post('/api/wallet/update-binance', ensureAuthenticated, async (req, res) => {
   try {
-    const { binanceId } = req.body;
-    await pool.query('UPDATE users SET "binanceId" = $1 WHERE id = $2', [binanceId, req.user.id]);
+    const { binanceId, bio, skills } = req.body;
+    await pool.query(`
+      UPDATE users 
+      SET "binanceId" = COALESCE($1, "binanceId"),
+          bio = COALESCE($2, bio),
+          skills = COALESCE($3, skills)
+      WHERE id = $4
+    `, [binanceId || null, bio || null, skills || null, req.user.id]);
     res.json({ success: true, binanceId });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -462,6 +652,7 @@ initDatabase().then(() => {
   server.listen(PORT, () => {
     console.log(`\n🚀 Serveur TrustWork démarré avec succès sur http://localhost:${PORT}`);
     console.log(`⚡ WebSocket / Socket.io : Actif (Temps réel)`);
+    console.log(`📎 Upload de Fichiers & Pièces Jointes : Actif`);
     console.log(`🐘 Base de Données : PostgreSQL 18 (ACID Enabled)`);
     console.log(`🔒 Système de Séquestre Escrow : Actif`);
     console.log(`💰 Mode Binance Pay & USDT : Actif\n`);

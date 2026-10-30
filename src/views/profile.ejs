@@ -1,0 +1,118 @@
+<%- include('partials/header', { title: 'Profil de ' + profile.name }) %>
+
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
+
+  <!-- Carte Profil Pro -->
+  <div class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+    <div class="flex items-center gap-4 sm:gap-6 min-w-0">
+      <img src="<%= profile.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + profile.name %>" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-emerald-500 shadow-md object-cover flex-shrink-0">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2">
+          <h1 class="text-xl sm:text-2xl font-black text-slate-900 truncate"><%= profile.name %></h1>
+          <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+            <i class="fa-solid fa-circle-check text-emerald-600 text-[10px]"></i> Vérifié
+          </span>
+        </div>
+        <p class="text-xs text-slate-500 mt-1">Membre depuis <%= new Date(profile.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) %></p>
+        
+        <% if (profile.bio) { %>
+          <p class="text-xs text-slate-700 mt-2 leading-relaxed max-w-xl"><%= profile.bio %></p>
+        <% } %>
+
+        <% if (profile.skills) { %>
+          <div class="flex flex-wrap gap-1.5 mt-3">
+            <% profile.skills.split(',').forEach(s => { %>
+              <span class="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full">
+                <%= s.trim() %>
+              </span>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Garanties Binance & Séquestre -->
+    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-2 w-full md:w-64 flex-shrink-0">
+      <div class="flex items-center justify-between text-slate-500">
+        <span>Règlement :</span>
+        <strong class="text-slate-900 font-semibold"><i class="fa-brands fa-bitcoin text-amber-500 mr-1"></i> Binance Pay</strong>
+      </div>
+      <div class="flex items-center justify-between text-slate-500">
+        <span>Services actifs :</span>
+        <strong class="text-emerald-700 font-bold"><%= services.length %></strong>
+      </div>
+      <div class="flex items-center justify-between text-slate-500">
+        <span>Avis clients :</span>
+        <strong class="text-slate-900 font-bold"><%= reviews.length %> note(s)</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Services proposés par ce travailleur -->
+  <div class="space-y-4">
+    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+      <i class="fa-solid fa-layer-group text-emerald-600"></i> Services proposés (<%= services.length %>)
+    </h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <% if (services && services.length > 0) { %>
+        <% services.forEach(service => { %>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+            <div>
+              <span class="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full inline-block mb-3">
+                <%= service.category %>
+              </span>
+              <h3 class="font-bold text-slate-900 text-sm mb-2 line-clamp-2">
+                <a href="/services/<%= service.id %>" class="hover:text-emerald-600 transition"><%= service.title %></a>
+              </h3>
+              <p class="text-slate-500 text-xs line-clamp-3 mb-4 leading-relaxed"><%= service.description %></p>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+              <span class="text-base font-black text-slate-900"><%= service.price.toFixed(2) %> <span class="text-xs text-emerald-600">USDT</span></span>
+              <a href="/services/<%= service.id %>" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition">
+                Commander
+              </a>
+            </div>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <p class="text-xs text-slate-400 py-6">Aucun service public pour l'instant.</p>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Avis clients reçus -->
+  <div class="space-y-4">
+    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+      <i class="fa-solid fa-star text-amber-500"></i> Avis clients vérifiés (<%= reviews.length %>)
+    </h2>
+
+    <% if (reviews && reviews.length > 0) { %>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <% reviews.forEach(r => { %>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <img src="<%= r.buyerAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + r.buyerName %>" class="w-7 h-7 rounded-full border border-slate-200">
+                <span class="text-xs font-bold text-slate-800"><%= r.buyerName %></span>
+              </div>
+              <div class="flex items-center text-amber-400 text-xs">
+                <% for (let i = 0; i < r.rating; i++) { %><i class="fa-solid fa-star"></i><% } %>
+              </div>
+            </div>
+            <p class="text-xs text-slate-600 italic">"<%= r.comment || 'Travail livré conforme et dans les temps !' %>"</p>
+            <span class="text-[10px] text-slate-400 block">Sur le service : <%= r.serviceTitle %></span>
+          </div>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="text-center py-8 bg-white rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400">
+        Pas encore d'avis déposé sur ce profil.
+      </div>
+    <% } %>
+  </div>
+
+</div>
+
+<%- include('partials/footer') %>

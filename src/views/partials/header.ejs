@@ -110,6 +110,31 @@
 
     </div>
 
+    <!-- Menu horizontal responsive visible directement sur mobile -->
+    <div class="md:hidden flex items-center justify-between gap-4 px-4 py-2 border-t border-slate-200 bg-white/95 backdrop-blur overflow-x-auto scrollbar-none text-xs font-semibold">
+      <a href="/" class="text-slate-700 hover:text-emerald-600 transition flex-shrink-0 flex items-center gap-1">
+        Explorer les Services
+      </a>
+      <span class="text-slate-300">•</span>
+      <a href="/services/new" class="text-slate-700 hover:text-emerald-600 transition flex-shrink-0 flex items-center gap-1">
+        Vendre un Service
+      </a>
+      <% if (user) { %>
+        <span class="text-slate-300">•</span>
+        <a href="/history" class="text-slate-700 hover:text-emerald-600 transition flex-shrink-0 flex items-center gap-1">
+          <i class="fa-solid fa-clock-rotate-left text-[11px] text-slate-500"></i> Historique
+        </a>
+      <% } %>
+      <% if (user && user.role === 'ADMIN') { %>
+        <span class="text-slate-300">•</span>
+        <a href="/admin/disputes" class="text-amber-600 hover:text-amber-700 font-bold flex-shrink-0 flex items-center gap-1">
+          <i class="fa-solid fa-gavel text-[11px]"></i> Arbitrage
+        </a>
+      <% } %>
+    </div>
+
+    </div>
+
     <!-- Tiroir déroulant mobile (Mobile Dropdown Menu) -->
     <div id="mobile-dropdown-menu" class="hidden md:hidden border-t border-slate-200 bg-white/95 backdrop-blur px-4 py-3 space-y-2">
       <a href="/" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition">

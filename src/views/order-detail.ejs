@@ -210,6 +210,53 @@
         <% } %>
       <% } %>
 
+      <!-- Avis / Évaluation sur la prestation terminée -->
+      <% if (order.status === 'COMPLETED') { %>
+        <% if (typeof review !== 'undefined' && review) { %>
+          <div class="bg-amber-50 border border-amber-200 p-4 sm:p-5 rounded-2xl text-xs space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-amber-900 text-sm flex items-center gap-1.5">
+                <i class="fa-solid fa-star text-amber-500"></i> Avis du client
+              </span>
+              <div class="flex text-amber-400 text-xs">
+                <% for (let i = 1; i <= 5; i++) { %>
+                  <i class="fa-solid fa-star <%= i <= review.rating ? 'text-amber-400' : 'text-slate-200' %>"></i>
+                <% } %>
+              </div>
+            </div>
+            <p class="text-slate-700 italic bg-white/80 p-3 rounded-xl border border-amber-100 text-[11px]">
+              "<%= review.comment %>"
+            </p>
+          </div>
+        <% } else if (user && user.id === order.buyerId) { %>
+          <div class="bg-white border border-slate-200 p-4 sm:p-5 rounded-2xl text-xs space-y-3 shadow-sm">
+            <h4 class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+              <i class="fa-solid fa-star text-amber-500"></i> Laisser un avis au vendeur
+            </h4>
+            <p class="text-slate-500 text-[11px]">Votre avis aidera la communauté à choisir ce travailleur.</p>
+            <form action="/orders/<%= order.id %>/review" method="POST" class="space-y-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1 text-[11px]">Note globale :</label>
+                <select name="rating" class="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold text-amber-600 bg-white" required>
+                  <option value="5">⭐⭐⭐⭐⭐ (5/5 Exceptionnel)</option>
+                  <option value="4">⭐⭐⭐⭐ (4/5 Très bien)</option>
+                  <option value="3">⭐⭐⭐ (3/5 Correct)</option>
+                  <option value="2">⭐⭐ (2/5 Décevant)</option>
+                  <option value="1">⭐ (1/5 Insatisfaisant)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1 text-[11px]">Commentaire :</label>
+                <textarea name="comment" rows="2" required placeholder="Partagez votre avis sur la qualité du service, respect des délais..." class="w-full p-2.5 border border-slate-200 rounded-xl bg-white text-xs"></textarea>
+              </div>
+              <button type="submit" class="w-full py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl shadow-sm transition">
+                Publier l'évaluation
+              </button>
+            </form>
+          </div>
+        <% } %>
+      <% } %>
+
       <!-- Actions Vendeur : Livrer la commande -->
       <% if (user && user.id === order.sellerId) { %>
         <% if (order.status === 'ESCROWED') { %>
@@ -263,7 +310,22 @@
               <div class="message-bubble flex flex-col <%= user && user.id === msg.senderId ? 'items-end' : 'items-start' %>">
                 <span class="text-[9px] sm:text-[10px] text-slate-400 mb-0.5"><%= msg.senderName %></span>
                 <div class="max-w-[85%] sm:max-w-md p-3 sm:p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-line break-words <%= user && user.id === msg.senderId ? 'bg-emerald-600 text-white rounded-br-none shadow-sm shadow-emerald-100' : 'bg-slate-100 text-slate-800 rounded-bl-none' %>">
-                  <%= msg.content %>
+                  <% if (msg.content) { %>
+                    <p><%= msg.content %></p>
+                  <% } %>
+                  <% if (msg.fileUrl) { %>
+                    <% const isImg = msg.fileUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i); %>
+                    <% if (isImg) { %>
+                      <a href="<%= msg.fileUrl %>" target="_blank" class="block mt-2 rounded-xl overflow-hidden border border-black/10 hover:opacity-95 transition">
+                        <img src="<%= msg.fileUrl %>" alt="<%= msg.fileName || 'Fichier' %>" class="max-h-48 w-full object-cover">
+                      </a>
+                    <% } else { %>
+                      <a href="<%= msg.fileUrl %>" download="<%= msg.fileName || 'fichier' %>" target="_blank" class="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl <%= user && user.id === msg.senderId ? 'bg-emerald-700/80 hover:bg-emerald-800 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-800' %> transition font-semibold text-[11px]">
+                        <i class="fa-solid fa-file-arrow-down text-sm"></i>
+                        <span class="truncate max-w-[180px]"><%= msg.fileName || 'Télécharger la pièce jointe' %></span>
+                      </a>
+                    <% } %>
+                  <% } %>
                 </div>
               </div>
             <% }) %>
@@ -272,9 +334,18 @@
           <% } %>
         </div>
 
+        <!-- Zone de statut d'upload fichier -->
+        <div id="upload-status" class="hidden px-4 py-1.5 bg-emerald-50 border-t border-emerald-100 text-[11px] text-emerald-700 font-medium flex items-center justify-between">
+          <span class="flex items-center gap-1.5"><i class="fa-solid fa-spinner fa-spin"></i> Envoi du fichier en cours...</span>
+        </div>
+
         <!-- Formulaire d'envoi en direct -->
-        <form id="chat-form" class="p-3 sm:p-4 border-t border-slate-100 flex gap-2">
-          <input type="text" id="chat-input" required autocomplete="off" placeholder="Écrire un message..." class="flex-grow text-xs px-3.5 sm:px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        <form id="chat-form" class="p-3 sm:p-4 border-t border-slate-100 flex items-center gap-2">
+          <input type="file" id="chat-file-input" class="hidden">
+          <button type="button" id="chat-attach-btn" title="Joindre un livrable ou fichier (max 25 Mo)" class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition flex-shrink-0">
+            <i class="fa-solid fa-paperclip text-sm"></i>
+          </button>
+          <input type="text" id="chat-input" autocomplete="off" placeholder="Écrire un message ou livrable..." class="flex-grow text-xs px-3.5 sm:px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
           <button type="submit" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 flex-shrink-0">
             <span>Envoyer</span> <i class="fa-solid fa-paper-plane text-[10px]"></i>
           </button>
@@ -297,6 +368,9 @@
   const messagesContainer = document.getElementById('messages-container');
   const chatForm = document.getElementById('chat-form');
   const chatInput = document.getElementById('chat-input');
+  const chatFileInput = document.getElementById('chat-file-input');
+  const chatAttachBtn = document.getElementById('chat-attach-btn');
+  const uploadStatus = document.getElementById('upload-status');
   const emptyPlaceholder = document.getElementById('empty-messages-placeholder');
 
   function scrollToBottom() {
@@ -306,22 +380,50 @@
 
   socket.emit('join_order', { orderId });
 
-  socket.on('new_message', (msg) => {
+  function renderMessageItem(msg) {
     if (emptyPlaceholder) emptyPlaceholder.style.display = 'none';
 
     const isMe = msg.senderId === currentUserId;
     const msgDiv = document.createElement('div');
     msgDiv.className = `message-bubble flex flex-col ${isMe ? 'items-end' : 'items-start'} toast-anim`;
+
+    let fileHtml = '';
+    if (msg.fileUrl) {
+      const isImg = msg.fileUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i);
+      if (isImg) {
+        fileHtml = `
+          <a href="${msg.fileUrl}" target="_blank" class="block mt-2 rounded-xl overflow-hidden border border-black/10 hover:opacity-95 transition">
+            <img src="${msg.fileUrl}" alt="${msg.fileName || 'Fichier'}" class="max-h-48 w-full object-cover">
+          </a>
+        `;
+      } else {
+        fileHtml = `
+          <a href="${msg.fileUrl}" download="${msg.fileName || 'fichier'}" target="_blank" class="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl ${isMe ? 'bg-emerald-700/80 hover:bg-emerald-800 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'} transition font-semibold text-[11px]">
+            <i class="fa-solid fa-file-arrow-down text-sm"></i>
+            <span class="truncate max-w-[180px]">${msg.fileName || 'Télécharger la pièce jointe'}</span>
+          </a>
+        `;
+      }
+    }
+
+    const contentHtml = msg.content ? `<p>${msg.content}</p>` : '';
+
     msgDiv.innerHTML = `
       <span class="text-[9px] sm:text-[10px] text-slate-400 mb-0.5">${msg.senderName}</span>
       <div class="max-w-[85%] sm:max-w-md p-3 sm:p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-line break-words ${
         isMe ? 'bg-emerald-600 text-white rounded-br-none shadow-sm shadow-emerald-100' : 'bg-slate-100 text-slate-800 rounded-bl-none'
-      }">${msg.content}</div>
+      }">
+        ${contentHtml}
+        ${fileHtml}
+      </div>
     `;
     messagesContainer.appendChild(msgDiv);
     scrollToBottom();
+  }
 
-    if (!isMe) {
+  socket.on('new_message', (msg) => {
+    renderMessageItem(msg);
+    if (msg.senderId !== currentUserId) {
       window.showToast(`Nouveau message de ${msg.senderName}`, 'info');
     }
   });
@@ -332,6 +434,55 @@
       window.location.reload();
     }, 1200);
   });
+
+  // Gestion de la pièce jointe
+  if (chatAttachBtn && chatFileInput) {
+    chatAttachBtn.addEventListener('click', () => {
+      chatFileInput.click();
+    });
+
+    chatFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (file.size > 25 * 1024 * 1024) {
+        window.showToast('Le fichier ne doit pas dépasser 25 Mo', 'error');
+        chatFileInput.value = '';
+        return;
+      }
+
+      uploadStatus.classList.remove('hidden');
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+          socket.emit('send_message', {
+            orderId,
+            senderId: currentUserId,
+            senderName: currentUserName,
+            content: chatInput.value.trim() || `Pièce jointe : ${data.fileName}`,
+            fileUrl: data.fileUrl,
+            fileName: data.fileName
+          });
+          chatInput.value = '';
+          window.showToast('Fichier envoyé avec succès !', 'success');
+        } else {
+          window.showToast(data.error || 'Erreur lors de l’envoi du fichier', 'error');
+        }
+      } catch (err) {
+        window.showToast('Erreur réseau lors de l’upload', 'error');
+      } finally {
+        uploadStatus.classList.add('hidden');
+        chatFileInput.value = '';
+      }
+    });
+  }
 
   chatForm.addEventListener('submit', (e) => {
     e.preventDefault();

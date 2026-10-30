@@ -281,10 +281,76 @@ async function notifyDisputeOpened({ order, dispute, initiator, otherParty }) {
   });
 }
 
+/**
+ * 5. Demande de retrait USDT vers Binance Pay
+ */
+async function notifyWithdrawalRequested({ user, amount, binanceId }) {
+  const amtStr = parseFloat(amount).toFixed(2);
+  
+  if (user && user.email && !user.email.endsWith('.local')) {
+    sendEmail({
+      to: user.email,
+      subject: `📤 Demande de retrait enregistrée - ${amtStr} USDT vers Binance Pay`,
+      html: getEmailTemplate({
+        title: `Votre demande de retrait est prise en compte`,
+        badge: 'Retrait en cours',
+        content: `
+          Bonjour <strong>${user.name}</strong>,<br><br>
+          Votre demande de retrait de <strong>${amtStr} USDT</strong> vers le compte Binance Pay ID <code>${binanceId}</code> a bien été enregistrée.<br>
+          Le virement sera traité sous peu.
+        `,
+        ctaText: 'Accéder à mon tableau de bord',
+        ctaUrl: 'https://51.20.182.245/dashboard'
+      })
+    });
+  }
+
+  // Notif Admin
+  sendEmail({
+    to: NOTIFICATION_EMAIL,
+    subject: `[Admin Retrait] Demande de ${amtStr} USDT par ${user.name}`,
+    html: getEmailTemplate({
+      title: `Demande de retrait Binance Pay reçue`,
+      badge: 'Demande Retrait',
+      content: `Utilisateur : ${user.name} (${user.email})<br>Montant : ${amtStr} USDT<br>Binance Pay ID : <code>${binanceId}</code>`,
+      ctaText: 'Vérifier sur le Dashboard Admin',
+      ctaUrl: 'https://51.20.182.245/dashboard'
+    })
+  });
+}
+
+/**
+ * 6. Nouvel avis déposé
+ */
+async function notifyReviewSubmitted({ review, order, seller, buyer }) {
+  if (seller && seller.email && !seller.email.endsWith('.local')) {
+    sendEmail({
+      to: seller.email,
+      subject: `⭐ Nouvel avis reçu de ${buyer.name} (${review.rating}/5)`,
+      html: getEmailTemplate({
+        title: `Vous avez reçu une nouvelle note client !`,
+        badge: 'Avis Client',
+        content: `
+          Bonjour <strong>${seller.name}</strong>,<br><br>
+          <strong>${buyer.name}</strong> a laissé une évaluation sur votre commande :<br>
+          <div class="box">
+            <strong>Note :</strong> ${review.rating} / 5 ⭐<br>
+            <strong>Commentaire :</strong> <em>"${review.comment}"</em>
+          </div>
+        `,
+        ctaText: 'Voir mon profil public',
+        ctaUrl: `https://51.20.182.245/profile/${seller.id}`
+      })
+    });
+  }
+}
+
 module.exports = {
   sendEmail,
   notifyNewOrder,
   notifyOrderDelivered,
   notifyOrderCompleted,
-  notifyDisputeOpened
+  notifyDisputeOpened,
+  notifyWithdrawalRequested,
+  notifyReviewSubmitted
 };

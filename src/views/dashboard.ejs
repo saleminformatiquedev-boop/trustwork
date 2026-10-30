@@ -44,9 +44,12 @@
         <p class="text-[11px] text-emerald-100 mt-2">Prêt pour commander ou retirer sur Binance.</p>
       </div>
 
-      <div class="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-emerald-500/50">
-        <button id="deposit-btn" class="w-full sm:w-auto px-3 py-2 bg-white text-emerald-800 text-xs font-bold rounded-lg hover:bg-emerald-50 transition flex items-center justify-center gap-1.5 shadow-sm">
-          <i class="fa-solid fa-plus text-[10px]"></i> Recharger +50 USDT (Test direct)
+      <div class="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-emerald-500/50 flex flex-wrap gap-2">
+        <button id="deposit-btn" class="flex-1 min-w-[120px] px-3 py-2 bg-white text-emerald-800 text-xs font-bold rounded-lg hover:bg-emerald-50 transition flex items-center justify-center gap-1.5 shadow-sm">
+          <i class="fa-solid fa-plus text-[10px]"></i> +50 USDT Test
+        </button>
+        <button id="open-withdraw-btn" class="flex-1 min-w-[120px] px-3 py-2 bg-emerald-800/90 hover:bg-emerald-900 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 border border-emerald-400/40 shadow-sm">
+          <i class="fa-solid fa-arrow-up-from-bracket text-[10px]"></i> Retirer USDT
         </button>
       </div>
     </div>
@@ -167,6 +170,99 @@
 
   </div>
 
+  <!-- Historique des Retraits Binance Pay -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+      <h2 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+        <i class="fa-solid fa-clock-rotate-left text-amber-500"></i> Historique des Retraits Binance Pay
+      </h2>
+      <span class="text-xs text-slate-500"><%= typeof withdrawals !== 'undefined' ? withdrawals.length : 0 %> demande(s)</span>
+    </div>
+
+    <div class="divide-y divide-slate-100" id="withdrawals-list">
+      <% if (typeof withdrawals !== 'undefined' && withdrawals.length > 0) { %>
+        <% withdrawals.forEach(w => { %>
+          <div class="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-slate-50 transition">
+            <div class="space-y-1">
+              <span class="text-[10px] text-slate-400 font-bold block">#<%= w.id %> • Binance Pay ID: <%= w.binanceId %></span>
+              <div class="text-xs font-bold text-slate-800"><%= new Date(w.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs sm:text-sm font-black text-rose-600">-<%= w.amount.toFixed(2) %> USDT</div>
+              <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 <%= w.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : (w.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800') %>">
+                <%= w.status === 'COMPLETED' ? 'Payé' : (w.status === 'REJECTED' ? 'Refusé' : 'En attente') %>
+              </span>
+            </div>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <div class="text-center py-8 text-slate-400 text-xs">
+          Aucune demande de retrait effectuée pour le moment.
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal Demande de Retrait -->
+<div id="withdraw-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 toast-anim space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+        <i class="fa-solid fa-arrow-up-from-bracket text-emerald-600"></i> Demander un Retrait USDT
+      </h3>
+      <button id="close-withdraw-modal" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-lg flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1">
+      <div class="flex justify-between">
+        <span class="text-slate-500">Solde disponible :</span>
+        <span class="font-bold text-emerald-600"><%= user.walletBalance.toFixed(2) %> USDT</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-slate-500">Binance Pay ID :</span>
+        <span class="font-bold text-slate-800"><%= user.binanceId || 'Non configuré' %></span>
+      </div>
+    </div>
+
+    <% if (!user.binanceId) { %>
+      <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-800 flex items-start gap-2">
+        <i class="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5"></i>
+        <span>Veuillez d'abord configurer votre <strong>Binance Pay ID</strong> sur le tableau de bord pour autoriser le virement.</span>
+      </div>
+    <% } %>
+
+    <form id="withdraw-form" class="space-y-4">
+      <div>
+        <div class="flex justify-between items-center mb-1">
+          <label class="text-xs font-bold text-slate-700">Montant à retirer (USDT) :</label>
+          <button type="button" id="withdraw-max-btn" class="text-[11px] font-bold text-emerald-600 hover:text-emerald-700">
+            Retirer tout
+          </button>
+        </div>
+        <div class="relative">
+          <input type="number" id="withdraw-amount-input" step="0.01" min="1" max="<%= user.walletBalance %>" required placeholder="Ex: 50.00" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          <span class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">USDT</span>
+        </div>
+      </div>
+
+      <div class="text-[11px] text-slate-500">
+        ⚡ Les fonds sont virés directement via le réseau Binance Pay après validation automatique.
+      </div>
+
+      <div class="flex gap-2">
+        <button type="button" id="cancel-withdraw-btn" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition">
+          Annuler
+        </button>
+        <button type="submit" id="submit-withdraw-btn" <%= !user.binanceId ? 'disabled' : '' %> class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5">
+          <span>Confirmer le Retrait</span>
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- Script AJAX -->
@@ -191,7 +287,7 @@
         window.showToast('Erreur réseau', 'error');
       } finally {
         depositBtn.disabled = false;
-        depositBtn.innerHTML = '<i class="fa-solid fa-plus text-[10px]"></i> Recharger +50 USDT (Test direct)';
+        depositBtn.innerHTML = '<i class="fa-solid fa-plus text-[10px]"></i> +50 USDT Test';
       }
     });
   }
@@ -214,6 +310,7 @@
         const data = await res.json();
         if (data.success) {
           window.showToast('Binance Pay ID enregistré avec succès !', 'success');
+          setTimeout(() => window.location.reload(), 1000);
         } else {
           window.showToast('Erreur lors de la mise à jour', 'error');
         }
@@ -222,6 +319,76 @@
       } finally {
         binanceSaveBtn.disabled = false;
         binanceSaveBtn.textContent = 'Enregistrer mon Binance ID';
+      }
+    });
+  }
+
+  // Gestion du Modal de Retrait
+  const openWithdrawBtn = document.getElementById('open-withdraw-btn');
+  const withdrawModal = document.getElementById('withdraw-modal');
+  const closeWithdrawModal = document.getElementById('close-withdraw-modal');
+  const cancelWithdrawBtn = document.getElementById('cancel-withdraw-btn');
+  const withdrawForm = document.getElementById('withdraw-form');
+  const withdrawAmountInput = document.getElementById('withdraw-amount-input');
+  const withdrawMaxBtn = document.getElementById('withdraw-max-btn');
+  const submitWithdrawBtn = document.getElementById('submit-withdraw-btn');
+
+  function openModal() {
+    if (withdrawModal) {
+      withdrawModal.classList.remove('hidden');
+      withdrawModal.classList.add('flex');
+    }
+  }
+
+  function closeModal() {
+    if (withdrawModal) {
+      withdrawModal.classList.add('hidden');
+      withdrawModal.classList.remove('flex');
+    }
+  }
+
+  if (openWithdrawBtn) openWithdrawBtn.addEventListener('click', openModal);
+  if (closeWithdrawModal) closeWithdrawModal.addEventListener('click', closeModal);
+  if (cancelWithdrawBtn) cancelWithdrawBtn.addEventListener('click', closeModal);
+
+  if (withdrawMaxBtn && withdrawAmountInput) {
+    withdrawMaxBtn.addEventListener('click', () => {
+      const currentBal = parseFloat(document.getElementById('dash-wallet-balance').textContent) || 0;
+      withdrawAmountInput.value = currentBal.toFixed(2);
+    });
+  }
+
+  if (withdrawForm) {
+    withdrawForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const amount = parseFloat(withdrawAmountInput.value);
+      if (isNaN(amount) || amount <= 0) {
+        window.showToast('Montant invalide', 'error');
+        return;
+      }
+
+      submitWithdrawBtn.disabled = true;
+      submitWithdrawBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Traitement...';
+
+      try {
+        const res = await fetch('/api/wallet/withdraw', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount })
+        });
+        const data = await res.json();
+        if (data.success) {
+          window.showToast(data.message || 'Retrait demandé avec succès !', 'success');
+          closeModal();
+          setTimeout(() => window.location.reload(), 1200);
+        } else {
+          window.showToast(data.error || 'Erreur lors du retrait', 'error');
+        }
+      } catch (err) {
+        window.showToast('Erreur réseau', 'error');
+      } finally {
+        submitWithdrawBtn.disabled = false;
+        submitWithdrawBtn.innerHTML = 'Confirmer le Retrait';
       }
     });
   }
