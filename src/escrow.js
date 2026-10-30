@@ -1,5 +1,6 @@
 // src/escrow.js
 const crypto = require('crypto');
+const emailService = require('./services/email');
 
 function generateId(prefix = 'ord_') {
   return prefix + crypto.randomBytes(6).toString('hex');
@@ -10,21 +11,29 @@ function generateId(prefix = 'ord_') {
  */
 async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements }) {
   const client = await pool.connect();
+  let createdOrder = null;
+  let srv = null;
+  let buyerUser = null;
+  let sellerUser = null;
+
   try {
     await client.query('BEGIN');
 
-    // 1. Verrouiller le service et l'acheteur (FOR UPDATE pour éviter toute race condition)
+    // 1. Verrouiller le service et l'acheteur
     const srvRes = await client.query('SELECT * FROM services WHERE id = $1 FOR UPDATE', [serviceId]);
-    const service = srvRes.rows[0];
-    if (!service) throw new Error("Service introuvable");
-    if (service.sellerId === buyerId) throw new Error("Vous ne pouvez pas acheter votre propre service");
+    srv = srvRes.rows[0];
+    if (!srv) throw new Error("Service introuvable");
+    if (srv.sellerId === buyerId) throw new Error("Vous ne pouvez pas acheter votre propre service");
 
     const buyerRes = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [buyerId]);
-    const buyer = buyerRes.rows[0];
-    if (!buyer) throw new Error("Acheteur introuvable");
+    buyerUser = buyerRes.rows[0];
+    if (!buyerUser) throw new Error("Acheteur introuvable");
 
-    const price = parseFloat(service.price);
-    const balance = parseFloat(buyer.walletBalance);
+    const sellerRes = await client.query('SELECT * FROM users WHERE id = $1', [srv.sellerId]);
+    sellerUser = sellerRes.rows[0];
+
+    const price = parseFloat(srv.price);
+    const balance = parseFloat(buyerUser.walletBalance);
 
     if (balance < price) {
       throw new Error(`Solde insuffisant. Vous avez ${balance.toFixed(2)} USDT et ce service coûte ${price.toFixed(2)} USDT`);
@@ -44,7 +53,8 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
       INSERT INTO orders (id, "serviceId", "buyerId", "sellerId", amount, status, requirements)
       VALUES ($1, $2, $3, $4, $5, 'ESCROWED', $6)
       RETURNING *
-    `, [orderId, service.id, buyer.id, service.sellerId, price, requirements || "Aucune consigne spécifique"]);
+    `, [orderId, srv.id, buyerUser.id, srv.sellerId, price, requirements || "Aucune consigne spécifique"]);
+    createdOrder = orderRes.rows[0];
 
     // 4. Message initial de confirmation
     const msgId = generateId('msg_');
@@ -54,18 +64,29 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
     `, [
       msgId,
       orderId,
-      buyer.id,
+      buyerUser.id,
       `Commande confirmée ! Un montant de ${price.toFixed(2)} USDT a été prélevé et sécurisé sous séquestre. Le travailleur a été notifié.`
     ]);
 
     await client.query('COMMIT');
-    return orderRes.rows[0];
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
   } finally {
     client.release();
   }
+
+  // Envoi asynchrone des emails (non bloquant pour la transaction)
+  if (createdOrder && srv && buyerUser && sellerUser) {
+    emailService.notifyNewOrder({
+      order: createdOrder,
+      service: srv,
+      buyer: buyerUser,
+      seller: sellerUser
+    }).catch(e => console.error("Erreur email notifyNewOrder:", e));
+  }
+
+  return createdOrder;
 }
 
 /**
@@ -73,6 +94,10 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
  */
 async function deliverOrder(pool, { orderId, sellerId, deliveryNote }) {
   const client = await pool.connect();
+  let updatedOrder = null;
+  let buyerUser = null;
+  let sellerUser = null;
+
   try {
     await client.query('BEGIN');
 
@@ -90,6 +115,7 @@ async function deliverOrder(pool, { orderId, sellerId, deliveryNote }) {
       WHERE id = $2
       RETURNING *
     `, [deliveryNote, orderId]);
+    updatedOrder = updatedRes.rows[0];
 
     const msgId = generateId('msg_');
     await client.query(`
@@ -102,14 +128,29 @@ async function deliverOrder(pool, { orderId, sellerId, deliveryNote }) {
       `📦 Le vendeur a soumis sa livraison !\n\nNote de livraison : ${deliveryNote}`
     ]);
 
+    const bRes = await client.query('SELECT * FROM users WHERE id = $1', [order.buyerId]);
+    const sRes = await client.query('SELECT * FROM users WHERE id = $1', [order.sellerId]);
+    buyerUser = bRes.rows[0];
+    sellerUser = sRes.rows[0];
+
     await client.query('COMMIT');
-    return updatedRes.rows[0];
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
   } finally {
     client.release();
   }
+
+  // Envoi email notification livraison à l'acheteur
+  if (updatedOrder && buyerUser && sellerUser) {
+    emailService.notifyOrderDelivered({
+      order: updatedOrder,
+      buyer: buyerUser,
+      seller: sellerUser
+    }).catch(e => console.error("Erreur email notifyOrderDelivered:", e));
+  }
+
+  return updatedOrder;
 }
 
 /**
@@ -117,6 +158,10 @@ async function deliverOrder(pool, { orderId, sellerId, deliveryNote }) {
  */
 async function completeOrderAndReleaseFunds(pool, { orderId, buyerId }) {
   const client = await pool.connect();
+  let updatedOrder = null;
+  let buyerUser = null;
+  let sellerUser = null;
+
   try {
     await client.query('BEGIN');
 
@@ -152,6 +197,7 @@ async function completeOrderAndReleaseFunds(pool, { orderId, buyerId }) {
       WHERE id = $1
       RETURNING *
     `, [orderId]);
+    updatedOrder = updatedRes.rows[0];
 
     const msgId = generateId('msg_');
     await client.query(`
@@ -164,14 +210,29 @@ async function completeOrderAndReleaseFunds(pool, { orderId, buyerId }) {
       `✅ Commande validée par l'acheteur ! Les fonds sous séquestre (${amount.toFixed(2)} USDT) ont été transférés avec succès au travailleur.`
     ]);
 
+    const bRes = await client.query('SELECT * FROM users WHERE id = $1', [order.buyerId]);
+    const sRes = await client.query('SELECT * FROM users WHERE id = $1', [order.sellerId]);
+    buyerUser = bRes.rows[0];
+    sellerUser = sRes.rows[0];
+
     await client.query('COMMIT');
-    return updatedRes.rows[0];
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
   } finally {
     client.release();
   }
+
+  // Envoi email gain débloqué au travailleur
+  if (updatedOrder && buyerUser && sellerUser) {
+    emailService.notifyOrderCompleted({
+      order: updatedOrder,
+      buyer: buyerUser,
+      seller: sellerUser
+    }).catch(e => console.error("Erreur email notifyOrderCompleted:", e));
+  }
+
+  return updatedOrder;
 }
 
 /**
@@ -179,16 +240,21 @@ async function completeOrderAndReleaseFunds(pool, { orderId, buyerId }) {
  */
 async function openDispute(pool, { orderId, userId, reason, details }) {
   const client = await pool.connect();
+  let createdDispute = null;
+  let ord = null;
+  let initiatorUser = null;
+  let otherPartyUser = null;
+
   try {
     await client.query('BEGIN');
 
     const ordRes = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
-    const order = ordRes.rows[0];
-    if (!order) throw new Error("Commande introuvable");
-    if (order.buyerId !== userId && order.sellerId !== userId) {
+    ord = ordRes.rows[0];
+    if (!ord) throw new Error("Commande introuvable");
+    if (ord.buyerId !== userId && ord.sellerId !== userId) {
       throw new Error("Seules les parties de la transaction peuvent ouvrir une enquête");
     }
-    if (order.status === "COMPLETED" || order.status === "REFUNDED") {
+    if (ord.status === "COMPLETED" || ord.status === "REFUNDED") {
       throw new Error("Impossible d'ouvrir un litige sur une commande déjà finalisée");
     }
 
@@ -200,6 +266,7 @@ async function openDispute(pool, { orderId, userId, reason, details }) {
       VALUES ($1, $2, $3, $4, $5, 'OPEN')
       RETURNING *
     `, [disputeId, orderId, userId, reason, details]);
+    createdDispute = dispRes.rows[0];
 
     const msgId = generateId('msg_');
     await client.query(`
@@ -212,14 +279,31 @@ async function openDispute(pool, { orderId, userId, reason, details }) {
       `⚠️ ENQUÊTE OUVERTE !\nMotif : ${reason}\nDétails : ${details}\n\n🔒 Les fonds restent entièrement bloqués et protégés par la plateforme jusqu'à décision d'arbitrage.`
     ]);
 
+    const otherPartyId = ord.buyerId === userId ? ord.sellerId : ord.buyerId;
+    const initRes = await client.query('SELECT * FROM users WHERE id = $1', [userId]);
+    const otherRes = await client.query('SELECT * FROM users WHERE id = $1', [otherPartyId]);
+    initiatorUser = initRes.rows[0];
+    otherPartyUser = otherRes.rows[0];
+
     await client.query('COMMIT');
-    return dispRes.rows[0];
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
   } finally {
     client.release();
   }
+
+  // Alerte email litige
+  if (createdDispute && ord && initiatorUser && otherPartyUser) {
+    emailService.notifyDisputeOpened({
+      order: ord,
+      dispute: createdDispute,
+      initiator: initiatorUser,
+      otherParty: otherPartyUser
+    }).catch(e => console.error("Erreur email notifyDisputeOpened:", e));
+  }
+
+  return createdDispute;
 }
 
 /**
