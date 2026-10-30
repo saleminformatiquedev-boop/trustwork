@@ -1,6 +1,6 @@
 <%- include('partials/header', { title: 'Commande #' + order.id }) %>
 
-<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10" id="order-page-root" data-order-id="<%= order.id %>">
 
   <!-- Header Commande -->
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
@@ -15,8 +15,8 @@
       </h1>
     </div>
 
-    <!-- Badge Statut -->
-    <div class="flex items-center gap-3">
+    <!-- Badge Statut dynamique -->
+    <div id="status-badge-container">
       <% if (order.status === 'ESCROWED') { %>
         <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
           <i class="fa-solid fa-lock text-blue-500"></i> Fonds sous Séquestre (<%= order.amount.toFixed(2) %> USDT)
@@ -43,11 +43,11 @@
 
   <!-- Stepper Visuel du Séquestre -->
   <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8">
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-center" id="escrow-stepper">
       
       <!-- Étape 1 -->
       <div class="flex flex-col items-center">
-        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm <%= order.status !== 'CREATED' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600' %> mb-2">
+        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm bg-emerald-600 text-white mb-2">
           <i class="fa-solid fa-lock"></i>
         </div>
         <span class="text-xs font-bold text-slate-800">1. Séquestre Déposé</span>
@@ -56,7 +56,7 @@
 
       <!-- Étape 2 -->
       <div class="flex flex-col items-center">
-        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm <%= order.status === 'ESCROWED' ? 'bg-blue-600 text-white ring-4 ring-blue-100' : (order.status === 'DELIVERED' || order.status === 'COMPLETED' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600') %> mb-2">
+        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm <%= order.status === 'ESCROWED' ? 'bg-blue-600 text-white ring-4 ring-blue-100' : 'bg-emerald-600 text-white' %> mb-2">
           <i class="fa-solid fa-hammer"></i>
         </div>
         <span class="text-xs font-bold text-slate-800">2. Réalisation</span>
@@ -86,7 +86,7 @@
 
   <!-- Alerte Litige si Enquête ouverte -->
   <% if (dispute) { %>
-    <div class="mb-8 p-6 rounded-2xl bg-rose-50 border border-rose-200">
+    <div class="mb-8 p-6 rounded-2xl bg-rose-50 border border-rose-200" id="dispute-box">
       <div class="flex items-start gap-4">
         <span class="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center text-lg flex-shrink-0">
           <i class="fa-solid fa-scale-balanced"></i>
@@ -120,7 +120,7 @@
 
               <form action="/disputes/<%= dispute.id %>/resolve" method="POST" class="inline">
                 <input type="hidden" name="resolution" value="PAY_SELLER">
-                <input type="hidden" name="resolutionNote" value="Preuves de livraison jugées conformes. Paiement débloqué au travailleur.">
+                <input type="hidden" name="resolutionNote" value="Preuves de livraison conformes. Paiement débloqué au travailleur.">
                 <button type="submit" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm">
                   💰 Payer le travailleur (<%= order.amount.toFixed(2) %> USDT)
                 </button>
@@ -132,7 +132,7 @@
     </div>
   <% } %>
 
-  <!-- Actions Disponibles selon le Rôle -->
+  <!-- Actions Disponibles -->
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
     
     <!-- Colonne Gauche : Actions & Consignes -->
@@ -229,12 +229,12 @@
 
     </div>
 
-    <!-- Colonne Droite : Fil de Discussion & Livraison -->
+    <!-- Colonne Droite : Fil de Discussion & Livraison en temps réel -->
     <div class="lg:col-span-2 space-y-6">
       
       <!-- Section Livraison si livrée -->
       <% if (order.deliveryNote) { %>
-        <div class="bg-amber-50/70 border border-amber-200 p-6 rounded-2xl">
+        <div class="bg-amber-50/70 border border-amber-200 p-6 rounded-2xl" id="delivery-note-container">
           <div class="flex items-center gap-2 font-bold text-amber-900 text-sm mb-2">
             <i class="fa-solid fa-box text-amber-600"></i> Travail Livré par <%= order.sellerName %>
           </div>
@@ -244,36 +244,38 @@
         </div>
       <% } %>
 
-      <!-- Fil de discussion sécurisé -->
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[500px]">
+      <!-- Fil de discussion sécurisé Socket.io -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[520px]">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
-            <i class="fa-regular fa-comments text-emerald-600"></i> Fil d'échange officiel
+            <i class="fa-regular fa-comments text-emerald-600"></i> Messagerie en temps réel
           </h3>
-          <span class="text-[11px] text-slate-400">Tous les échanges sont archivés pour arbitrage</span>
+          <span class="inline-flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Connecté
+          </span>
         </div>
 
-        <!-- Messages -->
-        <div class="flex-grow p-6 overflow-y-auto space-y-4">
+        <!-- Zone des messages instantanés -->
+        <div id="messages-container" class="flex-grow p-6 overflow-y-auto space-y-4">
           <% if (messages && messages.length > 0) { %>
             <% messages.forEach(msg => { %>
-              <div class="flex flex-col <%= user && user.id === msg.senderId ? 'items-end' : 'items-start' %>">
+              <div class="message-bubble flex flex-col <%= user && user.id === msg.senderId ? 'items-end' : 'items-start' %>">
                 <span class="text-[10px] text-slate-400 mb-1"><%= msg.senderName %></span>
-                <div class="max-w-md p-3.5 rounded-2xl text-xs leading-relaxed <%= user && user.id === msg.senderId ? 'bg-emerald-600 text-white rounded-br-none' : 'bg-slate-100 text-slate-800 rounded-bl-none' %>">
+                <div class="max-w-md p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-line <%= user && user.id === msg.senderId ? 'bg-emerald-600 text-white rounded-br-none shadow-sm shadow-emerald-100' : 'bg-slate-100 text-slate-800 rounded-bl-none' %>">
                   <%= msg.content %>
                 </div>
               </div>
             <% }) %>
           <% } else { %>
-            <p class="text-center text-xs text-slate-400 py-10">Aucun message pour le moment.</p>
+            <p id="empty-messages-placeholder" class="text-center text-xs text-slate-400 py-10">Aucun message pour le moment.</p>
           <% } %>
         </div>
 
-        <!-- Formulaire d'envoi -->
-        <form action="/orders/<%= order.id %>/messages" method="POST" class="p-4 border-t border-slate-100 flex gap-2">
-          <input type="text" name="content" required placeholder="Écrire un message..." class="flex-grow text-xs px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-          <button type="submit" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition">
-            <i class="fa-solid fa-paper-plane"></i>
+        <!-- Formulaire d'envoi en direct (AJAX + WebSockets) -->
+        <form id="chat-form" class="p-4 border-t border-slate-100 flex gap-2">
+          <input type="text" id="chat-input" required autocomplete="off" placeholder="Écrire un message en direct..." class="flex-grow text-xs px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          <button type="submit" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5">
+            <span>Envoyer</span> <i class="fa-solid fa-paper-plane text-[10px]"></i>
           </button>
         </form>
       </div>
@@ -283,5 +285,73 @@
   </div>
 
 </div>
+
+<!-- Script temps réel Socket.io pour la messagerie et les alertes de statut -->
+<script>
+  const orderId = "<%= order.id %>";
+  const currentUserId = "<%= user ? user.id : '' %>";
+  const currentUserName = "<%= user ? user.name : 'Moi' %>";
+  const socket = io();
+
+  const messagesContainer = document.getElementById('messages-container');
+  const chatForm = document.getElementById('chat-form');
+  const chatInput = document.getElementById('chat-input');
+  const emptyPlaceholder = document.getElementById('empty-messages-placeholder');
+
+  // Défilement automatique vers le bas
+  function scrollToBottom() {
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+  scrollToBottom();
+
+  // Rejoindre la room de la commande en temps réel
+  socket.emit('join_order', { orderId });
+
+  // Écouter les nouveaux messages reçus en direct
+  socket.on('new_message', (msg) => {
+    if (emptyPlaceholder) emptyPlaceholder.style.display = 'none';
+
+    const isMe = msg.senderId === currentUserId;
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message-bubble flex flex-col ${isMe ? 'items-end' : 'items-start'} toast-anim`;
+    msgDiv.innerHTML = `
+      <span class="text-[10px] text-slate-400 mb-1">${msg.senderName}</span>
+      <div class="max-w-md p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-line ${
+        isMe ? 'bg-emerald-600 text-white rounded-br-none shadow-sm shadow-emerald-100' : 'bg-slate-100 text-slate-800 rounded-bl-none'
+      }">${msg.content}</div>
+    `;
+    messagesContainer.appendChild(msgDiv);
+    scrollToBottom();
+
+    if (!isMe) {
+      window.showToast(`Nouveau message de ${msg.senderName}`, 'info');
+    }
+  });
+
+  // Écouter les changements d'état du séquestre en direct
+  socket.on('order_updated', (data) => {
+    window.showToast(`Statut mis à jour : ${data.status}`, 'success');
+    setTimeout(() => {
+      window.location.reload();
+    }, 1200);
+  });
+
+  // Envoi d'un message via Socket.io
+  chatForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const content = chatInput.value.trim();
+    if (!content) return;
+
+    socket.emit('send_message', {
+      orderId,
+      senderId: currentUserId,
+      senderName: currentUserName,
+      content
+    });
+
+    chatInput.value = '';
+    chatInput.focus();
+  });
+</script>
 
 <%- include('partials/footer') %>

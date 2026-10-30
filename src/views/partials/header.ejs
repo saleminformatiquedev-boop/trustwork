@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= typeof title !== 'undefined' ? title + ' | ' : '' %>TrustWork - Services avec Séquestre Garanti</title>
-  <!-- Tailwind CSS CDN pour un rendu immédiat et sans compilation préalable -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -23,11 +22,22 @@
     }
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    @keyframes slideIn {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .toast-anim { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+  </style>
 </head>
 <body class="flex flex-col min-h-screen text-slate-800 antialiased">
 
+  <!-- Système global de Toasts dynamiques -->
+  <div id="toast-container" class="fixed top-20 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
   <!-- Navbar -->
-  <header class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200">
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       
       <!-- Logo -->
@@ -52,17 +62,15 @@
       <!-- User Area / Auth -->
       <div class="flex items-center gap-4">
         <% if (user) { %>
-          <!-- Balances Badges -->
+          <!-- Balances Badges dynamiques -->
           <div class="hidden sm:flex items-center gap-2 bg-slate-100 py-1.5 px-3 rounded-full text-xs font-semibold">
-            <span class="text-emerald-700 flex items-center gap-1" title="Solde disponible dans votre portefeuille">
-              <i class="fa-solid fa-wallet"></i> <%= user.walletBalance.toFixed(2) %> €
+            <span class="text-emerald-700 flex items-center gap-1" title="Solde disponible USDT">
+              <i class="fa-solid fa-wallet"></i> <span id="header-wallet-balance"><%= user.walletBalance.toFixed(2) %></span> USDT
             </span>
-            <% if (user.escrowBalance > 0) { %>
-              <span class="text-slate-300">|</span>
-              <span class="text-amber-700 flex items-center gap-1" title="Argent actuellement sous séquestre (sécurisé)">
-                <i class="fa-solid fa-lock"></i> <%= user.escrowBalance.toFixed(2) %> €
-              </span>
-            <% } %>
+            <span class="text-slate-300">|</span>
+            <span class="text-amber-700 flex items-center gap-1" title="Argent actuellement sous séquestre">
+              <i class="fa-solid fa-lock"></i> <span id="header-escrow-balance"><%= user.escrowBalance.toFixed(2) %></span> USDT
+            </span>
           </div>
 
           <a href="/dashboard" class="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-slate-100 transition">
@@ -83,5 +91,24 @@
 
     </div>
   </header>
+
+  <script>
+    // Helper universel de Toast dynamique
+    window.showToast = function(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      const bg = type === 'success' ? 'bg-emerald-600' : (type === 'error' ? 'bg-rose-600' : 'bg-slate-800');
+      const icon = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
+      toast.className = `toast-anim pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl text-white text-xs font-semibold shadow-lg ${bg}`;
+      toast.innerHTML = `<i class="fa-solid ${icon} text-sm"></i> <span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.4s';
+        setTimeout(() => toast.remove(), 400);
+      }, 3500);
+    };
+  </script>
 
   <main class="flex-grow">

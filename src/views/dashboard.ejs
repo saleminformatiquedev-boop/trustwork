@@ -26,7 +26,7 @@
     </div>
   </div>
 
-  <!-- Cartes Portefeuille Binance & Escrow -->
+  <!-- Cartes Portefeuille Binance & Escrow Dynamiques -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
     
     <!-- Solde Disponible -->
@@ -37,17 +37,15 @@
           <i class="fa-solid fa-wallet text-base"></i>
         </div>
         <div class="text-3xl font-black">
-          <%= user.walletBalance.toFixed(2) %> <span class="text-lg font-bold">USDT</span>
+          <span id="dash-wallet-balance"><%= user.walletBalance.toFixed(2) %></span> <span class="text-lg font-bold">USDT</span>
         </div>
         <p class="text-[11px] text-emerald-100 mt-2">Prêt pour commander ou retirer sur Binance.</p>
       </div>
 
       <div class="mt-6 pt-4 border-t border-emerald-500/50 flex gap-2">
-        <form action="/wallet/deposit-test" method="POST" class="inline">
-          <button type="submit" class="px-3 py-1.5 bg-white text-emerald-800 text-xs font-bold rounded-lg hover:bg-emerald-50 transition">
-            + Recharger 50 USDT (Test)
-          </button>
-        </form>
+        <button id="deposit-btn" class="px-3 py-1.5 bg-white text-emerald-800 text-xs font-bold rounded-lg hover:bg-emerald-50 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-plus"></i> Recharger +50 USDT (Test direct)
+        </button>
       </div>
     </div>
 
@@ -59,7 +57,7 @@
           <i class="fa-solid fa-lock text-amber-500 text-base"></i>
         </div>
         <div class="text-3xl font-black text-slate-900">
-          <%= user.escrowBalance.toFixed(2) %> <span class="text-lg font-bold text-slate-400">USDT</span>
+          <span id="dash-escrow-balance"><%= user.escrowBalance.toFixed(2) %></span> <span class="text-lg font-bold text-slate-400">USDT</span>
         </div>
         <p class="text-[11px] text-slate-500 mt-2">
           Fonds bloqués dans des commandes en attente de livraison ou de validation.
@@ -71,7 +69,7 @@
       </div>
     </div>
 
-    <!-- Intégration Binance Pay -->
+    <!-- Intégration Binance Pay Dynamique -->
     <div class="bg-slate-900 text-white p-6 rounded-2xl shadow-sm flex flex-col justify-between">
       <div>
         <div class="flex items-center justify-between text-amber-400 text-xs font-bold mb-2">
@@ -83,9 +81,9 @@
         <p class="text-xs text-slate-300 leading-relaxed mb-3">
           Configurez votre Binance Pay ID pour recevoir vos paiements directement sur votre compte Binance.
         </p>
-        <form action="/wallet/update-binance" method="POST" class="space-y-2">
-          <input type="text" name="binanceId" value="<%= user.binanceId || '' %>" placeholder="Votre Binance Pay ID (ex: 123456789)" class="w-full text-xs px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-400">
-          <button type="submit" class="w-full py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg transition">
+        <form id="binance-form" class="space-y-2">
+          <input type="text" id="binanceId-input" name="binanceId" value="<%= user.binanceId || '' %>" placeholder="Votre Binance Pay ID (ex: 123456789)" class="w-full text-xs px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-400">
+          <button type="submit" id="binance-save-btn" class="w-full py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg transition">
             Enregistrer mon Binance ID
           </button>
         </form>
@@ -168,5 +166,65 @@
   </div>
 
 </div>
+
+<!-- Script interactif AJAX sans rechargement de page -->
+<script>
+  // Recharge rapide USDT en AJAX
+  const depositBtn = document.getElementById('deposit-btn');
+  if (depositBtn) {
+    depositBtn.addEventListener('click', async () => {
+      depositBtn.disabled = true;
+      depositBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Rechargement...';
+      try {
+        const res = await fetch('/api/wallet/deposit-test', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('dash-wallet-balance').textContent = data.newWalletBalance.toFixed(2);
+          const headerWallet = document.getElementById('header-wallet-balance');
+          if (headerWallet) headerWallet.textContent = data.newWalletBalance.toFixed(2);
+          window.showToast('+50 USDT crédités avec succès !', 'success');
+        } else {
+          window.showToast(data.error || 'Erreur lors du dépôt', 'error');
+        }
+      } catch (err) {
+        window.showToast('Erreur réseau', 'error');
+      } finally {
+        depositBtn.disabled = false;
+        depositBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Recharger +50 USDT (Test direct)';
+      }
+    });
+  }
+
+  // Enregistrement Binance ID en AJAX
+  const binanceForm = document.getElementById('binance-form');
+  const binanceInput = document.getElementById('binanceId-input');
+  const binanceSaveBtn = document.getElementById('binance-save-btn');
+
+  if (binanceForm) {
+    binanceForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      binanceSaveBtn.disabled = true;
+      binanceSaveBtn.textContent = 'Enregistrement...';
+      try {
+        const res = await fetch('/api/wallet/update-binance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ binanceId: binanceInput.value.trim() })
+        });
+        const data = await res.json();
+        if (data.success) {
+          window.showToast('Binance Pay ID enregistré avec succès !', 'success');
+        } else {
+          window.showToast('Erreur lors de la mise à jour', 'error');
+        }
+      } catch (err) {
+        window.showToast('Erreur réseau', 'error');
+      } finally {
+        binanceSaveBtn.disabled = false;
+        binanceSaveBtn.textContent = 'Enregistrer mon Binance ID';
+      }
+    });
+  }
+</script>
 
 <%- include('partials/footer') %>

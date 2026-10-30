@@ -1,16 +1,21 @@
 // src/server.js
 require('dotenv').config();
+const http = require('http');
 const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
 const path = require('path');
 const crypto = require('crypto');
+const { Server } = require('socket.io');
 
 const { pool, initDatabase } = require('./db');
 const { setupAuth, ensureAuthenticated, normalizeUser } = require('./auth');
 const escrow = require('./escrow');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
 const PORT = process.env.PORT || 3000;
 
 // Configurations Express & Middleware
@@ -43,7 +48,7 @@ app.use((req, res, next) => {
 // Setup auth
 setupAuth(app, pool);
 
-// Helper pour formater les prix / nombres dans les vues
+// Helper de formatage
 function formatRows(rows) {
   return rows.map(r => ({
     ...r,
@@ -55,10 +60,48 @@ function formatRows(rows) {
 }
 
 // ==========================================
+// SOCKET.IO (MESSAGERIE & SÉQUESTRE TEMPS RÉEL)
+// ==========================================
+io.on('connection', (socket) => {
+  // Rejoindre la room de la commande
+  socket.on('join_order', ({ orderId }) => {
+    socket.join(`order_${orderId}`);
+  });
+
+  // Nouveau message de chat en direct
+  socket.on('send_message', async ({ orderId, senderId, senderName, content }) => {
+    try {
+      if (!content || !content.trim()) return;
+
+      const newId = 'msg_' + crypto.randomBytes(6).toString('hex');
+      const insertRes = await pool.query(`
+        INSERT INTO messages (id, "orderId", "senderId", content)
+        VALUES ($1, $2, $3, $4)
+        RETURNING *
+      `, [newId, orderId, senderId, content.trim()]);
+
+      const savedMsg = insertRes.rows[0];
+
+      // Diffuser à toute la room de la commande
+      io.to(`order_${orderId}`).emit('new_message', {
+        id: savedMsg.id,
+        orderId,
+        senderId,
+        senderName: senderName || 'Utilisateur',
+        content: savedMsg.content,
+        createdAt: savedMsg.createdAt
+      });
+    } catch (err) {
+      console.error("Erreur socket send_message :", err);
+    }
+  });
+});
+
+// ==========================================
 // ROUTES PUBLIQUES
 // ==========================================
 
-// Page d'accueil : Liste des services
+// Page d'accueil : Catalogue des services
 app.get('/', async (req, res) => {
   try {
     const srvRes = await pool.query(`
@@ -170,7 +213,6 @@ app.get('/orders/:id', ensureAuthenticated, async (req, res) => {
     if (ordRes.rows.length === 0) return res.status(404).send("Commande introuvable");
     const order = formatRows(ordRes.rows)[0];
 
-    // Vérification des droits d'accès
     if (req.user.role !== 'ADMIN' && req.user.id !== order.buyerId && req.user.id !== order.sellerId) {
       return res.status(403).send("Accès refusé à cette commande");
     }
@@ -192,14 +234,16 @@ app.get('/orders/:id', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// Livraison par le vendeur
+// Livraison par le vendeur (notifie en direct via Socket.io)
 app.post('/orders/:id/deliver', ensureAuthenticated, async (req, res) => {
   try {
-    await escrow.deliverOrder(pool, {
+    const updated = await escrow.deliverOrder(pool, {
       orderId: req.params.id,
       sellerId: req.user.id,
       deliveryNote: req.body.deliveryNote
     });
+
+    io.to(`order_${req.params.id}`).emit('order_updated', { status: 'DELIVERED', order: updated });
     res.redirect('/orders/' + req.params.id);
   } catch (err) {
     res.status(400).send("Erreur: " + err.message);
@@ -209,10 +253,12 @@ app.post('/orders/:id/deliver', ensureAuthenticated, async (req, res) => {
 // Validation et déblocage des fonds par l'acheteur
 app.post('/orders/:id/complete', ensureAuthenticated, async (req, res) => {
   try {
-    await escrow.completeOrderAndReleaseFunds(pool, {
+    const updated = await escrow.completeOrderAndReleaseFunds(pool, {
       orderId: req.params.id,
       buyerId: req.user.id
     });
+
+    io.to(`order_${req.params.id}`).emit('order_updated', { status: 'COMPLETED', order: updated });
     res.redirect('/orders/' + req.params.id);
   } catch (err) {
     res.status(400).send("Erreur: " + err.message);
@@ -229,27 +275,11 @@ app.post('/orders/:id/dispute', ensureAuthenticated, async (req, res) => {
       reason,
       details
     });
+
+    io.to(`order_${req.params.id}`).emit('order_updated', { status: 'DISPUTED' });
     res.redirect('/orders/' + req.params.id);
   } catch (err) {
     res.status(400).send("Erreur: " + err.message);
-  }
-});
-
-// Message dans le fil de commande
-app.post('/orders/:id/messages', ensureAuthenticated, async (req, res) => {
-  try {
-    const content = req.body.content;
-    if (!content || !content.trim()) return res.redirect('/orders/' + req.params.id);
-
-    const newId = 'msg_' + crypto.randomBytes(6).toString('hex');
-    await pool.query(`
-      INSERT INTO messages (id, "orderId", "senderId", content)
-      VALUES ($1, $2, $3, $4)
-    `, [newId, req.params.id, req.user.id, content.trim()]);
-
-    res.redirect('/orders/' + req.params.id);
-  } catch (err) {
-    res.status(500).send("Erreur message: " + err.message);
   }
 });
 
@@ -290,24 +320,30 @@ app.get('/dashboard', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// Dépôt de test USDT
-app.post('/wallet/deposit-test', ensureAuthenticated, async (req, res) => {
+// API AJAX : Recharger le solde USDT sans recharger la page
+app.post('/api/wallet/deposit-test', ensureAuthenticated, async (req, res) => {
   try {
-    await pool.query('UPDATE users SET "walletBalance" = "walletBalance" + 50.00 WHERE id = $1', [req.user.id]);
-    res.redirect('/dashboard');
+    const upd = await pool.query(`
+      UPDATE users 
+      SET "walletBalance" = "walletBalance" + 50.00 
+      WHERE id = $1 
+      RETURNING "walletBalance"
+    `, [req.user.id]);
+
+    res.json({ success: true, newWalletBalance: parseFloat(upd.rows[0].walletBalance) });
   } catch (err) {
-    res.status(500).send("Erreur: " + err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Enregistrer Binance Pay ID
-app.post('/wallet/update-binance', ensureAuthenticated, async (req, res) => {
+// API AJAX : Enregistrer Binance Pay ID sans recharger la page
+app.post('/api/wallet/update-binance', ensureAuthenticated, async (req, res) => {
   try {
     const { binanceId } = req.body;
     await pool.query('UPDATE users SET "binanceId" = $1 WHERE id = $2', [binanceId, req.user.id]);
-    res.redirect('/dashboard');
+    res.json({ success: true, binanceId });
   } catch (err) {
-    res.status(500).send("Erreur: " + err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -354,10 +390,11 @@ app.post('/disputes/:id/resolve', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// Initialiser les tables PostgreSQL puis démarrer le serveur
+// Initialiser PostgreSQL et démarrer le serveur Socket.io
 initDatabase().then(() => {
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`\n🚀 Serveur TrustWork démarré avec succès sur http://localhost:${PORT}`);
+    console.log(`⚡ WebSocket / Socket.io : Actif (Temps réel)`);
     console.log(`🐘 Base de Données : PostgreSQL 18 (ACID Enabled)`);
     console.log(`🔒 Système de Séquestre Escrow : Actif`);
     console.log(`💰 Mode Binance Pay & USDT : Actif\n`);

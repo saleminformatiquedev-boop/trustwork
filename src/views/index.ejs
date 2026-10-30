@@ -13,7 +13,7 @@
       Comme Upwork, mais sans contrat à l'heure ni mauvaise surprise. Les fonds restent bloqués sur la plateforme tant que vous n'avez pas validé la livraison.
     </p>
 
-    <!-- Quick role switch for instant testing -->
+    <!-- Boutons d'action -->
     <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
       <a href="/services/new" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-md shadow-emerald-200 transition">
         <i class="fa-solid fa-plus"></i> Proposer un service
@@ -23,7 +23,7 @@
       </a>
     </div>
 
-    <!-- Quick test bar banner -->
+    <!-- Mode test rapide -->
     <div class="mt-10 max-w-xl mx-auto bg-white p-3 rounded-xl border border-dashed border-emerald-300 shadow-sm flex items-center justify-between text-xs text-slate-600">
       <span class="font-semibold flex items-center gap-1.5 text-slate-800">
         <i class="fa-solid fa-vial text-emerald-600"></i> Mode test rapide :
@@ -37,19 +37,45 @@
   </div>
 </section>
 
-<!-- Catalogue -->
+<!-- Catalogue Dynamique avec Recherche & Filtres instantanés -->
 <section id="catalogue" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
     <div>
       <h2 class="text-2xl font-bold text-slate-900">Services disponibles</h2>
-      <p class="text-sm text-slate-500">Tarif fixe sans dépassement possible. Argent sécurisé jusqu'à livraison.</p>
+      <p class="text-sm text-slate-500">Tarif fixe en USDT sans dépassement possible. Argent sécurisé jusqu'à livraison.</p>
+    </div>
+
+    <!-- Filtres & Barre de recherche instantanée (Client-side) -->
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input type="text" id="service-search-input" placeholder="Rechercher un service..." class="text-xs pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none w-52 sm:w-64">
+      </div>
+
+      <select id="category-filter-select" class="text-xs px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-slate-700">
+        <option value="ALL">Toutes les catégories</option>
+        <option value="Développement Web & Mobile">Développement Web & Mobile</option>
+        <option value="Design & Graphisme">Design & Graphisme</option>
+        <option value="Rédaction & Traduction">Rédaction & Traduction</option>
+        <option value="Marketing & Réseaux Sociaux">Marketing & Réseaux Sociaux</option>
+      </select>
+
+      <select id="sort-filter-select" class="text-xs px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-slate-700">
+        <option value="recent">Plus récents</option>
+        <option value="price_asc">Prix croissant</option>
+        <option value="price_desc">Prix décroissant</option>
+      </select>
     </div>
   </div>
 
-  <% if (services && services.length > 0) { %>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  <!-- Grille des cartes de services -->
+  <div id="services-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <% if (services && services.length > 0) { %>
       <% services.forEach(service => { %>
-        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between">
+        <div class="service-card bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between"
+             data-title="<%= service.title.toLowerCase() %>"
+             data-category="<%= service.category %>"
+             data-price="<%= service.price %>">
           
           <div class="p-6">
             <!-- Vendeur & Catégorie -->
@@ -78,11 +104,11 @@
             </div>
           </div>
 
-          <!-- Footer carte avec Prix et Bouton Séquestre -->
+          <!-- Footer carte avec Prix USDT et Bouton Séquestre -->
           <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
             <div>
-              <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Prix Forfaitaire</span>
-              <div class="text-xl font-extrabold text-slate-900"><%= service.price.toFixed(2) %> €</div>
+              <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Prix Forfait</span>
+              <div class="text-xl font-extrabold text-slate-900"><%= service.price.toFixed(2) %> <span class="text-xs font-bold text-emerald-600">USDT</span></div>
             </div>
             
             <a href="/services/<%= service.id %>" class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm transition">
@@ -92,17 +118,67 @@
 
         </div>
       <% }) %>
-    </div>
-  <% } else { %>
-    <div class="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
-      <i class="fa-solid fa-folder-open text-4xl text-slate-300 mb-3"></i>
-      <h3 class="text-base font-semibold text-slate-700">Aucun service pour le moment</h3>
-      <p class="text-xs text-slate-400 mt-1 mb-4">Soyez le premier travailleur à proposer une prestation forfaitaire.</p>
-      <a href="/services/new" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white font-semibold text-xs rounded-lg">
-        Créer un service
-      </a>
-    </div>
-  <% } %>
+    <% } %>
+  </div>
+
+  <!-- Message si aucun résultat après filtre -->
+  <div id="no-results-message" class="hidden text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
+    <i class="fa-solid fa-magnifying-glass text-4xl text-slate-300 mb-3"></i>
+    <h3 class="text-base font-semibold text-slate-700">Aucun service correspondant</h3>
+    <p class="text-xs text-slate-400 mt-1">Essayez de modifier votre mot-clé ou catégorie de recherche.</p>
+  </div>
 </section>
+
+<!-- Script dynamique pour la recherche & filtres instantanés sans recharger -->
+<script>
+  const searchInput = document.getElementById('service-search-input');
+  const categorySelect = document.getElementById('category-filter-select');
+  const sortSelect = document.getElementById('sort-filter-select');
+  const grid = document.getElementById('services-grid');
+  const noResults = document.getElementById('no-results-message');
+
+  function filterAndSortServices() {
+    const query = searchInput.value.toLowerCase().trim();
+    const category = categorySelect.value;
+    const sortBy = sortSelect.value;
+    const cards = Array.from(document.querySelectorAll('.service-card'));
+
+    let visibleCount = 0;
+
+    cards.forEach(card => {
+      const title = card.getAttribute('data-title');
+      const cat = card.getAttribute('data-category');
+      const matchesSearch = !query || title.includes(query);
+      const matchesCategory = category === 'ALL' || cat === category;
+
+      if (matchesSearch && matchesCategory) {
+        card.style.display = 'flex';
+        visibleCount++;
+      } else {
+        card.style.display = 'none';
+      }
+    });
+
+    // Tri dynamique
+    const visibleCards = cards.filter(c => c.style.display !== 'none');
+    if (sortBy === 'price_asc') {
+      visibleCards.sort((a, b) => parseFloat(a.dataset.price) - parseFloat(b.dataset.price));
+      visibleCards.forEach(c => grid.appendChild(c));
+    } else if (sortBy === 'price_desc') {
+      visibleCards.sort((a, b) => parseFloat(b.dataset.price) - parseFloat(a.dataset.price));
+      visibleCards.forEach(c => grid.appendChild(c));
+    }
+
+    if (visibleCount === 0) {
+      noResults.classList.remove('hidden');
+    } else {
+      noResults.classList.add('hidden');
+    }
+  }
+
+  searchInput.addEventListener('input', filterAndSortServices);
+  categorySelect.addEventListener('change', filterAndSortServices);
+  sortSelect.addEventListener('change', filterAndSortServices);
+</script>
 
 <%- include('partials/footer') %>
