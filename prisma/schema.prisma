@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  googleId      String?   @unique
+  email         String    @unique
+  name          String
+  avatar        String?
+  role          String    @default("USER") // USER, ADMIN
+  
+  // Portefeuille & Escrow
+  walletBalance Float     @default(100.0) // Montant offert à l'inscription pour tester immédiatement
+  escrowBalance Float     @default(0.0)   // Argent actuellement bloqué dans des commandes en cours
+
+  services      Service[]
+  buyerOrders   Order[]   @relation("BuyerOrders")
+  sellerOrders  Order[]   @relation("SellerOrders")
+  disputes      Dispute[] @relation("DisputeInitiator")
+  messages      OrderMessage[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Service {
+  id           String   @id @default(uuid())
+  title        String
+  description  String
+  category     String   @default("Développement")
+  price        Float    // Prix forfaitaire fixe (ex: 50.0€)
+  deliveryDays Int      @default(3) // Délai de livraison en jours
+  
+  sellerId     String
+  seller       User     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  
+  orders       Order[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Order {
+  id           String        @id @default(uuid())
+  serviceId    String
+  service      Service       @relation(fields: [serviceId], references: [id])
+  
+  buyerId      String
+  buyer        User          @relation("BuyerOrders", fields: [buyerId], references: [id])
+  
+  sellerId     String
+  seller       User          @relation("SellerOrders", fields: [sellerId], references: [id])
+  
+  amount       Float         // Montant bloqué sous séquestre
+  
+  // Statuts : ESCROWED -> DELIVERED -> COMPLETED (argent débloqué)
+  // Ou si litige : DISPUTED -> REFUNDED (remboursement acheteur) ou COMPLETED (arbitré vendeur)
+  status       String        @default("ESCROWED") 
+  
+  requirements String?       // Consignes de l'acheteur
+  deliveryNote String?       // Preuve ou fichier de livraison du vendeur
+  
+  deliveredAt  DateTime?
+  completedAt  DateTime?
+  
+  dispute      Dispute?
+  messages     OrderMessage[]
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Dispute {
+  id             String    @id @default(uuid())
+  orderId        String    @unique
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  initiatorId    String
+  initiator      User      @relation("DisputeInitiator", fields: [initiatorId], references: [id])
+  
+  reason         String    // "Non livré", "Non conforme aux consignes", etc.
+  details        String    // Explications et preuves
+  
+  status         String    @default("OPEN") // OPEN, RESOLVED_REFUNDED, RESOLVED_PAID
+  resolutionNote String?
+  
+  resolvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model OrderMessage {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  
+  content   String
+  createdAt DateTime @default(now())
+}

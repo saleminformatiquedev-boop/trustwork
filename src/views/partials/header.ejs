@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title + ' | ' : '' %>TrustWork - Services avec Séquestre Garanti</title>
+  <!-- Tailwind CSS CDN pour un rendu immédiat et sans compilation préalable -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="flex flex-col min-h-screen text-slate-800 antialiased">
+
+  <!-- Navbar -->
+  <header class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Logo -->
+      <a href="/" class="flex items-center gap-2.5 font-bold text-xl text-slate-900 group">
+        <span class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-200 group-hover:scale-105 transition-transform">
+          <i class="fa-solid fa-shield-halved text-lg"></i>
+        </span>
+        <span>Trust<span class="text-emerald-600">Work</span></span>
+      </a>
+
+      <!-- Navigation links -->
+      <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+        <a href="/" class="hover:text-emerald-600 transition">Explorer les Services</a>
+        <a href="/services/new" class="hover:text-emerald-600 transition">Vendre un Service</a>
+        <% if (user && user.role === 'ADMIN') { %>
+          <a href="/admin/disputes" class="text-amber-600 hover:text-amber-700 font-semibold flex items-center gap-1.5">
+            <i class="fa-solid fa-gavel"></i> Arbitrage Litiges
+          </a>
+        <% } %>
+      </nav>
+
+      <!-- User Area / Auth -->
+      <div class="flex items-center gap-4">
+        <% if (user) { %>
+          <!-- Balances Badges -->
+          <div class="hidden sm:flex items-center gap-2 bg-slate-100 py-1.5 px-3 rounded-full text-xs font-semibold">
+            <span class="text-emerald-700 flex items-center gap-1" title="Solde disponible dans votre portefeuille">
+              <i class="fa-solid fa-wallet"></i> <%= user.walletBalance.toFixed(2) %> €
+            </span>
+            <% if (user.escrowBalance > 0) { %>
+              <span class="text-slate-300">|</span>
+              <span class="text-amber-700 flex items-center gap-1" title="Argent actuellement sous séquestre (sécurisé)">
+                <i class="fa-solid fa-lock"></i> <%= user.escrowBalance.toFixed(2) %> €
+              </span>
+            <% } %>
+          </div>
+
+          <a href="/dashboard" class="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-slate-100 transition">
+            <img src="<%= user.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.name %>" alt="<%= user.name %>" class="w-8 h-8 rounded-full border border-slate-200">
+            <span class="text-sm font-medium hidden sm:inline"><%= user.name %></span>
+          </a>
+
+          <a href="/logout" title="Déconnexion" class="text-slate-400 hover:text-rose-500 transition text-sm">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+          </a>
+        <% } else { %>
+          <a href="/login" class="text-sm font-semibold text-slate-700 hover:text-emerald-600">Connexion</a>
+          <a href="/login" class="inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 shadow-sm transition">
+            Commencer
+          </a>
+        <% } %>
+      </div>
+
+    </div>
+  </header>
+
+  <main class="flex-grow">

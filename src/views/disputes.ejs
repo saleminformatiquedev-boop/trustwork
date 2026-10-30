@@ -1,0 +1,84 @@
+<%- include('partials/header', { title: 'Arbitrage des Litiges' }) %>
+
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 flex items-center gap-2">
+        <i class="fa-solid fa-gavel text-amber-600"></i> Centre d'Arbitrage des Enquêtes
+      </h1>
+      <p class="text-xs text-slate-500 mt-1">
+        Espace réservé à la modération pour garantir que les acheteurs et vendeurs sont protégés.
+      </p>
+    </div>
+  </div>
+
+  <% if (disputes && disputes.length > 0) { %>
+    <div class="space-y-4">
+      <% disputes.forEach(disp => { %>
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+          
+          <div class="space-y-2 max-w-2xl">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-slate-400">Dossier #<%= disp.id %></span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full <%= disp.status === 'OPEN' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800' %>">
+                <%= disp.status === 'OPEN' ? 'Enquête Ouverte' : 'Clôturé' %>
+              </span>
+            </div>
+
+            <h3 class="font-bold text-slate-900 text-sm">
+              <a href="/orders/<%= disp.orderId %>" class="hover:text-emerald-600 underline">
+                Commande #<%= disp.orderId %> • <%= disp.serviceTitle %> (<%= disp.amount.toFixed(2) %> USDT)
+              </a>
+            </h3>
+
+            <div class="text-xs text-slate-600">
+              <strong class="text-slate-800">Motif :</strong> <%= disp.reason %>
+            </div>
+
+            <div class="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <%= disp.details %>
+            </div>
+          </div>
+
+          <!-- Actions d'Arbitrage -->
+          <div class="flex flex-col gap-2 flex-shrink-0">
+            <% if (disp.status === 'OPEN') { %>
+              <form action="/disputes/<%= disp.id %>/resolve" method="POST">
+                <input type="hidden" name="resolution" value="REFUND_BUYER">
+                <input type="hidden" name="resolutionNote" value="Arbitrage rendu : remboursement complet de l'acheteur.">
+                <button type="submit" class="w-full px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-sm transition">
+                  🛡️ Rembourser l'Acheteur
+                </button>
+              </form>
+
+              <form action="/disputes/<%= disp.id %>/resolve" method="POST">
+                <input type="hidden" name="resolution" value="PAY_SELLER">
+                <input type="hidden" name="resolutionNote" value="Arbitrage rendu : travail conforme validé pour le vendeur.">
+                <button type="submit" class="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition">
+                  💰 Payer le Travailleur
+                </button>
+              </form>
+            <% } else { %>
+              <span class="text-xs font-semibold text-slate-400 text-center">Dossier clôturé</span>
+            <% } %>
+
+            <a href="/orders/<%= disp.orderId %>" class="text-center text-xs text-slate-500 hover:text-slate-800 mt-1">
+              Consulter le fil d'échange
+            </a>
+          </div>
+
+        </div>
+      <% }) %>
+    </div>
+  <% } else { %>
+    <div class="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
+      <i class="fa-solid fa-shield-check text-4xl text-emerald-500 mb-3"></i>
+      <h3 class="text-base font-semibold text-slate-800">Aucun litige en cours</h3>
+      <p class="text-xs text-slate-400 mt-1">Toutes les transactions se déroulent actuellement dans le respect des engagements.</p>
+    </div>
+  <% } %>
+
+</div>
+
+<%- include('partials/footer') %>
