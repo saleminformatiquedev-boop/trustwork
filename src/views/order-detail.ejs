@@ -1,84 +1,84 @@
 <%- include('partials/header', { title: 'Commande #' + order.id }) %>
 
-<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10" id="order-page-root" data-order-id="<%= order.id %>">
+<div class="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-10" id="order-page-root" data-order-id="<%= order.id %>">
 
   <!-- Header Commande -->
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
     <div>
-      <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 mb-1">
+      <div class="flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold text-slate-500 mb-1">
         <a href="/dashboard" class="hover:text-emerald-600">Tableau de bord</a>
         <span>/</span>
-        <span>Commande #<%= order.id %></span>
+        <span class="truncate max-w-[200px]">Commande #<%= order.id %></span>
       </div>
-      <h1 class="text-2xl font-black text-slate-900">
+      <h1 class="text-xl sm:text-2xl font-black text-slate-900 leading-snug">
         <%= order.serviceTitle %>
       </h1>
     </div>
 
     <!-- Badge Statut dynamique -->
-    <div id="status-badge-container">
+    <div id="status-badge-container" class="self-start sm:self-auto">
       <% if (order.status === 'ESCROWED') { %>
-        <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
           <i class="fa-solid fa-lock text-blue-500"></i> Fonds sous Séquestre (<%= order.amount.toFixed(2) %> USDT)
         </span>
       <% } else if (order.status === 'DELIVERED') { %>
-        <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200">
           <i class="fa-solid fa-box text-amber-500"></i> Travail Livré (À Valider)
         </span>
       <% } else if (order.status === 'COMPLETED') { %>
-        <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
           <i class="fa-solid fa-circle-check text-emerald-500"></i> Commande Validée & Payée
         </span>
       <% } else if (order.status === 'DISPUTED') { %>
-        <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200 animate-pulse">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200 animate-pulse">
           <i class="fa-solid fa-triangle-exclamation text-rose-500"></i> Enquête / Litige en Cours
         </span>
       <% } else if (order.status === 'REFUNDED') { %>
-        <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold border border-slate-300">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold border border-slate-300">
           <i class="fa-solid fa-rotate-left"></i> Acheteur Remboursé
         </span>
       <% } %>
     </div>
   </div>
 
-  <!-- Stepper Visuel du Séquestre -->
-  <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8">
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-center" id="escrow-stepper">
+  <!-- Stepper Visuel du Séquestre Responsive (Horizontal scroll sur petit écran) -->
+  <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 sm:mb-8 overflow-x-auto">
+    <div class="grid grid-cols-4 gap-2 sm:gap-4 text-center min-w-[340px]" id="escrow-stepper">
       
       <!-- Étape 1 -->
       <div class="flex flex-col items-center">
-        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm bg-emerald-600 text-white mb-2">
+        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm bg-emerald-600 text-white mb-1.5 sm:mb-2">
           <i class="fa-solid fa-lock"></i>
         </div>
-        <span class="text-xs font-bold text-slate-800">1. Séquestre Déposé</span>
-        <span class="text-[11px] text-slate-500"><%= order.amount.toFixed(2) %> USDT bloqués</span>
+        <span class="text-[11px] sm:text-xs font-bold text-slate-800">1. Séquestre</span>
+        <span class="text-[9px] sm:text-[11px] text-slate-500"><%= order.amount.toFixed(2) %> USDT</span>
       </div>
 
       <!-- Étape 2 -->
       <div class="flex flex-col items-center">
-        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm <%= order.status === 'ESCROWED' ? 'bg-blue-600 text-white ring-4 ring-blue-100' : 'bg-emerald-600 text-white' %> mb-2">
+        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm <%= order.status === 'ESCROWED' ? 'bg-blue-600 text-white ring-4 ring-blue-100' : 'bg-emerald-600 text-white' %> mb-1.5 sm:mb-2">
           <i class="fa-solid fa-hammer"></i>
         </div>
-        <span class="text-xs font-bold text-slate-800">2. Réalisation</span>
-        <span class="text-[11px] text-slate-500">Par le travailleur</span>
+        <span class="text-[11px] sm:text-xs font-bold text-slate-800">2. En cours</span>
+        <span class="text-[9px] sm:text-[11px] text-slate-500">Travailleur</span>
       </div>
 
       <!-- Étape 3 -->
       <div class="flex flex-col items-center">
-        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm <%= order.status === 'DELIVERED' ? 'bg-amber-500 text-white ring-4 ring-amber-100' : (order.status === 'COMPLETED' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600') %> mb-2">
+        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm <%= order.status === 'DELIVERED' ? 'bg-amber-500 text-white ring-4 ring-amber-100' : (order.status === 'COMPLETED' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600') %> mb-1.5 sm:mb-2">
           <i class="fa-solid fa-box-open"></i>
         </div>
-        <span class="text-xs font-bold text-slate-800">3. Livraison</span>
-        <span class="text-[11px] text-slate-500">Vérification acheteur</span>
+        <span class="text-[11px] sm:text-xs font-bold text-slate-800">3. Livré</span>
+        <span class="text-[9px] sm:text-[11px] text-slate-500">Validation</span>
       </div>
 
       <!-- Étape 4 -->
       <div class="flex flex-col items-center">
-        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm <%= order.status === 'COMPLETED' ? 'bg-emerald-600 text-white' : (order.status === 'DISPUTED' ? 'bg-rose-600 text-white' : (order.status === 'REFUNDED' ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-600')) %> mb-2">
+        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm <%= order.status === 'COMPLETED' ? 'bg-emerald-600 text-white' : (order.status === 'DISPUTED' ? 'bg-rose-600 text-white' : (order.status === 'REFUNDED' ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-600')) %> mb-1.5 sm:mb-2">
           <i class="fa-solid fa-<%= order.status === 'DISPUTED' ? 'triangle-exclamation' : (order.status === 'REFUNDED' ? 'arrow-rotate-left' : 'check') %>"></i>
         </div>
-        <span class="text-xs font-bold text-slate-800">4. <%= order.status === 'DISPUTED' ? 'Enquête' : (order.status === 'REFUNDED' ? 'Remboursé' : 'Fonds Débloqués') %></span>
-        <span class="text-[11px] text-slate-500"><%= order.status === 'COMPLETED' ? 'Vendeur payé' : 'Sécurité active' %></span>
+        <span class="text-[11px] sm:text-xs font-bold text-slate-800">4. <%= order.status === 'DISPUTED' ? 'Litige' : (order.status === 'REFUNDED' ? 'Remboursé' : 'Libéré') %></span>
+        <span class="text-[9px] sm:text-[11px] text-slate-500"><%= order.status === 'COMPLETED' ? 'Payé' : 'Sécurisé' %></span>
       </div>
 
     </div>
@@ -86,45 +86,46 @@
 
   <!-- Alerte Litige si Enquête ouverte -->
   <% if (dispute) { %>
-    <div class="mb-8 p-6 rounded-2xl bg-rose-50 border border-rose-200" id="dispute-box">
-      <div class="flex items-start gap-4">
-        <span class="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center text-lg flex-shrink-0">
+    <div class="mb-6 sm:mb-8 p-4 sm:p-6 rounded-2xl bg-rose-50 border border-rose-200" id="dispute-box">
+      <div class="flex items-start gap-3 sm:gap-4">
+        <span class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center text-sm sm:text-lg flex-shrink-0">
           <i class="fa-solid fa-scale-balanced"></i>
         </span>
-        <div class="flex-grow">
-          <div class="flex items-center justify-between mb-1">
-            <h3 class="font-bold text-rose-900 text-sm">Dossier d'Enquête Ouvert (#<%= dispute.id %>)</h3>
-            <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full <%= dispute.status === 'OPEN' ? 'bg-rose-200 text-rose-800' : 'bg-emerald-200 text-emerald-800' %>">
-              <%= dispute.status === 'OPEN' ? 'En attente d\'arbitrage' : 'Résolu' %>
+        <div class="flex-grow min-w-0">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+            <h3 class="font-bold text-rose-900 text-xs sm:text-sm">Enquête Ouverte (#<%= dispute.id %>)</h3>
+            <span class="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full self-start sm:self-auto <%= dispute.status === 'OPEN' ? 'bg-rose-200 text-rose-800' : 'bg-emerald-200 text-emerald-800' %>">
+              <%= dispute.status === 'OPEN' ? 'En arbitrage' : 'Résolu' %>
             </span>
           </div>
-          <p class="text-xs text-rose-800 mb-2"><strong>Motif :</strong> <%= dispute.reason %></p>
-          <p class="text-xs text-rose-700 bg-white/70 p-3 rounded-lg border border-rose-200 whitespace-pre-line mb-3"><%= dispute.details %></p>
+          <p class="text-xs text-rose-800 mb-1.5"><strong>Motif :</strong> <%= dispute.reason %></p>
+          <p class="text-xs text-rose-700 bg-white/70 p-2.5 sm:p-3 rounded-lg border border-rose-200 whitespace-pre-line mb-2"><%= dispute.details %></p>
           
           <p class="text-[11px] text-rose-600">
-            🔒 <strong>Protection active :</strong> Les <%= order.amount.toFixed(2) %> USDT sont totalement gelés.
+            🔒 <strong>Protection active :</strong> Les <%= order.amount.toFixed(2) %> USDT restent entièrement bloqués.
           </p>
 
           <!-- Arbitrage Admin -->
           <% if (user && user.role === 'ADMIN' && dispute.status === 'OPEN') { %>
-            <div class="mt-4 pt-4 border-t border-rose-200 flex flex-wrap items-center gap-3">
-              <span class="text-xs font-bold text-rose-900">Décision d'arbitrage (Admin) :</span>
-              
-              <form action="/disputes/<%= dispute.id %>/resolve" method="POST" class="inline">
-                <input type="hidden" name="resolution" value="REFUND_BUYER">
-                <input type="hidden" name="resolutionNote" value="Travail non conforme ou non livré. Remboursement intégral à l'acheteur.">
-                <button type="submit" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm">
-                  🛡️ Rembourser l'acheteur (<%= order.amount.toFixed(2) %> USDT)
-                </button>
-              </form>
+            <div class="mt-3 pt-3 border-t border-rose-200 flex flex-col sm:flex-row sm:items-center gap-2">
+              <span class="text-xs font-bold text-rose-900">Arbitrage Admin :</span>
+              <div class="flex gap-2">
+                <form action="/disputes/<%= dispute.id %>/resolve" method="POST" class="inline flex-1">
+                  <input type="hidden" name="resolution" value="REFUND_BUYER">
+                  <input type="hidden" name="resolutionNote" value="Arbitrage : remboursement acheteur.">
+                  <button type="submit" class="w-full sm:w-auto px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm">
+                    🛡️ Rembourser Acheteur
+                  </button>
+                </form>
 
-              <form action="/disputes/<%= dispute.id %>/resolve" method="POST" class="inline">
-                <input type="hidden" name="resolution" value="PAY_SELLER">
-                <input type="hidden" name="resolutionNote" value="Preuves de livraison conformes. Paiement débloqué au travailleur.">
-                <button type="submit" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm">
-                  💰 Payer le travailleur (<%= order.amount.toFixed(2) %> USDT)
-                </button>
-              </form>
+                <form action="/disputes/<%= dispute.id %>/resolve" method="POST" class="inline flex-1">
+                  <input type="hidden" name="resolution" value="PAY_SELLER">
+                  <input type="hidden" name="resolutionNote" value="Arbitrage : paiement travailleur validé.">
+                  <button type="submit" class="w-full sm:w-auto px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm">
+                    💰 Payer Vendeur
+                  </button>
+                </form>
+              </div>
             </div>
           <% } %>
         </div>
@@ -132,17 +133,17 @@
     </div>
   <% } %>
 
-  <!-- Actions Disponibles -->
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+  <!-- Actions & Chat (Adaptatif Mobile : Colonne unique sur mobile, 2 colonnes sur Desktop) -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
     
-    <!-- Colonne Gauche : Actions & Consignes -->
-    <div class="lg:col-span-1 space-y-6">
+    <!-- Colonne Actions & Récapitulatif -->
+    <div class="lg:col-span-1 space-y-4 sm:space-y-6 order-2 lg:order-1">
       
       <!-- Contrat / Détails -->
-      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3 text-xs">
-        <h3 class="font-bold text-slate-900 text-sm mb-3">Récapitulatif de la transaction</h3>
+      <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2.5 text-xs">
+        <h3 class="font-bold text-slate-900 text-sm mb-2 sm:mb-3">Détails de la transaction</h3>
         <div class="flex justify-between py-1 border-b border-slate-100">
-          <span class="text-slate-500">Montant :</span>
+          <span class="text-slate-500">Montant Escrow :</span>
           <span class="font-bold text-slate-900"><%= order.amount.toFixed(2) %> USDT</span>
         </div>
         <div class="flex justify-between py-1 border-b border-slate-100">
@@ -153,9 +154,9 @@
           <span class="text-slate-500">Travailleur :</span>
           <span class="font-semibold text-slate-900"><%= order.sellerName %></span>
         </div>
-        <div class="py-2">
-          <span class="text-slate-500 block mb-1">Consignes initiales :</span>
-          <div class="bg-slate-50 p-2.5 rounded-lg text-slate-700 italic border border-slate-100">
+        <div class="pt-1">
+          <span class="text-slate-500 block mb-1">Consignes :</span>
+          <div class="bg-slate-50 p-2.5 rounded-lg text-slate-700 italic border border-slate-100 text-[11px] leading-relaxed">
             <%= order.requirements || "Aucune consigne spécifique" %>
           </div>
         </div>
@@ -164,32 +165,32 @@
       <!-- Actions Acheteur : Valider la livraison -->
       <% if (user && user.id === order.buyerId) { %>
         <% if (order.status === 'DELIVERED') { %>
-          <div class="bg-emerald-50 border border-emerald-200 p-6 rounded-2xl text-xs space-y-3">
+          <div class="bg-emerald-50 border border-emerald-200 p-4 sm:p-6 rounded-2xl text-xs space-y-3">
             <h4 class="font-bold text-emerald-900 text-sm">Le travailleur a livré !</h4>
-            <p class="text-emerald-800 leading-relaxed">
-              Vérifiez le travail ci-contre. Si tout est parfait, cliquez ci-dessous pour libérer définitivement les <strong><%= order.amount.toFixed(2) %> USDT</strong>.
+            <p class="text-emerald-800 leading-relaxed text-[11px]">
+              Vérifiez le travail ci-contre. Si tout est conforme, libérez les <strong><%= order.amount.toFixed(2) %> USDT</strong>.
             </p>
             <form action="/orders/<%= order.id %>/complete" method="POST">
               <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2">
-                <i class="fa-solid fa-check"></i> Valider et Libérer les fonds (<%= order.amount.toFixed(2) %> USDT)
+                <i class="fa-solid fa-check"></i> Valider & Débloquer (<%= order.amount.toFixed(2) %> USDT)
               </button>
             </form>
           </div>
         <% } %>
 
-        <!-- Bouton Ouvrir une Enquête si litige non ouvert et commande non terminée -->
+        <!-- Bouton Ouvrir une Enquête -->
         <% if ((order.status === 'ESCROWED' || order.status === 'DELIVERED') && !dispute) { %>
-          <div class="bg-white p-5 rounded-2xl border border-slate-200 text-xs">
+          <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 text-xs">
             <h4 class="font-bold text-slate-900 mb-1">Un problème avec la commande ?</h4>
-            <p class="text-slate-500 mb-3">Si le travailleur ne répond pas ou ne respecte pas les consignes, ouvrez une enquête pour bloquer les fonds.</p>
+            <p class="text-slate-500 mb-3 text-[11px]">Si le travailleur ne répond pas, ouvrez une enquête pour geler les fonds.</p>
             
             <details class="group">
               <summary class="cursor-pointer text-rose-600 font-semibold hover:text-rose-700 flex items-center gap-1.5 list-none">
                 <i class="fa-solid fa-triangle-exclamation"></i> Ouvrir une Enquête / Litige
               </summary>
-              <form action="/orders/<%= order.id %>/dispute" method="POST" class="mt-4 space-y-3 pt-3 border-t border-slate-100">
+              <form action="/orders/<%= order.id %>/dispute" method="POST" class="mt-3 space-y-2.5 pt-3 border-t border-slate-100">
                 <div>
-                  <label class="block font-semibold text-slate-700 mb-1">Motif :</label>
+                  <label class="block font-semibold text-slate-700 mb-1 text-[11px]">Motif :</label>
                   <select name="reason" class="w-full p-2 border border-slate-200 rounded-lg text-xs" required>
                     <option value="Travail non conforme aux consignes">Travail non conforme aux consignes</option>
                     <option value="Retard excessif / Aucun contact">Retard excessif / Aucun contact</option>
@@ -197,11 +198,11 @@
                   </select>
                 </div>
                 <div>
-                  <label class="block font-semibold text-slate-700 mb-1">Explications :</label>
+                  <label class="block font-semibold text-slate-700 mb-1 text-[11px]">Explications :</label>
                   <textarea name="details" rows="2" class="w-full p-2 border border-slate-200 rounded-lg text-xs" required placeholder="Détaillez le problème..."></textarea>
                 </div>
                 <button type="submit" class="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs">
-                  Geler les fonds & Soumettre l'enquête
+                  Geler les fonds & Soumettre
                 </button>
               </form>
             </details>
@@ -212,13 +213,13 @@
       <!-- Actions Vendeur : Livrer la commande -->
       <% if (user && user.id === order.sellerId) { %>
         <% if (order.status === 'ESCROWED') { %>
-          <div class="bg-blue-50 border border-blue-200 p-6 rounded-2xl text-xs space-y-3">
+          <div class="bg-blue-50 border border-blue-200 p-4 sm:p-6 rounded-2xl text-xs space-y-3">
             <h4 class="font-bold text-blue-900 text-sm">Prêt à livrer ?</h4>
-            <p class="text-blue-800 leading-relaxed">
-              Les <%= order.amount.toFixed(2) %> USDT sont bien sous séquestre. Envoyez vos livrables ou liens de téléchargement ci-dessous.
+            <p class="text-blue-800 leading-relaxed text-[11px]">
+              Les <%= order.amount.toFixed(2) %> USDT sont sous séquestre. Soumettez vos livrables ou liens ci-dessous.
             </p>
-            <form action="/orders/<%= order.id %>/deliver" method="POST" class="space-y-3">
-              <textarea name="deliveryNote" rows="3" required placeholder="Lien GitHub, Google Drive, résumé du travail accompli..." class="w-full p-2.5 border border-slate-200 rounded-xl bg-white"></textarea>
+            <form action="/orders/<%= order.id %>/deliver" method="POST" class="space-y-2.5">
+              <textarea name="deliveryNote" rows="3" required placeholder="Lien GitHub, Google Drive, livrables..." class="w-full p-2.5 border border-slate-200 rounded-xl bg-white text-xs"></textarea>
               <button type="submit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2">
                 <i class="fa-solid fa-box-arrow-up"></i> Livrer le travail
               </button>
@@ -230,38 +231,38 @@
     </div>
 
     <!-- Colonne Droite : Fil de Discussion & Livraison en temps réel -->
-    <div class="lg:col-span-2 space-y-6">
+    <div class="lg:col-span-2 space-y-4 sm:space-y-6 order-1 lg:order-2">
       
       <!-- Section Livraison si livrée -->
       <% if (order.deliveryNote) { %>
-        <div class="bg-amber-50/70 border border-amber-200 p-6 rounded-2xl" id="delivery-note-container">
-          <div class="flex items-center gap-2 font-bold text-amber-900 text-sm mb-2">
+        <div class="bg-amber-50/80 border border-amber-200 p-4 sm:p-6 rounded-2xl" id="delivery-note-container">
+          <div class="flex items-center gap-2 font-bold text-amber-900 text-xs sm:text-sm mb-1.5">
             <i class="fa-solid fa-box text-amber-600"></i> Travail Livré par <%= order.sellerName %>
           </div>
-          <div class="text-xs text-amber-950 bg-white p-4 rounded-xl border border-amber-200 whitespace-pre-line leading-relaxed">
+          <div class="text-xs text-amber-950 bg-white p-3.5 sm:p-4 rounded-xl border border-amber-200 whitespace-pre-line leading-relaxed break-words">
             <%= order.deliveryNote %>
           </div>
         </div>
       <% } %>
 
       <!-- Fil de discussion sécurisé Socket.io -->
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[520px]">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[420px] sm:h-[500px]">
+        <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 class="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-2">
             <i class="fa-regular fa-comments text-emerald-600"></i> Messagerie en temps réel
           </h3>
-          <span class="inline-flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Connecté
+          <span class="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] text-emerald-600 font-medium">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> En direct
           </span>
         </div>
 
         <!-- Zone des messages instantanés -->
-        <div id="messages-container" class="flex-grow p-6 overflow-y-auto space-y-4">
+        <div id="messages-container" class="flex-grow p-4 sm:p-6 overflow-y-auto space-y-3 sm:space-y-4">
           <% if (messages && messages.length > 0) { %>
             <% messages.forEach(msg => { %>
               <div class="message-bubble flex flex-col <%= user && user.id === msg.senderId ? 'items-end' : 'items-start' %>">
-                <span class="text-[10px] text-slate-400 mb-1"><%= msg.senderName %></span>
-                <div class="max-w-md p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-line <%= user && user.id === msg.senderId ? 'bg-emerald-600 text-white rounded-br-none shadow-sm shadow-emerald-100' : 'bg-slate-100 text-slate-800 rounded-bl-none' %>">
+                <span class="text-[9px] sm:text-[10px] text-slate-400 mb-0.5"><%= msg.senderName %></span>
+                <div class="max-w-[85%] sm:max-w-md p-3 sm:p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-line break-words <%= user && user.id === msg.senderId ? 'bg-emerald-600 text-white rounded-br-none shadow-sm shadow-emerald-100' : 'bg-slate-100 text-slate-800 rounded-bl-none' %>">
                   <%= msg.content %>
                 </div>
               </div>
@@ -271,10 +272,10 @@
           <% } %>
         </div>
 
-        <!-- Formulaire d'envoi en direct (AJAX + WebSockets) -->
-        <form id="chat-form" class="p-4 border-t border-slate-100 flex gap-2">
-          <input type="text" id="chat-input" required autocomplete="off" placeholder="Écrire un message en direct..." class="flex-grow text-xs px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-          <button type="submit" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5">
+        <!-- Formulaire d'envoi en direct -->
+        <form id="chat-form" class="p-3 sm:p-4 border-t border-slate-100 flex gap-2">
+          <input type="text" id="chat-input" required autocomplete="off" placeholder="Écrire un message..." class="flex-grow text-xs px-3.5 sm:px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          <button type="submit" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 flex-shrink-0">
             <span>Envoyer</span> <i class="fa-solid fa-paper-plane text-[10px]"></i>
           </button>
         </form>
@@ -286,7 +287,7 @@
 
 </div>
 
-<!-- Script temps réel Socket.io pour la messagerie et les alertes de statut -->
+<!-- Script temps réel Socket.io -->
 <script>
   const orderId = "<%= order.id %>";
   const currentUserId = "<%= user ? user.id : '' %>";
@@ -298,16 +299,13 @@
   const chatInput = document.getElementById('chat-input');
   const emptyPlaceholder = document.getElementById('empty-messages-placeholder');
 
-  // Défilement automatique vers le bas
   function scrollToBottom() {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
   scrollToBottom();
 
-  // Rejoindre la room de la commande en temps réel
   socket.emit('join_order', { orderId });
 
-  // Écouter les nouveaux messages reçus en direct
   socket.on('new_message', (msg) => {
     if (emptyPlaceholder) emptyPlaceholder.style.display = 'none';
 
@@ -315,8 +313,8 @@
     const msgDiv = document.createElement('div');
     msgDiv.className = `message-bubble flex flex-col ${isMe ? 'items-end' : 'items-start'} toast-anim`;
     msgDiv.innerHTML = `
-      <span class="text-[10px] text-slate-400 mb-1">${msg.senderName}</span>
-      <div class="max-w-md p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-line ${
+      <span class="text-[9px] sm:text-[10px] text-slate-400 mb-0.5">${msg.senderName}</span>
+      <div class="max-w-[85%] sm:max-w-md p-3 sm:p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-line break-words ${
         isMe ? 'bg-emerald-600 text-white rounded-br-none shadow-sm shadow-emerald-100' : 'bg-slate-100 text-slate-800 rounded-bl-none'
       }">${msg.content}</div>
     `;
@@ -328,15 +326,13 @@
     }
   });
 
-  // Écouter les changements d'état du séquestre en direct
   socket.on('order_updated', (data) => {
-    window.showToast(`Statut mis à jour : ${data.status}`, 'success');
+    window.showToast(`Statut de la commande mis à jour : ${data.status}`, 'success');
     setTimeout(() => {
       window.location.reload();
     }, 1200);
   });
 
-  // Envoi d'un message via Socket.io
   chatForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const content = chatInput.value.trim();

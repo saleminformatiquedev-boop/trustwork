@@ -1,66 +1,71 @@
 <%- include('partials/header', { title: 'Accueil - Marketplace Sécurisée' }) %>
 
-<!-- Hero Banner -->
-<section class="bg-gradient-to-b from-emerald-50/60 to-transparent py-14 border-b border-slate-100">
+<!-- Hero Banner (Entièrement responsive mobile/tablette/desktop) -->
+<section class="bg-gradient-to-b from-emerald-50/70 via-white to-transparent py-8 sm:py-14 border-b border-slate-100">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-    <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-100/80 text-emerald-800 text-xs font-semibold mb-6">
-      <i class="fa-solid fa-lock text-emerald-600"></i> Système de Séquestre Intégré : Votre argent est 100% protégé
+    
+    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100/90 text-emerald-800 text-[11px] sm:text-xs font-semibold mb-4 sm:mb-6 max-w-full">
+      <i class="fa-solid fa-lock text-emerald-600 flex-shrink-0"></i> 
+      <span class="truncate">Séquestre Intégré : Votre argent est 100% protégé</span>
     </div>
-    <h1 class="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight max-w-3xl mx-auto leading-tight">
+
+    <h1 class="text-2xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight max-w-3xl mx-auto leading-tight sm:leading-tight">
       Achetez et vendez des services <span class="text-emerald-600">à prix forfaitaire</span> en toute confiance.
     </h1>
-    <p class="mt-4 text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
+    
+    <p class="mt-3 sm:mt-4 text-xs sm:text-base lg:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
       Comme Upwork, mais sans contrat à l'heure ni mauvaise surprise. Les fonds restent bloqués sur la plateforme tant que vous n'avez pas validé la livraison.
     </p>
 
-    <!-- Boutons d'action -->
-    <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-      <a href="/services/new" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-md shadow-emerald-200 transition">
+    <!-- Boutons d'action responsives -->
+    <div class="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+      <a href="/services/new" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-emerald-200 transition">
         <i class="fa-solid fa-plus"></i> Proposer un service
       </a>
-      <a href="#catalogue" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-sm shadow-sm transition">
+      <a href="#catalogue" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm shadow-sm transition">
         <i class="fa-solid fa-compass"></i> Explorer les offres
       </a>
     </div>
 
-    <!-- Mode test rapide -->
-    <div class="mt-10 max-w-xl mx-auto bg-white p-3 rounded-xl border border-dashed border-emerald-300 shadow-sm flex items-center justify-between text-xs text-slate-600">
-      <span class="font-semibold flex items-center gap-1.5 text-slate-800">
+    <!-- Mode test rapide compact et responsive -->
+    <div class="mt-8 max-w-xl mx-auto bg-white p-3 rounded-2xl border border-dashed border-emerald-300 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-slate-600">
+      <span class="font-semibold flex items-center gap-1.5 text-slate-800 text-[11px] sm:text-xs">
         <i class="fa-solid fa-vial text-emerald-600"></i> Mode test rapide :
       </span>
-      <div class="flex items-center gap-2">
-        <a href="/auth/demo-login/buyer" class="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md font-medium hover:bg-blue-100 transition">Acheteur (Thomas)</a>
-        <a href="/auth/demo-login/seller" class="bg-purple-50 text-purple-700 px-2.5 py-1 rounded-md font-medium hover:bg-purple-100 transition">Vendeur (Sarah)</a>
-        <a href="/auth/demo-login/admin" class="bg-amber-50 text-amber-700 px-2.5 py-1 rounded-md font-medium hover:bg-amber-100 transition">Médiateur</a>
+      <div class="flex items-center gap-1.5 w-full sm:w-auto justify-center">
+        <a href="/auth/demo-login/buyer" class="flex-1 sm:flex-initial text-center bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold hover:bg-blue-100 transition">Acheteur</a>
+        <a href="/auth/demo-login/seller" class="flex-1 sm:flex-initial text-center bg-purple-50 text-purple-700 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold hover:bg-purple-100 transition">Vendeur</a>
+        <a href="/auth/demo-login/admin" class="flex-1 sm:flex-initial text-center bg-amber-50 text-amber-700 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold hover:bg-amber-100 transition">Médiateur</a>
       </div>
     </div>
+
   </div>
 </section>
 
-<!-- Catalogue Dynamique avec Recherche & Filtres instantanés -->
-<section id="catalogue" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+<!-- Catalogue Dynamique Responsive -->
+<section id="catalogue" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 sm:mb-8">
     <div>
-      <h2 class="text-2xl font-bold text-slate-900">Services disponibles</h2>
-      <p class="text-sm text-slate-500">Tarif fixe en USDT sans dépassement possible. Argent sécurisé jusqu'à livraison.</p>
+      <h2 class="text-xl sm:text-2xl font-bold text-slate-900">Services disponibles</h2>
+      <p class="text-xs sm:text-sm text-slate-500">Tarif fixe en USDT sans dépassement possible. Argent sécurisé sous séquestre.</p>
     </div>
 
-    <!-- Filtres & Barre de recherche instantanée (Client-side) -->
-    <div class="flex flex-wrap items-center gap-3">
-      <div class="relative">
+    <!-- Filtres & Barre de recherche instantanés adaptés mobile -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full md:w-auto">
+      <div class="relative w-full">
         <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-        <input type="text" id="service-search-input" placeholder="Rechercher un service..." class="text-xs pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none w-52 sm:w-64">
+        <input type="text" id="service-search-input" placeholder="Rechercher..." class="w-full text-xs pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
       </div>
 
-      <select id="category-filter-select" class="text-xs px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-slate-700">
-        <option value="ALL">Toutes les catégories</option>
-        <option value="Développement Web & Mobile">Développement Web & Mobile</option>
+      <select id="category-filter-select" class="w-full text-xs px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-slate-700 truncate">
+        <option value="ALL">Toutes catégories</option>
+        <option value="Développement Web & Mobile">Développement Web</option>
         <option value="Design & Graphisme">Design & Graphisme</option>
-        <option value="Rédaction & Traduction">Rédaction & Traduction</option>
-        <option value="Marketing & Réseaux Sociaux">Marketing & Réseaux Sociaux</option>
+        <option value="Rédaction & Traduction">Rédaction</option>
+        <option value="Marketing & Réseaux Sociaux">Marketing</option>
       </select>
 
-      <select id="sort-filter-select" class="text-xs px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-slate-700">
+      <select id="sort-filter-select" class="w-full text-xs px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-slate-700">
         <option value="recent">Plus récents</option>
         <option value="price_asc">Prix croissant</option>
         <option value="price_desc">Prix décroissant</option>
@@ -68,8 +73,8 @@
     </div>
   </div>
 
-  <!-- Grille des cartes de services -->
-  <div id="services-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  <!-- Grille des cartes de services adaptative -->
+  <div id="services-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
     <% if (services && services.length > 0) { %>
       <% services.forEach(service => { %>
         <div class="service-card bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between"
@@ -77,20 +82,20 @@
              data-category="<%= service.category %>"
              data-price="<%= service.price %>">
           
-          <div class="p-6">
+          <div class="p-5 sm:p-6">
             <!-- Vendeur & Catégorie -->
-            <div class="flex items-center justify-between mb-4">
-              <div class="flex items-center gap-2.5">
-                <img src="<%= service.sellerAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + service.sellerName %>" alt="<%= service.sellerName %>" class="w-8 h-8 rounded-full border border-slate-200">
-                <span class="text-xs font-semibold text-slate-700"><%= service.sellerName %></span>
+            <div class="flex items-center justify-between mb-3.5 gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <img src="<%= service.sellerAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + service.sellerName %>" alt="<%= service.sellerName %>" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-slate-200 flex-shrink-0 object-cover">
+                <span class="text-xs font-semibold text-slate-700 truncate"><%= service.sellerName %></span>
               </div>
-              <span class="text-[11px] font-medium bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">
+              <span class="text-[10px] sm:text-[11px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full flex-shrink-0 max-w-[120px] truncate">
                 <%= service.category %>
               </span>
             </div>
 
             <!-- Titre & Description -->
-            <h3 class="font-bold text-slate-900 text-base mb-2 line-clamp-2 hover:text-emerald-600 transition">
+            <h3 class="font-bold text-slate-900 text-sm sm:text-base mb-2 line-clamp-2 hover:text-emerald-600 transition">
               <a href="/services/<%= service.id %>"><%= service.title %></a>
             </h3>
             <p class="text-slate-500 text-xs line-clamp-3 leading-relaxed mb-4">
@@ -105,14 +110,16 @@
           </div>
 
           <!-- Footer carte avec Prix USDT et Bouton Séquestre -->
-          <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+          <div class="px-5 sm:px-6 py-3.5 sm:py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
             <div>
-              <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Prix Forfait</span>
-              <div class="text-xl font-extrabold text-slate-900"><%= service.price.toFixed(2) %> <span class="text-xs font-bold text-emerald-600">USDT</span></div>
+              <span class="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Prix Forfait</span>
+              <div class="text-lg sm:text-xl font-extrabold text-slate-900">
+                <%= service.price.toFixed(2) %> <span class="text-xs font-bold text-emerald-600">USDT</span>
+              </div>
             </div>
             
-            <a href="/services/<%= service.id %>" class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm transition">
-              <i class="fa-solid fa-shield-halved"></i> Commander
+            <a href="/services/<%= service.id %>" class="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm transition">
+              <i class="fa-solid fa-shield-halved text-[11px]"></i> Commander
             </a>
           </div>
 
@@ -122,14 +129,14 @@
   </div>
 
   <!-- Message si aucun résultat après filtre -->
-  <div id="no-results-message" class="hidden text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
-    <i class="fa-solid fa-magnifying-glass text-4xl text-slate-300 mb-3"></i>
-    <h3 class="text-base font-semibold text-slate-700">Aucun service correspondant</h3>
+  <div id="no-results-message" class="hidden text-center py-12 sm:py-16 bg-white rounded-2xl border border-dashed border-slate-300">
+    <i class="fa-solid fa-magnifying-glass text-3xl sm:text-4xl text-slate-300 mb-3"></i>
+    <h3 class="text-sm sm:text-base font-semibold text-slate-700">Aucun service correspondant</h3>
     <p class="text-xs text-slate-400 mt-1">Essayez de modifier votre mot-clé ou catégorie de recherche.</p>
   </div>
 </section>
 
-<!-- Script dynamique pour la recherche & filtres instantanés sans recharger -->
+<!-- Script de recherche & filtres instantanés -->
 <script>
   const searchInput = document.getElementById('service-search-input');
   const categorySelect = document.getElementById('category-filter-select');
@@ -159,7 +166,6 @@
       }
     });
 
-    // Tri dynamique
     const visibleCards = cards.filter(c => c.style.display !== 'none');
     if (sortBy === 'price_asc') {
       visibleCards.sort((a, b) => parseFloat(a.dataset.price) - parseFloat(b.dataset.price));

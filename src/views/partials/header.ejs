@@ -2,7 +2,7 @@
 <html lang="fr" class="h-full bg-slate-50">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title><%= typeof title !== 'undefined' ? title + ' | ' : '' %>TrustWork - Services avec Séquestre Garanti</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -29,26 +29,28 @@
       to { transform: translateY(0); opacity: 1; }
     }
     .toast-anim { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    /* Touch target comfort */
+    button, a { -webkit-tap-highlight-color: transparent; }
   </style>
 </head>
-<body class="flex flex-col min-h-screen text-slate-800 antialiased">
+<body class="flex flex-col min-h-screen text-slate-800 antialiased pb-16 md:pb-0">
 
   <!-- Système global de Toasts dynamiques -->
-  <div id="toast-container" class="fixed top-20 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+  <div id="toast-container" class="fixed top-16 right-4 left-4 sm:left-auto sm:right-6 sm:w-80 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-  <!-- Navbar -->
+  <!-- Navbar Principale -->
   <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
       
       <!-- Logo -->
-      <a href="/" class="flex items-center gap-2.5 font-bold text-xl text-slate-900 group">
-        <span class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-200 group-hover:scale-105 transition-transform">
-          <i class="fa-solid fa-shield-halved text-lg"></i>
+      <a href="/" class="flex items-center gap-2.5 font-bold text-lg sm:text-xl text-slate-900 group flex-shrink-0">
+        <span class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-200 group-hover:scale-105 transition-transform">
+          <i class="fa-solid fa-shield-halved text-base sm:text-lg"></i>
         </span>
         <span>Trust<span class="text-emerald-600">Work</span></span>
       </a>
 
-      <!-- Navigation links -->
+      <!-- Navigation links (Desktop) -->
       <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
         <a href="/" class="hover:text-emerald-600 transition">Explorer les Services</a>
         <a href="/services/new" class="hover:text-emerald-600 transition">Vendre un Service</a>
@@ -59,31 +61,37 @@
         <% } %>
       </nav>
 
-      <!-- User Area / Auth -->
-      <div class="flex items-center gap-4">
+      <!-- User Area / Badges Solde & Profil -->
+      <div class="flex items-center gap-2 sm:gap-3">
         <% if (user) { %>
-          <!-- Balances Badges dynamiques -->
-          <div class="hidden sm:flex items-center gap-2 bg-slate-100 py-1.5 px-3 rounded-full text-xs font-semibold">
+          <!-- Balances Badges (Responsive : compact sur mobile) -->
+          <a href="/dashboard" class="flex items-center gap-1.5 sm:gap-2 bg-slate-100 hover:bg-slate-200/80 transition py-1.5 px-2.5 sm:px-3 rounded-full text-[11px] sm:text-xs font-semibold">
             <span class="text-emerald-700 flex items-center gap-1" title="Solde disponible USDT">
-              <i class="fa-solid fa-wallet"></i> <span id="header-wallet-balance"><%= user.walletBalance.toFixed(2) %></span> USDT
+              <i class="fa-solid fa-wallet text-[10px] sm:text-xs"></i> 
+              <span id="header-wallet-balance"><%= user.walletBalance.toFixed(0) %></span><span class="hidden sm:inline">.<%= (user.walletBalance % 1).toFixed(2).slice(2) %></span> <span class="text-[9px] sm:text-[11px]">USDT</span>
             </span>
-            <span class="text-slate-300">|</span>
-            <span class="text-amber-700 flex items-center gap-1" title="Argent actuellement sous séquestre">
-              <i class="fa-solid fa-lock"></i> <span id="header-escrow-balance"><%= user.escrowBalance.toFixed(2) %></span> USDT
-            </span>
-          </div>
-
-          <a href="/dashboard" class="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-slate-100 transition">
-            <img src="<%= user.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.name %>" alt="<%= user.name %>" class="w-8 h-8 rounded-full border border-slate-200">
-            <span class="text-sm font-medium hidden sm:inline"><%= user.name %></span>
+            <% if (user.escrowBalance > 0) { %>
+              <span class="text-slate-300">|</span>
+              <span class="text-amber-700 flex items-center gap-1" title="Argent sous séquestre">
+                <i class="fa-solid fa-lock text-[10px] sm:text-xs"></i> 
+                <span id="header-escrow-balance"><%= user.escrowBalance.toFixed(0) %></span> <span class="text-[9px] sm:text-[11px]">USDT</span>
+              </span>
+            <% } %>
           </a>
 
-          <a href="/logout" title="Déconnexion" class="text-slate-400 hover:text-rose-500 transition text-sm">
+          <!-- Profil link -->
+          <a href="/dashboard" class="flex items-center gap-2 py-1 px-1.5 rounded-lg hover:bg-slate-100 transition flex-shrink-0">
+            <img src="<%= user.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.name %>" alt="<%= user.name %>" class="w-8 h-8 rounded-full border border-slate-200 object-cover">
+            <span class="text-xs font-semibold hidden lg:inline max-w-[100px] truncate"><%= user.name %></span>
+          </a>
+
+          <!-- Logout (Desktop) -->
+          <a href="/logout" title="Déconnexion" class="hidden sm:flex items-center text-slate-400 hover:text-rose-500 transition text-sm p-1">
             <i class="fa-solid fa-arrow-right-from-bracket"></i>
           </a>
         <% } else { %>
-          <a href="/login" class="text-sm font-semibold text-slate-700 hover:text-emerald-600">Connexion</a>
-          <a href="/login" class="inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 shadow-sm transition">
+          <a href="/login" class="text-xs sm:text-sm font-semibold text-slate-700 hover:text-emerald-600 px-2 py-1">Connexion</a>
+          <a href="/login" class="inline-flex items-center justify-center px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 shadow-sm transition">
             Commencer
           </a>
         <% } %>
@@ -91,6 +99,34 @@
 
     </div>
   </header>
+
+  <!-- Barre de navigation mobile inférieure (Bottom Navigation Bar) -->
+  <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 flex items-center justify-around h-14 px-2 shadow-lg">
+    <a href="/" class="flex flex-col items-center justify-center text-[10px] font-medium text-slate-600 hover:text-emerald-600 transition flex-1 py-1">
+      <i class="fa-solid fa-compass text-base mb-0.5"></i>
+      <span>Explorer</span>
+    </a>
+    <a href="/services/new" class="flex flex-col items-center justify-center text-[10px] font-medium text-slate-600 hover:text-emerald-600 transition flex-1 py-1">
+      <i class="fa-solid fa-circle-plus text-base mb-0.5 text-emerald-600"></i>
+      <span>Vendre</span>
+    </a>
+    <a href="/dashboard" class="flex flex-col items-center justify-center text-[10px] font-medium text-slate-600 hover:text-emerald-600 transition flex-1 py-1">
+      <i class="fa-solid fa-wallet text-base mb-0.5"></i>
+      <span>Portefeuille</span>
+    </a>
+    <% if (user && user.role === 'ADMIN') { %>
+      <a href="/admin/disputes" class="flex flex-col items-center justify-center text-[10px] font-medium text-amber-600 hover:text-amber-700 transition flex-1 py-1">
+        <i class="fa-solid fa-gavel text-base mb-0.5"></i>
+        <span>Litiges</span>
+      </a>
+    <% } %>
+    <% if (user) { %>
+      <a href="/logout" class="flex flex-col items-center justify-center text-[10px] font-medium text-slate-400 hover:text-rose-500 transition flex-1 py-1">
+        <i class="fa-solid fa-arrow-right-from-bracket text-base mb-0.5"></i>
+        <span>Quitter</span>
+      </a>
+    <% } %>
+  </nav>
 
   <script>
     // Helper universel de Toast dynamique
@@ -101,7 +137,7 @@
       const bg = type === 'success' ? 'bg-emerald-600' : (type === 'error' ? 'bg-rose-600' : 'bg-slate-800');
       const icon = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle');
       toast.className = `toast-anim pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl text-white text-xs font-semibold shadow-lg ${bg}`;
-      toast.innerHTML = `<i class="fa-solid ${icon} text-sm"></i> <span>${message}</span>`;
+      toast.innerHTML = `<i class="fa-solid ${icon} text-sm flex-shrink-0"></i> <span>${message}</span>`;
       container.appendChild(toast);
       setTimeout(() => {
         toast.style.opacity = '0';
