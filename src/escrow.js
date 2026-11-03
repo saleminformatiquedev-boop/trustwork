@@ -47,16 +47,18 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
       WHERE id = $2
     `, [price, buyerId]);
 
-    // 3. Créer la commande en statut ESCROWED ou DELIVERED si PDF immédiatement disponible
+    // 3. Créer la commande en statut ESCROWED ou DELIVERED si méthode immédiatement disponible
     const orderId = generateId('ord_');
-    const isInstantPdf = !!srv.fileUrl;
-    const initialStatus = isInstantPdf ? 'DELIVERED' : 'ESCROWED';
-    const deliveryNote = isInstantPdf ? `Votre guide PDF (${srv.fileName || 'methode.pdf'}) est accessible en téléchargement immédiat.` : null;
-    const deliveredAt = isInstantPdf ? new Date() : null;
+    const isInstantDelivery = !!srv.fileUrl || (srv.attachments && srv.attachments.length > 0);
+    const initialStatus = isInstantDelivery ? 'DELIVERED' : 'ESCROWED';
+    const deliveryNote = isInstantDelivery ? `Votre pack méthode (${srv.fileName || 'pack-fichiers'}) avec ses ressources (PDF, ZIP, scripts, vidéo) est accessible en téléchargement immédiat.` : null;
+    const deliveredAt = isInstantDelivery ? new Date() : null;
+
+    const attachmentsJson = srv.attachments ? JSON.stringify(srv.attachments) : '[]';
 
     const orderRes = await client.query(`
-      INSERT INTO orders (id, "serviceId", "buyerId", "sellerId", amount, status, requirements, "fileUrl", "fileName", "deliveryNote", "deliveredAt")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      INSERT INTO orders (id, "serviceId", "buyerId", "sellerId", amount, status, requirements, "fileUrl", "fileName", "deliveryNote", "deliveredAt", "formats", "videoUrl", "attachments")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)
       RETURNING *
     `, [
       orderId,
@@ -65,11 +67,14 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
       srv.sellerId,
       price,
       initialStatus,
-      requirements || "Achat de la méthode PDF",
+      requirements || "Achat du pack méthode",
       srv.fileUrl || null,
       srv.fileName || null,
       deliveryNote,
-      deliveredAt
+      deliveredAt,
+      srv.formats || 'PDF,ZIP,TEXT,VIDEO',
+      srv.videoUrl || null,
+      attachmentsJson
     ]);
     createdOrder = orderRes.rows[0];
 
@@ -82,8 +87,8 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
       msgId,
       orderId,
       buyerUser.id,
-      isInstantPdf 
-        ? `🎉 Commande validée ! Votre méthode PDF "${srv.title}" est prête au téléchargement immédiat. Vos ${price.toFixed(2)} USDT sont sécurisés sous séquestre jusqu'à votre validation.`
+      isInstantDelivery 
+        ? `🎉 Commande validée ! Votre pack méthode "${srv.title}" (PDF, ZIP, Scripts & Vidéo) est prêt au téléchargement immédiat. Vos ${price.toFixed(2)} USDT sont sécurisés sous séquestre jusqu'à votre validation.`
         : `Commande confirmée ! Un montant de ${price.toFixed(2)} USDT a été prélevé et sécurisé sous séquestre.`,
       srv.fileUrl || null,
       srv.fileName || null

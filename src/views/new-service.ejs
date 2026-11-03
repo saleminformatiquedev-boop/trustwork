@@ -24,13 +24,56 @@
         <p class="text-[11px] text-slate-400 mt-1">Formulez clairement la tâche résolue par votre méthode.</p>
       </div>
 
-      <!-- Fichier PDF du Guide -->
-      <div class="p-4 rounded-xl bg-slate-50 border-2 border-dashed border-slate-300 hover:border-emerald-500 transition">
-        <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1 flex items-center gap-2">
-          <i class="fa-solid fa-file-pdf text-rose-500 text-sm"></i> Fichier PDF du Guide (Téléchargement immédiat)
+      <!-- Section des Fichiers & Livrables de la Méthode (PDF, ZIP, Texte, Vidéo) -->
+      <div class="space-y-3 pt-2">
+        <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+          📦 Fichiers et Ressources Inclus dans la Méthode
         </label>
-        <p class="text-[11px] text-slate-500 mb-2">Sélectionnez le document PDF complet qui sera délivré à l'acheteur dès sa commande.</p>
-        <input type="file" name="pdfFile" accept=".pdf" class="w-full text-xs text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer">
+        <p class="text-[11px] text-slate-500">Ajoutez les documents, archives de code, scripts et vidéos qui composeront votre méthode complète.</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          
+          <!-- 1. Document PDF -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <span class="font-bold text-rose-700 flex items-center gap-1.5">
+              <i class="fa-solid fa-file-pdf"></i> 1. Document PDF (Guide Pas à Pas)
+            </span>
+            <input type="file" name="pdfFile" accept=".pdf" class="w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-rose-600 file:text-white hover:file:bg-rose-700 cursor-pointer">
+          </div>
+
+          <!-- 2. Archive ZIP -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <span class="font-bold text-amber-700 flex items-center gap-1.5">
+              <i class="fa-solid fa-file-zipper"></i> 2. Code Source & Templates (ZIP)
+            </span>
+            <input type="file" name="zipFile" accept=".zip,.rar,.tar,.gz" class="w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-700 cursor-pointer">
+          </div>
+
+          <!-- 3. Fichier Texte / Scripts -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <span class="font-bold text-blue-700 flex items-center gap-1.5">
+              <i class="fa-solid fa-file-lines"></i> 3. Scripts & Commandes (Texte / .sh / .env)
+            </span>
+            <input type="file" name="textFile" accept=".txt,.md,.sh,.env,.json,.yml,.yaml" class="w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer">
+          </div>
+
+          <!-- 4. Vidéo Démonstrative -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <span class="font-bold text-purple-700 flex items-center gap-1.5">
+              <i class="fa-solid fa-video"></i> 4. Fichier Vidéo (MP4 / WebM)
+            </span>
+            <input type="file" name="videoFile" accept=".mp4,.webm,.mov" class="w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer">
+          </div>
+
+        </div>
+
+        <!-- Ou Lien Vidéo Externe -->
+        <div class="mt-2">
+          <label class="block text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1">
+            <i class="fa-brands fa-youtube text-rose-600"></i> Ou Lien du Tutoriel Vidéo (YouTube, Loom, Vimeo) :
+          </label>
+          <input type="url" name="videoUrl" placeholder="https://www.youtube.com/watch?v=... ou https://www.loom.com/share/..." class="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+        </div>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">

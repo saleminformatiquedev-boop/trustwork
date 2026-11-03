@@ -227,31 +227,87 @@ app.post('/api/upload', ensureAuthenticated, upload.single('file'), (req, res) =
   });
 });
 
-// Création d'un guide / méthode PDF
-app.post('/services/new', ensureAuthenticated, upload.single('pdfFile'), async (req, res) => {
+// Création d'une méthode complète multi-formats (PDF, ZIP, Texte, Vidéo)
+app.post('/services/new', ensureAuthenticated, upload.any(), async (req, res) => {
   try {
-    const { title, description, category, price, pageCount, difficulty } = req.body;
+    const { title, description, category, price, pageCount, difficulty, videoUrl, formats } = req.body;
     const newId = 'srv_' + crypto.randomBytes(6).toString('hex');
 
-    let fileUrl = null;
-    let fileName = null;
-    let fileSize = null;
+    const attachments = [];
+    let primaryFileUrl = null;
+    let primaryFileName = null;
+    let primaryFileSize = null;
 
-    if (req.file) {
-      fileUrl = `/uploads/${req.file.filename}`;
-      fileName = req.file.originalname;
-      const sizeMb = (req.file.size / (1024 * 1024)).toFixed(1);
-      fileSize = sizeMb > 0 ? `${sizeMb} Mo` : `${(req.file.size / 1024).toFixed(0)} Ko`;
-    } else {
-      // Démo fallback si aucun fichier n'a été téléversé
-      fileUrl = '/uploads/guide-methode-developpement-ideale.pdf';
-      fileName = 'methode-pratique.pdf';
-      fileSize = '2.4 Mo';
+    if (req.files && req.files.length > 0) {
+      req.files.forEach(f => {
+        const ext = path.extname(f.originalname).toLowerCase();
+        let type = 'other';
+        let label = f.originalname;
+
+        if (ext === '.pdf') {
+          type = 'pdf';
+          label = `Guide Complet (${f.originalname})`;
+        } else if (['.zip', '.rar', '.tar', '.gz'].includes(ext)) {
+          type = 'zip';
+          label = `Code Source & Archives (${f.originalname})`;
+        } else if (['.txt', '.md', '.sh', '.env', '.json', '.yml', '.yaml'].includes(ext)) {
+          type = 'text';
+          label = `Scripts & Configuration (${f.originalname})`;
+        } else if (['.mp4', '.mov', '.webm', '.mkv'].includes(ext)) {
+          type = 'video';
+          label = `Tutoriel Vidéo (${f.originalname})`;
+        }
+
+        const sizeMb = (f.size / (1024 * 1024)).toFixed(1);
+        const sizeStr = sizeMb > 0 ? `${sizeMb} Mo` : `${(f.size / 1024).toFixed(0)} Ko`;
+        const url = `/uploads/${f.filename}`;
+
+        attachments.push({
+          type,
+          name: f.originalname,
+          url,
+          size: sizeStr,
+          label
+        });
+
+        if (!primaryFileUrl) {
+          primaryFileUrl = url;
+          primaryFileName = f.originalname;
+          primaryFileSize = sizeStr;
+        }
+      });
     }
 
+    if (videoUrl && videoUrl.trim()) {
+      attachments.push({
+        type: 'video',
+        name: 'Tutoriel Vidéo en Ligne',
+        url: videoUrl.trim(),
+        size: 'Streaming Vidéo',
+        label: 'Tutoriel Vidéo Pas à Pas'
+      });
+    }
+
+    // Si aucun fichier téléversé manuellement, attribution d'un pack de démonstration
+    if (attachments.length === 0) {
+      attachments.push(
+        { type: "pdf", name: "guide-methode-pas-a-pas.pdf", url: "/uploads/guide-methode-developpement-ideale.pdf", size: "2.4 Mo", label: "Guide Complet Pas à Pas (PDF)" },
+        { type: "zip", name: "code-source-template.zip", url: "/uploads/code-source-template.zip", size: "5.1 Mo", label: "Code Source & Fichiers Prêts (ZIP)" },
+        { type: "text", name: "commandes-scripts.txt", url: "/uploads/commandes-scripts.txt", size: "15 Ko", label: "Scripts Shell & Variables .env (Texte)" }
+      );
+      if (videoUrl && videoUrl.trim()) {
+        attachments.push({ type: "video", name: "tutoriel-video", url: videoUrl.trim(), size: "Streaming", label: "Tutoriel Vidéo" });
+      }
+      primaryFileUrl = '/uploads/guide-methode-developpement-ideale.pdf';
+      primaryFileName = 'pack-methode-complet.zip';
+      primaryFileSize = '7.5 Mo';
+    }
+
+    const activeFormats = Array.isArray(formats) ? formats.join(',') : (formats || 'PDF,ZIP,TEXT');
+
     await pool.query(`
-      INSERT INTO services (id, "sellerId", title, description, category, price, "deliveryDays", "fileUrl", "fileName", "fileSize", "pageCount", "difficulty")
-      VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8, $9, $10, $11)
+      INSERT INTO services (id, "sellerId", title, description, category, price, "deliveryDays", "fileUrl", "fileName", "fileSize", "pageCount", "difficulty", "formats", "videoUrl", "attachments")
+      VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)
     `, [
       newId,
       req.user.id,
@@ -259,16 +315,19 @@ app.post('/services/new', ensureAuthenticated, upload.single('pdfFile'), async (
       description,
       category || 'Méthodologie de Développement',
       parseFloat(price),
-      fileUrl,
-      fileName,
-      fileSize,
+      primaryFileUrl,
+      primaryFileName,
+      primaryFileSize,
       parseInt(pageCount, 10) || 30,
-      difficulty || 'Intermédiaire'
+      difficulty || 'Intermédiaire',
+      activeFormats,
+      videoUrl || null,
+      JSON.stringify(attachments)
     ]);
 
     res.redirect('/services/' + newId);
   } catch (err) {
-    res.status(500).send("Erreur création méthode PDF: " + err.message);
+    res.status(500).send("Erreur création méthode multi-formats: " + err.message);
   }
 });
 

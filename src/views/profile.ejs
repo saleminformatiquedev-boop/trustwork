@@ -48,10 +48,10 @@
     </div>
   </div>
 
-  <!-- Services proposés par ce travailleur -->
+  <!-- Méthodes proposées par cet auteur -->
   <div class="space-y-4">
     <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-      <i class="fa-solid fa-layer-group text-emerald-600"></i> Services proposés (<%= services.length %>)
+      <i class="fa-solid fa-layer-group text-emerald-600"></i> Méthodes & Packs Techniques proposés (<%= services.length %>)
     </h2>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -59,9 +59,16 @@
         <% services.forEach(service => { %>
           <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
             <div>
-              <span class="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full inline-block mb-3">
-                <%= service.category %>
-              </span>
+              <div class="flex items-center justify-between mb-3 gap-1">
+                <span class="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full inline-block truncate max-w-[130px]">
+                  <%= service.category %>
+                </span>
+                <div class="flex gap-1 text-[9px] font-bold">
+                  <span class="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded border border-rose-200">PDF</span>
+                  <span class="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">ZIP</span>
+                  <span class="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">TXT</span>
+                </div>
+              </div>
               <h3 class="font-bold text-slate-900 text-sm mb-2 line-clamp-2">
                 <a href="/services/<%= service.id %>" class="hover:text-emerald-600 transition"><%= service.title %></a>
               </h3>
@@ -70,14 +77,14 @@
 
             <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
               <span class="text-base font-black text-slate-900"><%= service.price.toFixed(2) %> <span class="text-xs text-emerald-600">USDT</span></span>
-              <a href="/services/<%= service.id %>" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition">
-                Commander
+              <a href="/services/<%= service.id %>" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5">
+                <i class="fa-solid fa-box-open text-[10px]"></i> Voir le Pack
               </a>
             </div>
           </div>
         <% }) %>
       <% } else { %>
-        <p class="text-xs text-slate-400 py-6">Aucun service public pour l'instant.</p>
+        <p class="text-xs text-slate-400 py-6">Aucune méthode publiée par cet auteur pour l'instant.</p>
       <% } %>
     </div>
   </div>

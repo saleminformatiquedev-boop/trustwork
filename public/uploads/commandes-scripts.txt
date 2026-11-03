@@ -1,0 +1,20 @@
+# Guide Méthode - Scripts & Commandes d'Exécution
+# Tâche : Déploiement et Configuration Rapide
+
+# 1. Cloner et installer les dépendances
+git clone https://github.com/saleminformatiquedev-boop/trustwork.git
+cd trustwork
+npm install
+
+# 2. Configurer les variables d'environnement
+cp .env.example .env
+nano .env
+
+# 3. Lancer en production avec PM2
+pm2 start src/server.js --name trustwork
+pm2 save
+pm2 startup
+
+# 4. Vérification du statut
+pm2 status
+curl -I http://localhost:3000

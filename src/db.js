@@ -104,16 +104,38 @@ async function initDatabase() {
       );
     `);
 
-    // Migrations idempotentes pour le support des Méthodes PDF
+    // Migrations idempotentes pour le support des Méthodes Multi-formats (PDF, ZIP, Texte, Vidéo)
     await client.query(`
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "fileUrl" TEXT;
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "fileName" TEXT;
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "fileSize" TEXT;
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "pageCount" INTEGER DEFAULT 25;
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "difficulty" VARCHAR(32) DEFAULT 'Intermédiaire';
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "formats" VARCHAR(255) DEFAULT 'PDF,ZIP,TEXT,VIDEO';
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "videoUrl" TEXT;
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "attachments" JSONB DEFAULT '[]'::jsonb;
+      
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS "fileUrl" TEXT;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS "fileName" TEXT;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS "formats" VARCHAR(255) DEFAULT 'PDF,ZIP,TEXT,VIDEO';
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS "videoUrl" TEXT;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS "attachments" JSONB DEFAULT '[]'::jsonb;
     `);
+
+    // Mise à jour des services existants pour inclure les packs multi-fichiers
+    const defaultAttachments = JSON.stringify([
+      { type: "pdf", name: "guide-methode-pas-a-pas.pdf", url: "/uploads/guide-methode-developpement-ideale.pdf", size: "2.4 Mo", label: "Guide Complet (PDF)" },
+      { type: "zip", name: "code-source-projet.zip", url: "/uploads/code-source-template.zip", size: "5.1 Mo", label: "Code Source & Fichiers Prêts (ZIP)" },
+      { type: "text", name: "commandes-scripts.txt", url: "/uploads/commandes-scripts.txt", size: "15 Ko", label: "Scripts Shell & Variables .env (Texte)" },
+      { type: "video", name: "tutoriel-video.mp4", url: "https://www.youtube.com/watch?v=gAkwW2tuIqE", size: "18 min", label: "Tutoriel Vidéo de Démonstration (Vidéo)" }
+    ]);
+
+    await client.query(`
+      UPDATE services 
+      SET "formats" = COALESCE("formats", 'PDF,ZIP,TEXT,VIDEO'),
+          "videoUrl" = COALESCE("videoUrl", 'https://www.youtube.com/watch?v=gAkwW2tuIqE'),
+          "attachments" = CASE WHEN "attachments" IS NULL OR "attachments" = '[]'::jsonb THEN $1::jsonb ELSE "attachments" END
+    `, [defaultAttachments]);
 
     // Données de test initiales si la base est vide
     const res = await client.query('SELECT count(*) as total FROM users');

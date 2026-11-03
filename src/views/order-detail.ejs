@@ -84,25 +84,92 @@
     </div>
   </div>
 
-  <!-- Bandeau Téléchargement Immédiat du Guide PDF -->
-  <% if (order.fileUrl) { %>
-    <div class="mb-6 sm:mb-8 p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div class="flex items-center gap-4">
-        <span class="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-white text-2xl flex-shrink-0">
-          <i class="fa-solid fa-file-pdf"></i>
-        </span>
-        <div>
-          <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-200 block">Votre Méthode Pratique PDF</span>
-          <h3 class="text-base sm:text-lg font-black"><%= order.fileName || 'Guide-Methode.pdf' %></h3>
-          <p class="text-xs text-emerald-100 mt-0.5">Téléchargement immédiat et sécurisé sous séquestre.</p>
+  <!-- Bandeau Téléchargement du Pack de Ressources (PDF, ZIP, Texte, Vidéo) -->
+  <div class="mb-6 sm:mb-8 p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+      <div>
+        <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-600 block">Ressources Débloquées</span>
+        <h3 class="text-base sm:text-lg font-black text-slate-900">Pack de la Méthode : Fichiers & Livrables</h3>
+        <p class="text-xs text-slate-500 mt-0.5">Téléchargez vos fichiers et visionnez la vidéo pour accomplir votre tâche.</p>
+      </div>
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 self-start sm:self-auto">
+        <i class="fa-solid fa-lock text-emerald-600"></i> <%= order.amount.toFixed(2) %> USDT sous Séquestre
+      </span>
+    </div>
+
+    <!-- Grille des 4 Fichiers de la Méthode (PDF, ZIP, Texte, Vidéo) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      
+      <!-- 1. Document PDF -->
+      <div class="p-3.5 rounded-xl bg-rose-50/60 border border-rose-200 flex flex-col justify-between space-y-3">
+        <div class="flex items-start gap-2.5">
+          <span class="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center text-sm flex-shrink-0">
+            <i class="fa-solid fa-file-pdf"></i>
+          </span>
+          <div class="min-w-0">
+            <span class="text-[10px] font-bold text-rose-700 uppercase block">Guide Écrit</span>
+            <strong class="text-xs text-slate-900 block truncate" title="Guide Complet PDF">Guide-Methode.pdf</strong>
+            <span class="text-[10px] text-slate-500">2.4 Mo • 42 pages</span>
+          </div>
         </div>
+        <a href="<%= order.fileUrl || '/uploads/guide-methode-developpement-ideale.pdf' %>" download="Guide-Methode.pdf" target="_blank" class="w-full py-2 px-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] rounded-lg text-center transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-download"></i> Télécharger PDF
+        </a>
       </div>
 
-      <a href="<%= order.fileUrl %>" download="<%= order.fileName || 'methode.pdf' %>" target="_blank" class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white hover:bg-emerald-50 text-emerald-900 font-bold text-xs sm:text-sm shadow-md transition transform hover:scale-105 flex-shrink-0">
-        <i class="fa-solid fa-download text-emerald-600"></i> Télécharger le Guide PDF
-      </a>
+      <!-- 2. Code Source ZIP -->
+      <div class="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200 flex flex-col justify-between space-y-3">
+        <div class="flex items-start gap-2.5">
+          <span class="w-8 h-8 rounded-lg bg-amber-600 text-white flex items-center justify-center text-sm flex-shrink-0">
+            <i class="fa-solid fa-file-zipper"></i>
+          </span>
+          <div class="min-w-0">
+            <span class="text-[10px] font-bold text-amber-700 uppercase block">Code Source</span>
+            <strong class="text-xs text-slate-900 block truncate" title="Code Source & Templates">Code-Source.zip</strong>
+            <span class="text-[10px] text-slate-500">5.1 Mo • Projets prêts</span>
+          </div>
+        </div>
+        <a href="/uploads/code-source-template.zip" download="Code-Source.zip" target="_blank" class="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] rounded-lg text-center transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-download"></i> Télécharger ZIP
+        </a>
+      </div>
+
+      <!-- 3. Scripts Texte -->
+      <div class="p-3.5 rounded-xl bg-blue-50/60 border border-blue-200 flex flex-col justify-between space-y-3">
+        <div class="flex items-start gap-2.5">
+          <span class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-sm flex-shrink-0">
+            <i class="fa-solid fa-file-lines"></i>
+          </span>
+          <div class="min-w-0">
+            <span class="text-[10px] font-bold text-blue-700 uppercase block">Scripts & Commandes</span>
+            <strong class="text-xs text-slate-900 block truncate" title="Commandes & Config">commandes-scripts.txt</strong>
+            <span class="text-[10px] text-slate-500">15 Ko • Prêt à coller</span>
+          </div>
+        </div>
+        <a href="/uploads/commandes-scripts.txt" download="commandes-scripts.txt" target="_blank" class="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] rounded-lg text-center transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-download"></i> Télécharger TXT
+        </a>
+      </div>
+
+      <!-- 4. Tutoriel Vidéo -->
+      <div class="p-3.5 rounded-xl bg-purple-50/60 border border-purple-200 flex flex-col justify-between space-y-3">
+        <div class="flex items-start gap-2.5">
+          <span class="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center text-sm flex-shrink-0">
+            <i class="fa-solid fa-video"></i>
+          </span>
+          <div class="min-w-0">
+            <span class="text-[10px] font-bold text-purple-700 uppercase block">Démonstration</span>
+            <strong class="text-xs text-slate-900 block truncate" title="Tutoriel Vidéo Pas à Pas">Tutoriel Vidéo</strong>
+            <span class="text-[10px] text-slate-500">18 min • Démonstration</span>
+          </div>
+        </div>
+        <a href="<%= order.videoUrl || 'https://www.youtube.com/watch?v=gAkwW2tuIqE' %>" target="_blank" class="w-full py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] rounded-lg text-center transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-play"></i> Visionner Vidéo
+        </a>
+      </div>
+
     </div>
-  <% } %>
+  </div>
 
   <!-- Alerte Litige si Enquête ouverte -->
   <% if (dispute) { %>

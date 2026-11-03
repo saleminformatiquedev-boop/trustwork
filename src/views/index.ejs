@@ -87,15 +87,30 @@
              data-price="<%= service.price %>">
           
           <div class="p-5 sm:p-6">
-            <!-- Vendeur & Format PDF Badge -->
+            <!-- Vendeur & Badges Formats Inclus (PDF, ZIP, Texte, Vidéo) -->
             <div class="flex items-center justify-between mb-3.5 gap-2">
               <div class="flex items-center gap-2 min-w-0">
                 <img src="<%= service.sellerAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + service.sellerName %>" alt="<%= service.sellerName %>" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-slate-200 flex-shrink-0 object-cover">
                 <span class="text-xs font-semibold text-slate-700 truncate"><%= service.sellerName %></span>
               </div>
-              <span class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full flex-shrink-0">
-                <i class="fa-solid fa-file-pdf text-rose-500"></i> PDF
-              </span>
+              
+              <!-- Badges de formats -->
+              <div class="flex items-center gap-1 flex-shrink-0">
+                <span class="text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded" title="Guide PDF inclus">
+                  PDF
+                </span>
+                <span class="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded" title="Code source ZIP inclus">
+                  ZIP
+                </span>
+                <span class="text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded" title="Scripts texte inclus">
+                  TXT
+                </span>
+                <% if (service.videoUrl || (service.formats && service.formats.includes('VIDEO'))) { %>
+                  <span class="text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded" title="Tutoriel vidéo inclus">
+                    <i class="fa-solid fa-play text-[8px]"></i> Vidéo
+                  </span>
+                <% } %>
+              </div>
             </div>
 
             <!-- Titre & Description de la tâche -->

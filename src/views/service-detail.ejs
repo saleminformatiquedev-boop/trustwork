@@ -82,6 +82,57 @@
           <%= service.description %>
         </div>
 
+        <!-- Fichiers et Ressources inclus dans la méthode -->
+        <div class="mb-8">
+          <h3 class="font-bold text-slate-900 text-sm uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-box-open text-emerald-600"></i> Ressources Incluses dans ce Pack de Méthode :
+          </h3>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+              <span class="w-9 h-9 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center text-base flex-shrink-0">
+                <i class="fa-solid fa-file-pdf"></i>
+              </span>
+              <div class="min-w-0">
+                <strong class="text-slate-800 block truncate">Guide Écrit Pas à Pas</strong>
+                <span class="text-[11px] text-slate-500">Document PDF (<%= service.pageCount || 40 %> pages)</span>
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+              <span class="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-base flex-shrink-0">
+                <i class="fa-solid fa-file-zipper"></i>
+              </span>
+              <div class="min-w-0">
+                <strong class="text-slate-800 block truncate">Code Source & Templates</strong>
+                <span class="text-[11px] text-slate-500">Archive ZIP téléchargeable</span>
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+              <span class="w-9 h-9 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-base flex-shrink-0">
+                <i class="fa-solid fa-file-lines"></i>
+              </span>
+              <div class="min-w-0">
+                <strong class="text-slate-800 block truncate">Scripts Shell & Configuration</strong>
+                <span class="text-[11px] text-slate-500">Fichiers texte (.txt, .sh, .env)</span>
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+              <span class="w-9 h-9 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center text-base flex-shrink-0">
+                <i class="fa-solid fa-video"></i>
+              </span>
+              <div class="min-w-0">
+                <strong class="text-slate-800 block truncate">Tutoriel Vidéo de Démonstration</strong>
+                <span class="text-[11px] text-slate-500">Vidéo explicative pas à pas</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
         <!-- Étapes de la méthode & Séquestre -->
         <div class="border-t border-slate-100 pt-6">
           <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider mb-4 text-slate-500">
