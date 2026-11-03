@@ -47,25 +47,46 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
       WHERE id = $2
     `, [price, buyerId]);
 
-    // 3. Créer la commande en statut ESCROWED
+    // 3. Créer la commande en statut ESCROWED ou DELIVERED si PDF immédiatement disponible
     const orderId = generateId('ord_');
+    const isInstantPdf = !!srv.fileUrl;
+    const initialStatus = isInstantPdf ? 'DELIVERED' : 'ESCROWED';
+    const deliveryNote = isInstantPdf ? `Votre guide PDF (${srv.fileName || 'methode.pdf'}) est accessible en téléchargement immédiat.` : null;
+    const deliveredAt = isInstantPdf ? new Date() : null;
+
     const orderRes = await client.query(`
-      INSERT INTO orders (id, "serviceId", "buyerId", "sellerId", amount, status, requirements)
-      VALUES ($1, $2, $3, $4, $5, 'ESCROWED', $6)
+      INSERT INTO orders (id, "serviceId", "buyerId", "sellerId", amount, status, requirements, "fileUrl", "fileName", "deliveryNote", "deliveredAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
-    `, [orderId, srv.id, buyerUser.id, srv.sellerId, price, requirements || "Aucune consigne spécifique"]);
+    `, [
+      orderId,
+      srv.id,
+      buyerUser.id,
+      srv.sellerId,
+      price,
+      initialStatus,
+      requirements || "Achat de la méthode PDF",
+      srv.fileUrl || null,
+      srv.fileName || null,
+      deliveryNote,
+      deliveredAt
+    ]);
     createdOrder = orderRes.rows[0];
 
     // 4. Message initial de confirmation
     const msgId = generateId('msg_');
     await client.query(`
-      INSERT INTO messages (id, "orderId", "senderId", content)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO messages (id, "orderId", "senderId", content, "fileUrl", "fileName")
+      VALUES ($1, $2, $3, $4, $5, $6)
     `, [
       msgId,
       orderId,
       buyerUser.id,
-      `Commande confirmée ! Un montant de ${price.toFixed(2)} USDT a été prélevé et sécurisé sous séquestre. Le travailleur a été notifié.`
+      isInstantPdf 
+        ? `🎉 Commande validée ! Votre méthode PDF "${srv.title}" est prête au téléchargement immédiat. Vos ${price.toFixed(2)} USDT sont sécurisés sous séquestre jusqu'à votre validation.`
+        : `Commande confirmée ! Un montant de ${price.toFixed(2)} USDT a été prélevé et sécurisé sous séquestre.`,
+      srv.fileUrl || null,
+      srv.fileName || null
     ]);
 
     await client.query('COMMIT');

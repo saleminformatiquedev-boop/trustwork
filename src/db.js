@@ -34,9 +34,13 @@ async function initDatabase() {
         "sellerId" VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         title VARCHAR(255) NOT NULL,
         description TEXT NOT NULL,
-        category VARCHAR(64) DEFAULT 'Développement Web & Mobile',
+        category VARCHAR(64) DEFAULT 'Méthodologie de Développement',
         price NUMERIC(14, 2) NOT NULL,
-        "deliveryDays" INTEGER DEFAULT 3,
+        "deliveryDays" INTEGER DEFAULT 1,
+        "fileUrl" TEXT,
+        "fileName" TEXT,
+        "fileSize" TEXT,
+        "pageCount" INTEGER DEFAULT 50,
         "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -48,6 +52,8 @@ async function initDatabase() {
         amount NUMERIC(14, 2) NOT NULL,
         status VARCHAR(32) DEFAULT 'ESCROWED',
         requirements TEXT,
+        "fileUrl" TEXT,
+        "fileName" TEXT,
         "deliveryNote" TEXT,
         "deliveredAt" TIMESTAMP WITH TIME ZONE,
         "completedAt" TIMESTAMP WITH TIME ZONE,
@@ -98,6 +104,17 @@ async function initDatabase() {
       );
     `);
 
+    // Migrations idempotentes pour le support des Méthodes PDF
+    await client.query(`
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "fileUrl" TEXT;
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "fileName" TEXT;
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "fileSize" TEXT;
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "pageCount" INTEGER DEFAULT 25;
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "difficulty" VARCHAR(32) DEFAULT 'Intermédiaire';
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS "fileUrl" TEXT;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS "fileName" TEXT;
+    `);
+
     // Données de test initiales si la base est vide
     const res = await client.query('SELECT count(*) as total FROM users');
     if (parseInt(res.rows[0].total, 10) === 0) {
@@ -115,8 +132,8 @@ async function initDatabase() {
         "USER",
         250.00,
         0.00,
-        "Entrepreneur e-commerce à la recherche de prestataires talentueux.",
-        "Gestion de projet, Marketing digital"
+        "Développeur & créateur de projets à la recherche de méthodes fiables pour accomplir ses tâches.",
+        "Gestion de projet, JavaScript, Python"
       ]);
 
       const sellerId = "usr_seller_demo";
@@ -126,13 +143,13 @@ async function initDatabase() {
       `, [
         sellerId,
         "vendeur@demo.local",
-        "Sarah Dev & Design",
+        "Sarah Méthodes Dev",
         "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80",
         "USER",
         45.00,
         0.00,
-        "Développeuse Full-Stack & UI Designer spécialisée Node.js & Tailwind CSS.",
-        "Node.js, PostgreSQL, Tailwind, React, UI/UX",
+        "Architecte logicielle & Auteure de guides méthodologiques pas à pas.",
+        "DevOps, Architecture, Sécurité, Clean Code",
         "BINANCE-PAY-789456"
       ]);
 
@@ -150,33 +167,73 @@ async function initDatabase() {
         0.00
       ]);
 
+      // Guides & Méthodes PDF orientés "Comment accomplir des tâches"
       await client.query(`
-        INSERT INTO services (id, "sellerId", title, description, category, price, "deliveryDays")
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO services (id, "sellerId", title, description, category, price, "deliveryDays", "fileUrl", "fileName", "fileSize", "pageCount", "difficulty")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       `, [
-        "srv_landing_page",
+        "srv_guide_aws_docker",
         sellerId,
-        "Je vais créer votre Landing Page moderne avec Tailwind CSS",
-        "Conception complète d'une page d'atterrissage responsive, rapide et optimisée pour la conversion. Code propre en HTML/Tailwind CSS sous 48h.",
-        "Développement Web & Mobile",
-        65.00,
-        2
+        "Guide PDF : Comment déployer une application Web sur AWS avec Docker & HTTPS",
+        "Méthode pas à pas pour accomplir cette tâche de A à Z : création de l'instance EC2, configuration Nginx, SSL Let's Encrypt automatique, Docker Compose, monitoring et gestion des pannes. Avec scripts shell prêts à copier-coller.",
+        "Déploiement & Cloud",
+        29.00,
+        1,
+        "/uploads/guide-methode-developpement-ideale.pdf",
+        "methode-deploiement-aws-docker.pdf",
+        "2.4 Mo",
+        42,
+        "Intermédiaire"
       ]);
 
       await client.query(`
-        INSERT INTO services (id, "sellerId", title, description, category, price, "deliveryDays")
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO services (id, "sellerId", title, description, category, price, "deliveryDays", "fileUrl", "fileName", "fileSize", "pageCount", "difficulty")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       `, [
-        "srv_logo_minimal",
+        "srv_guide_api_rest",
         sellerId,
-        "Je vais concevoir un Logo minimaliste et charte graphique",
-        "Logo vectoriel haute résolution (SVG, PNG, PDF), 3 propositions initiales, révisions illimitées jusqu'à validation finale.",
-        "Design & Graphisme",
-        40.00,
-        3
+        "Méthode PDF : Comment concevoir une API REST sécurisée avec JWT & PostgreSQL",
+        "Fiche de procédure pratique pour réaliser une API robuste : validation stricte des entrées, hash des mots de passe avec bcrypt, gestion sécurisée des tokens JWT, middleware d'autorisation et transactions ACID protégées contre les doubles dépenses.",
+        "Backend & API",
+        19.00,
+        1,
+        "/uploads/guide-methode-developpement-ideale.pdf",
+        "methode-api-rest-securisee.pdf",
+        "1.8 Mo",
+        35,
+        "Débutant"
+      ]);
+
+      await client.query(`
+        INSERT INTO services (id, "sellerId", title, description, category, price, "deliveryDays", "fileUrl", "fileName", "fileSize", "pageCount", "difficulty")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `, [
+        "srv_guide_cicd_actions",
+        sellerId,
+        "Playbook PDF : Comment mettre en place une Pipeline CI/CD avec GitHub Actions",
+        "Procédure pas à pas pour automatiser vos tests et déploiements : configuration des fichiers YAML, gestion sécurisée des secrets d'infrastructure, exécution des tests unitaires et intégration sans interruption de service.",
+        "DevOps & CI/CD",
+        39.00,
+        1,
+        "/uploads/guide-methode-developpement-ideale.pdf",
+        "playbook-cicd-github-actions.pdf",
+        "3.1 Mo",
+        55,
+        "Avancé"
       ]);
 
       console.log("✅ Base de données PostgreSQL initialisée avec succès !");
+    } else {
+      // S'assurer que les guides de démo existants ont des PDF attachés
+      await client.query(`
+        UPDATE services 
+        SET "fileUrl" = '/uploads/guide-methode-developpement-ideale.pdf',
+            "fileName" = 'methode-tache-developpement.pdf',
+            "fileSize" = '2.4 Mo',
+            "pageCount" = 45,
+            "difficulty" = 'Intermédiaire'
+        WHERE "fileUrl" IS NULL;
+      `);
     }
   } finally {
     client.release();

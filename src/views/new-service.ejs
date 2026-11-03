@@ -1,88 +1,93 @@
-<%- include('partials/header', { title: 'Proposer un service' }) %>
+<%- include('partials/header', { title: 'Publier une Méthode PDF' }) %>
 
 <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
   
   <div class="bg-white p-5 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
     
     <div class="border-b border-slate-100 pb-5">
-      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold mb-2">
-        <i class="fa-solid fa-briefcase text-[10px]"></i> Espace Travailleur / Vendeur
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-semibold mb-2 border border-rose-100">
+        <i class="fa-solid fa-file-pdf text-[11px] text-rose-600"></i> Méthodes & Procédures PDF
       </div>
-      <h1 class="text-xl sm:text-2xl font-black text-slate-900">Publier une prestation à prix forfaitaire</h1>
+      <h1 class="text-xl sm:text-2xl font-black text-slate-900">Publier une Méthode pas à pas pour accomplir une tâche</h1>
       <p class="text-xs text-slate-500 mt-1 leading-relaxed">
-        Définissez un tarif fixe en USDT et un délai garanti. Les fonds de vos acheteurs seront automatiquement mis sous séquestre avant le début de votre travail.
+        Définissez le prix en USDT et téléversez votre document PDF. Vos acheteurs pourront télécharger le guide immédiatement dès leur commande avec protection sous séquestre.
       </p>
     </div>
 
-    <form action="/services/new" method="POST" class="space-y-5 sm:space-y-6">
+    <form action="/services/new" method="POST" enctype="multipart/form-data" class="space-y-5 sm:space-y-6">
       
       <div>
         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-          Titre du service
+          Titre du Guide / Tâche expliquée
         </label>
-        <input type="text" name="title" required placeholder="Ex: Je vais concevoir votre application web avec Node.js et Tailwind" class="w-full text-xs sm:text-sm px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50/50 focus:bg-white transition">
-        <p class="text-[11px] text-slate-400 mt-1">Un titre clair et précis attire davantage de clients sérieux.</p>
+        <input type="text" name="title" required placeholder="Ex: Guide PDF : Comment déployer une application sur AWS avec Docker & SSL" class="w-full text-xs sm:text-sm px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50/50 focus:bg-white transition">
+        <p class="text-[11px] text-slate-400 mt-1">Formulez clairement la tâche résolue par votre méthode.</p>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <!-- Fichier PDF du Guide -->
+      <div class="p-4 rounded-xl bg-slate-50 border-2 border-dashed border-slate-300 hover:border-emerald-500 transition">
+        <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1 flex items-center gap-2">
+          <i class="fa-solid fa-file-pdf text-rose-500 text-sm"></i> Fichier PDF du Guide (Téléchargement immédiat)
+        </label>
+        <p class="text-[11px] text-slate-500 mb-2">Sélectionnez le document PDF complet qui sera délivré à l'acheteur dès sa commande.</p>
+        <input type="file" name="pdfFile" accept=".pdf" class="w-full text-xs text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer">
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Catégorie</label>
-          <select name="category" class="w-full text-xs sm:text-sm px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
-            <option value="Développement Web & Mobile">Développement Web & Mobile</option>
-            <option value="Design & Graphisme">Design & Graphisme</option>
-            <option value="Rédaction & Traduction">Rédaction & Traduction</option>
-            <option value="Marketing & Réseaux Sociaux">Marketing & Réseaux Sociaux</option>
-            <option value="Audio & Vidéo">Audio & Vidéo</option>
+          <select name="category" class="w-full text-xs sm:text-sm px-3.5 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+            <option value="Déploiement & Cloud">Déploiement & Cloud</option>
+            <option value="Backend & API">Backend & API</option>
+            <option value="DevOps & CI/CD">DevOps & CI/CD</option>
+            <option value="Sécurité & Blockchain">Sécurité & Blockchain</option>
+            <option value="Architecture Logicielle">Architecture Logicielle</option>
+            <option value="Méthodologie de Développement">Méthodologie de Développement</option>
           </select>
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Délai de réalisation</label>
-          <div class="relative">
-            <input type="number" name="deliveryDays" min="1" max="60" value="3" required class="w-full text-xs sm:text-sm px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none pr-14 font-semibold text-slate-800">
-            <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-xs font-bold text-slate-400">
-              jours
-            </div>
-          </div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Difficulté</label>
+          <select name="difficulty" class="w-full text-xs sm:text-sm px-3.5 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+            <option value="Débutant">Débutant</option>
+            <option value="Intermédiaire" selected>Intermédiaire</option>
+            <option value="Avancé">Avancé</option>
+            <option value="Expert">Expert</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nombre de pages</label>
+          <input type="number" name="pageCount" min="1" max="1000" value="40" required class="w-full text-xs sm:text-sm px-3.5 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold text-slate-800">
         </div>
       </div>
 
       <div>
         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-          Prix Forfaitaire Fixe (USDT)
+          Prix Forfaitaire du Guide (USDT)
         </label>
         <div class="relative">
-          <input type="number" step="0.5" min="5" name="price" required placeholder="50.00" class="w-full text-sm sm:text-base px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none pr-16 font-black text-slate-900 bg-slate-50/50 focus:bg-white transition">
+          <input type="number" step="0.5" min="1" name="price" required placeholder="25.00" class="w-full text-sm sm:text-base px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none pr-16 font-black text-slate-900 bg-slate-50/50 focus:bg-white transition">
           <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-xs font-bold text-emerald-600">
             USDT
           </div>
         </div>
         <p class="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-          <i class="fa-solid fa-shield-halved text-emerald-600 text-[10px]"></i> Ce montant sera bloqué sous séquestre lors de la commande et reversé dès validation.
+          <i class="fa-solid fa-shield-halved text-emerald-600 text-[10px]"></i> Ce montant sera sécurisé sous séquestre lors de la commande et reversé dès validation par l'acheteur.
         </p>
       </div>
 
       <div>
         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-          Description complète de la prestation
+          Sommaire & Étapes expliquées dans la méthode
         </label>
-        <textarea name="description" rows="5" required placeholder="Détaillez les livrables précis, les options incluses, les technologies employées et le format de remise finale..." class="w-full text-xs sm:text-sm p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50/50 focus:bg-white transition"></textarea>
-      </div>
-
-      <!-- Récapitulatif confiance -->
-      <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1.5">
-        <div class="font-bold text-slate-900 flex items-center gap-1.5">
-          <i class="fa-brands fa-bitcoin text-amber-500"></i> Mode de règlement Binance Pay
-        </div>
-        <p class="text-[11px] leading-relaxed text-slate-500">
-          Une fois la commande livrée et acceptée par votre acheteur, les USDT sont automatiquement versés sur votre solde disponible et peuvent être retirés vers votre compte Binance Pay.
-        </p>
+        <textarea name="description" rows="5" required placeholder="Détaillez le plan étape par étape de la méthode :&#10;1. Cadrage et prérequis nécessaires&#10;2. Commandes et scripts à exécuter pas à pas&#10;3. Configuration et pièges fréquents à éviter&#10;4. Vérification et validation du résultat..." class="w-full text-xs sm:text-sm p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50/50 focus:bg-white transition"></textarea>
       </div>
 
       <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
         <a href="/" class="px-4 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition">Annuler</a>
         <button type="submit" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md shadow-emerald-200 transition flex items-center gap-2">
-          <i class="fa-solid fa-plus text-xs"></i> Publier mon service
+          <i class="fa-solid fa-file-arrow-up text-xs"></i> Publier la Méthode PDF
         </button>
       </div>
 

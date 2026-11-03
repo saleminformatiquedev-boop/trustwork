@@ -1,35 +1,35 @@
-# 🛡️ TrustWork — Plateforme de Services Freelance avec Séquestre (Escrow) & Binance Pay
+# 🛡️ TrustWork — Marketplace de Méthodes & Procédures PDF (How-To Tech) avec Séquestre Garanti
 
-Plateforme de mise en relation de services forfaitaires entre travailleurs (inspirée de G2G / Upwork / ComeUp), simplifiée, **sans contrat à l'heure**, avec **séquestre financier 100% garanti** et intégration **Binance Pay / USDT**.
+Plateforme spécialisée dans la vente et l'achat de **guides et méthodes pratiques en PDF** expliquant pas à pas **comment accomplir des tâches concrètes de développement** (déploiement AWS/Docker, conception d'APIs sécurisées, pipelines CI/CD, audits de sécurité, clean architecture...).
+
+Le modèle combine **téléchargement immédiat du guide PDF** dès l'achat et **séquestre financier 100% garanti (Escrow USDT & Binance Pay)** pour protéger l'acheteur contre les documents non conformes.
 
 ---
 
 ## 🌟 Principes Clés
 
-1. **Tarif Forfaitaire Fixe (Fixed-Price uniquement)** :
-   - Aucun suivi au temps passé ni tarif à l'heure.
-   - Les commandes ont un prix clair et un délai de livraison défini (en jours).
+1. **Guides & Méthodes PDF Orientés Tâches ("How-To")** :
+   - Chaque produit est un document PDF complet (nombre de pages, niveau requis, étapes pas à pas, snippets de code et commandes prêtes à l'emploi).
+   - Accès immédiat au téléchargement dès la commande.
 
 2. **Système de Séquestre Garanti (Escrow)** :
-   - **Verrouillage initial (`ESCROWED`)** : Dès que l'acheteur commande, les USDT sont prélevés de son solde disponible et **bloqués sous séquestre** par la plateforme. Le travailleur sait que les fonds sont garantis.
-   - **Livraison (`DELIVERED`)** : Le travailleur réalise la mission et soumet ses livrables (liens, fichiers, rapports).
-   - **Validation & Paiement (`COMPLETED`)** : L'acheteur vérifie le travail. Dès qu'il valide, les USDT bloqués sont immédiatement versés sur le compte du travailleur.
+   - **Verrouillage initial (`ESCROWED` / `DELIVERED`)** : Dès que l'acheteur commande, les USDT sont prélevés de son solde disponible et **bloqués sous séquestre** par la plateforme. Le PDF est immédiatement accessible en téléchargement.
+   - **Validation de la Tâche (`COMPLETED`)** : L'acheteur teste la méthode sur son projet. Dès qu'il valide que la tâche est accomplie, les USDT sont versés à l'auteur du guide, et l'acheteur peut laisser une note.
 
 3. **Protection Enquête / Litige (`DISPUTED`)** :
-   - **L'acheteur ne peut pas perdre son argent** : S'il y a le moindre problème (travail non conforme, retard, absence de réponse), l'acheteur clique sur **"Ouvrir une Enquête / Litige"**.
+   - **Anti-Déception 100%** : Si le fichier PDF est corrompu, illisible ou ne correspond pas au sommaire annoncé, l'acheteur clique sur **"Ouvrir une Enquête / Litige"**.
    - Les fonds restent **intégralement gelés**.
-   - Un arbitre/administrateur examine le dossier et le fil de messagerie, puis peut décider en un clic :
-     - 🛡️ **Rembourser l'Acheteur** (les USDT retournent immédiatement sur son portefeuille).
-     - 💰 **Payer le Vendeur** (si les preuves de livraison sont conformes).
+   - L'administrateur peut trancher en un clic :
+     - 🛡️ **Rembourser l'Acheteur** (restitution immédiate des USDT).
+     - 💰 **Payer l'Auteur** (si le contenu est conforme au descriptif).
 
 4. **Paiements & Retraits Binance** :
-   - Support des transactions en **USDT**.
+   - Support complet des transactions en **USDT**.
    - Enregistrement du **Binance Pay ID** sur le profil pour les retraits directs.
-   - Rechargement rapide.
+   - Rechargement direct.
 
-5. **Authentification Simple** :
-   - Connexion **Google OAuth 2.0** en un clic.
-   - Mode démo instantané inclus pour tester les rôles Acheteur, Vendeur et Modérateur sans configuration préalable.
+5. **Messagerie en Direct & Support de l'Auteur** :
+   - Messagerie Socket.io intégrée dans chaque commande pour poser des questions à l'auteur ou recevoir des fichiers d'exemples complémentaires.
 
 ---
 

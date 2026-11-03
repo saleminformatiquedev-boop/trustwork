@@ -227,28 +227,48 @@ app.post('/api/upload', ensureAuthenticated, upload.single('file'), (req, res) =
   });
 });
 
-// Création d'un service
-app.post('/services/new', ensureAuthenticated, async (req, res) => {
+// Création d'un guide / méthode PDF
+app.post('/services/new', ensureAuthenticated, upload.single('pdfFile'), async (req, res) => {
   try {
-    const { title, description, category, price, deliveryDays } = req.body;
+    const { title, description, category, price, pageCount, difficulty } = req.body;
     const newId = 'srv_' + crypto.randomBytes(6).toString('hex');
 
+    let fileUrl = null;
+    let fileName = null;
+    let fileSize = null;
+
+    if (req.file) {
+      fileUrl = `/uploads/${req.file.filename}`;
+      fileName = req.file.originalname;
+      const sizeMb = (req.file.size / (1024 * 1024)).toFixed(1);
+      fileSize = sizeMb > 0 ? `${sizeMb} Mo` : `${(req.file.size / 1024).toFixed(0)} Ko`;
+    } else {
+      // Démo fallback si aucun fichier n'a été téléversé
+      fileUrl = '/uploads/guide-methode-developpement-ideale.pdf';
+      fileName = 'methode-pratique.pdf';
+      fileSize = '2.4 Mo';
+    }
+
     await pool.query(`
-      INSERT INTO services (id, "sellerId", title, description, category, price, "deliveryDays")
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO services (id, "sellerId", title, description, category, price, "deliveryDays", "fileUrl", "fileName", "fileSize", "pageCount", "difficulty")
+      VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8, $9, $10, $11)
     `, [
       newId,
       req.user.id,
       title,
       description,
-      category || 'Développement Web & Mobile',
+      category || 'Méthodologie de Développement',
       parseFloat(price),
-      parseInt(deliveryDays, 10) || 3
+      fileUrl,
+      fileName,
+      fileSize,
+      parseInt(pageCount, 10) || 30,
+      difficulty || 'Intermédiaire'
     ]);
 
     res.redirect('/services/' + newId);
   } catch (err) {
-    res.status(500).send("Erreur création service: " + err.message);
+    res.status(500).send("Erreur création méthode PDF: " + err.message);
   }
 });
 

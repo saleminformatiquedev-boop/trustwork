@@ -104,9 +104,9 @@
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between">
         <h2 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-          <i class="fa-solid fa-cart-shopping text-emerald-600"></i> Mes Achats
+          <i class="fa-solid fa-file-pdf text-rose-500"></i> Mes Guides PDF Achetés
         </h2>
-        <span class="text-xs text-slate-500"><%= buyerOrders.length %> commande(s)</span>
+        <span class="text-xs text-slate-500"><%= buyerOrders.length %> guide(s)</span>
       </div>
 
       <div class="divide-y divide-slate-100">
@@ -114,9 +114,46 @@
           <% buyerOrders.forEach(ord => { %>
             <a href="/orders/<%= ord.id %>" class="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-slate-50 transition block">
               <div class="space-y-1 min-w-0">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 block truncate">#<%= ord.id %> • <%= ord.sellerName %></span>
+                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 block truncate">#<%= ord.id %> • Auteur: <%= ord.sellerName %></span>
                 <h4 class="text-xs sm:text-sm font-bold text-slate-800 truncate"><%= ord.serviceTitle %></h4>
-                <div class="text-[11px] sm:text-xs text-slate-500"><%= ord.amount.toFixed(2) %> USDT sous séquestre</div>
+                <div class="text-[11px] sm:text-xs text-slate-500 flex items-center gap-2">
+                  <span><%= ord.amount.toFixed(2) %> USDT</span>
+                  <span class="text-emerald-600 font-semibold flex items-center gap-1"><i class="fa-solid fa-download text-[10px]"></i> PDF Disponible</span>
+                </div>
+              </div>
+              <div class="text-right flex-shrink-0">
+                <span class="inline-block text-[10px] sm:text-xs font-bold px-2.5 py-0.5 sm:py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : (ord.status === 'DELIVERED' ? 'bg-amber-100 text-amber-800' : (ord.status === 'DISPUTED' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800')) %>">
+                  <%= ord.status %>
+                </span>
+                <span class="block text-[10px] sm:text-[11px] text-slate-400 mt-1">Accéder <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
+              </div>
+            </a>
+          <% }) %>
+        <% } else { %>
+          <div class="text-center py-10 text-slate-400 text-xs">
+            Vous n'avez pas encore acheté de guide PDF.
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Mes Ventes (En tant que Travailleur) -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <h2 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+          <i class="fa-solid fa-book-bookmark text-blue-600"></i> Mes Méthodes PDF en Vente
+        </h2>
+        <span class="text-xs text-slate-500"><%= sellerOrders.length %> vente(s)</span>
+      </div>
+
+      <div class="divide-y divide-slate-100">
+        <% if (sellerOrders && sellerOrders.length > 0) { %>
+          <% sellerOrders.forEach(ord => { %>
+            <a href="/orders/<%= ord.id %>" class="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-slate-50 transition block">
+              <div class="space-y-1 min-w-0">
+                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 block truncate">#<%= ord.id %> • Acheteur: <%= ord.buyerName %></span>
+                <h4 class="text-xs sm:text-sm font-bold text-slate-800 truncate"><%= ord.serviceTitle %></h4>
+                <div class="text-[11px] sm:text-xs text-emerald-600 font-semibold">+<%= ord.amount.toFixed(2) %> USDT</div>
               </div>
               <div class="text-right flex-shrink-0">
                 <span class="inline-block text-[10px] sm:text-xs font-bold px-2.5 py-0.5 sm:py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : (ord.status === 'DELIVERED' ? 'bg-amber-100 text-amber-800' : (ord.status === 'DISPUTED' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800')) %>">
@@ -128,41 +165,7 @@
           <% }) %>
         <% } else { %>
           <div class="text-center py-10 text-slate-400 text-xs">
-            Vous n'avez pas encore passé de commande.
-          </div>
-        <% } %>
-      </div>
-    </div>
-
-    <!-- Mes Ventes (En tant que Travailleur) -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h2 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-          <i class="fa-solid fa-briefcase text-blue-600"></i> Mes Ventes (Prestations)
-        </h2>
-        <span class="text-xs text-slate-500"><%= sellerOrders.length %> mission(s)</span>
-      </div>
-
-      <div class="divide-y divide-slate-100">
-        <% if (sellerOrders && sellerOrders.length > 0) { %>
-          <% sellerOrders.forEach(ord => { %>
-            <a href="/orders/<%= ord.id %>" class="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-slate-50 transition block">
-              <div class="space-y-1 min-w-0">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 block truncate">#<%= ord.id %> • <%= ord.buyerName %></span>
-                <h4 class="text-xs sm:text-sm font-bold text-slate-800 truncate"><%= ord.serviceTitle %></h4>
-                <div class="text-[11px] sm:text-xs text-emerald-600 font-semibold">+<%= ord.amount.toFixed(2) %> USDT</div>
-              </div>
-              <div class="text-right flex-shrink-0">
-                <span class="inline-block text-[10px] sm:text-xs font-bold px-2.5 py-0.5 sm:py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : (ord.status === 'DELIVERED' ? 'bg-amber-100 text-amber-800' : (ord.status === 'DISPUTED' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800')) %>">
-                  <%= ord.status %>
-                </span>
-                <span class="block text-[10px] sm:text-[11px] text-slate-400 mt-1">Voir <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
-              </div>
-            </a>
-          <% }) %>
-        <% } else { %>
-          <div class="text-center py-10 text-slate-400 text-xs">
-            Aucune commande reçue pour vos services pour le moment.
+            Aucune vente enregistrée pour vos méthodes PDF pour le moment.
           </div>
         <% } %>
       </div>
