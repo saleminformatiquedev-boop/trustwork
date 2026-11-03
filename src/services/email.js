@@ -11,6 +11,7 @@ const SMTP_SECURE = process.env.SMTP_SECURE !== undefined
   : (SMTP_PORT === 465);
 
 const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || 'saleminformatiquedev@gmail.com';
+const BASE_URL = process.env.BASE_URL || 'https://51.20.182.245.sslip.io';
 
 let transporter = null;
 
@@ -114,7 +115,7 @@ function getEmailTemplate({ title, badge, content, ctaText, ctaUrl }) {
  */
 async function notifyNewOrder({ order, service, buyer, seller }) {
   const amount = parseFloat(order.amount).toFixed(2);
-  const orderUrl = `https://51.20.182.245/orders/${order.id}`;
+  const orderUrl = `${BASE_URL}/orders/${order.id}`;
 
   // Notification Vendeur
   if (seller && seller.email && !seller.email.endsWith('.local')) {
@@ -181,7 +182,7 @@ async function notifyNewOrder({ order, service, buyer, seller }) {
  * 2. Travail livré par le vendeur
  */
 async function notifyOrderDelivered({ order, buyer, seller }) {
-  const orderUrl = `https://51.20.182.245/orders/${order.id}`;
+  const orderUrl = `${BASE_URL}/orders/${order.id}`;
 
   if (buyer && buyer.email && !buyer.email.endsWith('.local')) {
     sendEmail({
@@ -211,7 +212,7 @@ async function notifyOrderDelivered({ order, buyer, seller }) {
  */
 async function notifyOrderCompleted({ order, buyer, seller }) {
   const amount = parseFloat(order.amount).toFixed(2);
-  const orderUrl = `https://51.20.182.245/orders/${order.id}`;
+  const orderUrl = `${BASE_URL}/orders/${order.id}`;
 
   if (seller && seller.email && !seller.email.endsWith('.local')) {
     sendEmail({
@@ -226,7 +227,7 @@ async function notifyOrderCompleted({ order, buyer, seller }) {
           Vous pouvez retirer vos fonds sur votre portefeuille Binance Pay à tout moment.
         `,
         ctaText: 'Voir mon portefeuille',
-        ctaUrl: `https://51.20.182.245/dashboard`
+        ctaUrl: `${BASE_URL}/dashboard`
       })
     });
   }
@@ -236,7 +237,7 @@ async function notifyOrderCompleted({ order, buyer, seller }) {
  * 4. Ouverture d'un litige / enquête
  */
 async function notifyDisputeOpened({ order, dispute, initiator, otherParty }) {
-  const orderUrl = `https://51.20.182.245/orders/${order.id}`;
+  const orderUrl = `${BASE_URL}/orders/${order.id}`;
 
   // Notification aux parties
   const emailContent = `
@@ -276,7 +277,7 @@ async function notifyDisputeOpened({ order, dispute, initiator, otherParty }) {
         <strong>Explications :</strong> ${dispute.details}
       `,
       ctaText: 'Arbitrer le dossier',
-      ctaUrl: `https://51.20.182.245/admin/disputes`
+      ctaUrl: `${BASE_URL}/admin/disputes`
     })
   });
 }
@@ -300,7 +301,7 @@ async function notifyWithdrawalRequested({ user, amount, binanceId }) {
           Le virement sera traité sous peu.
         `,
         ctaText: 'Accéder à mon tableau de bord',
-        ctaUrl: 'https://51.20.182.245/dashboard'
+        ctaUrl: `${BASE_URL}/dashboard`
       })
     });
   }
@@ -314,7 +315,7 @@ async function notifyWithdrawalRequested({ user, amount, binanceId }) {
       badge: 'Demande Retrait',
       content: `Utilisateur : ${user.name} (${user.email})<br>Montant : ${amtStr} USDT<br>Binance Pay ID : <code>${binanceId}</code>`,
       ctaText: 'Vérifier sur le Dashboard Admin',
-      ctaUrl: 'https://51.20.182.245/dashboard'
+      ctaUrl: `${BASE_URL}/dashboard`
     })
   });
 }
@@ -339,7 +340,7 @@ async function notifyReviewSubmitted({ review, order, seller, buyer }) {
           </div>
         `,
         ctaText: 'Voir mon profil public',
-        ctaUrl: `https://51.20.182.245/profile/${seller.id}`
+        ctaUrl: `${BASE_URL}/profile/${seller.id}`
       })
     });
   }
