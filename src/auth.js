@@ -95,14 +95,29 @@ function setupAuth(app, pool) {
   app.get('/logout', (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
-      res.redirect('/');
+      if (req.session) {
+        req.session.destroy(() => {
+          res.clearCookie('connect.sid');
+          res.redirect('/');
+        });
+      } else {
+        res.redirect('/');
+      }
     });
   });
 
-  // Instant demo switch
+  // Instant demo switch (can be disabled in production via ENABLE_DEMO_MODE=false)
   app.get('/auth/demo-login/:role', async (req, res) => {
     try {
-      const role = req.params.role.toLowerCase();
+      if (process.env.ENABLE_DEMO_MODE === 'false') {
+        return res.status(403).send("Le mode démo est désactivé sur cet environnement.");
+      }
+
+      const role = (req.params.role || '').toLowerCase();
+      if (!['buyer', 'seller', 'admin'].includes(role)) {
+        return res.status(400).send("Rôle de démonstration invalide.");
+      }
+
       let email = "buyer@demo.local";
       if (role === "seller") email = "seller@demo.local";
       if (role === "admin") email = "admin@demo.local";
@@ -124,7 +139,8 @@ function setupAuth(app, pool) {
         res.redirect('/dashboard');
       });
     } catch (e) {
-      res.status(500).send("Error: " + e.message);
+      console.error("Demo login error:", e);
+      res.status(500).send("Erreur d'authentification.");
     }
   });
 }

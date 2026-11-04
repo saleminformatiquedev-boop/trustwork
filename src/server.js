@@ -20,48 +20,125 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// Trust Nginx reverse proxy & hide Express fingerprint
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
 const PORT = process.env.PORT || 3000;
 const PLATFORM_BINANCE_PAY_ID = process.env.PLATFORM_BINANCE_PAY_ID || process.env.BINANCE_PAY_ID || 'BINANCE-PAY-789456';
 
-// Upload Directory configuration
+// Security Headers Middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  next();
+});
+
+// Lightweight Rate Limiter for sensitive endpoints (120 req / min / IP)
+const rateLimitStore = new Map();
+setInterval(() => rateLimitStore.clear(), 60 * 1000).unref();
+function rateLimiter(req, res, next) {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const count = (rateLimitStore.get(ip) || 0) + 1;
+  rateLimitStore.set(ip, count);
+  if (count > 120) {
+    return res.status(429).json({ success: false, error: 'Too many requests, please slow down.' });
+  }
+  next();
+}
+app.use(['/api', '/auth', '/orders', '/disputes'], rateLimiter);
+
+// Upload Directory configuration & Strict Whitelist
 const uploadDir = path.join(__dirname, '../public/uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+const ALLOWED_EXTENSIONS = new Set([
+  '.pdf', '.zip', '.rar', '.tar', '.gz', '.7z',
+  '.txt', '.md', '.sh', '.env', '.json', '.yml', '.yaml',
+  '.png', '.jpg', '.jpeg', '.webp', '.gif',
+  '.mp4', '.mov', '.webm', '.doc', '.docx'
+]);
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const uniqueName = Date.now() + '-' + crypto.randomBytes(4).toString('hex') + ext;
+    const rawExt = path.extname(file.originalname || '').toLowerCase().replace(/[^a-z0-9.]/g, '');
+    const safeExt = ALLOWED_EXTENSIONS.has(rawExt) ? rawExt : '.bin';
+    const uniqueName = Date.now() + '-' + crypto.randomBytes(6).toString('hex') + safeExt;
     cb(null, uniqueName);
   }
 });
+
 const upload = multer({
   storage,
-  limits: { fileSize: 25 * 1024 * 1024 } // 25 MB max
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB max
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (!ALLOWED_EXTENSIONS.has(ext)) {
+      return cb(new Error(`Format de fichier non autorisé (${ext}). Formats acceptés : PDF, ZIP, TXT, Images, Vidéos.`));
+    }
+    cb(null, true);
+  }
 });
 
 // Middleware Express
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(express.json({ limit: '2mb' }));
+
+// Harden /uploads static serving to prevent stored XSS execution
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'");
+  const ext = path.extname(req.path).toLowerCase();
+  if (!['.png', '.jpg', '.jpeg', '.webp', '.gif', '.pdf', '.mp4', '.webm'].includes(ext)) {
+    res.setHeader('Content-Disposition', 'attachment');
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Session
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || 'escrow-secret-key-1234',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
-  })
-);
+// Hardened Session Configuration (shared with Socket.io)
+const sessionMiddleware = session({
+  name: 'trustwork.sid',
+  secret: process.env.SESSION_SECRET || 'escrow-secret-key-1234-change-in-prod',
+  resave: false,
+  saveUninitialized: false,
+  proxy: true,
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: 'auto',
+    maxAge: 7 * 24 * 60 * 60 * 1000
+  }
+});
 
+app.use(sessionMiddleware);
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Share session with Socket.io and authenticate socket connections
+io.engine.use(sessionMiddleware);
+io.use(async (socket, next) => {
+  try {
+    const userId = socket.request.session?.passport?.user;
+    if (userId) {
+      const uRes = await pool.query('SELECT id, name, email, avatar, role FROM users WHERE id = $1', [userId]);
+      socket.user = uRes.rows[0] || null;
+    } else {
+      socket.user = null;
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Global injection of user and unread chat counter in EJS views
 app.use(async (req, res, next) => {
@@ -96,31 +173,61 @@ function formatRows(rows) {
 }
 
 // ==========================================
-// SOCKET.IO (REAL-TIME MESSAGING & ESCROW)
+// SOCKET.IO (AUTHENTICATED REAL-TIME MESSAGING & ESCROW)
 // ==========================================
+async function canAccessOrder(user, orderId) {
+  if (!user || !orderId) return false;
+  if (user.role === 'ADMIN') return true;
+  const res = await pool.query('SELECT "buyerId", "sellerId" FROM orders WHERE id = $1', [orderId]);
+  if (res.rows.length === 0) return false;
+  return res.rows[0].buyerId === user.id || res.rows[0].sellerId === user.id;
+}
+
+async function canAccessConversation(user, conversationId) {
+  if (!user || !conversationId) return false;
+  if (user.role === 'ADMIN') return true;
+  const res = await pool.query(
+    'SELECT 1 FROM conversation_participants WHERE "conversationId" = $1 AND "userId" = $2 LIMIT 1',
+    [conversationId, user.id]
+  );
+  return res.rows.length > 0;
+}
+
 io.on('connection', (socket) => {
-  // User rooms for notifications / badges
-  socket.on('join_user', ({ userId }) => {
-    if (userId) {
-      socket.join(`user_${userId}`);
+  // User rooms for notifications / badges (strictly bound to authenticated session user)
+  socket.on('join_user', () => {
+    if (socket.user && socket.user.id) {
+      socket.join(`user_${socket.user.id}`);
     }
   });
 
-  // Order rooms
-  socket.on('join_order', ({ orderId }) => {
-    socket.join(`order_${orderId}`);
+  // Order rooms (verified against order participants)
+  socket.on('join_order', async ({ orderId } = {}) => {
+    try {
+      if (await canAccessOrder(socket.user, orderId)) {
+        socket.join(`order_${orderId}`);
+      }
+    } catch (err) {
+      console.error("Socket error join_order:", err);
+    }
   });
 
-  socket.on('send_message', async ({ orderId, senderId, senderName, content, fileUrl, fileName }) => {
+  socket.on('send_message', async ({ orderId, content, fileUrl, fileName } = {}) => {
     try {
+      if (!socket.user) return;
+      if (!(await canAccessOrder(socket.user, orderId))) return;
       if ((!content || !content.trim()) && !fileUrl) return;
+
+      const senderId = socket.user.id;
+      const senderName = socket.user.name || 'User';
+      const safeFileUrl = fileUrl && String(fileUrl).startsWith('/uploads/') ? String(fileUrl) : null;
 
       const newId = 'msg_' + crypto.randomBytes(6).toString('hex');
       const insertRes = await pool.query(`
         INSERT INTO messages (id, "orderId", "senderId", content, "fileUrl", "fileName")
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
-      `, [newId, orderId, senderId, content ? content.trim() : '', fileUrl || null, fileName || null]);
+      `, [newId, orderId, senderId, content ? content.trim() : '', safeFileUrl, fileName || null]);
 
       const savedMsg = insertRes.rows[0];
 
@@ -128,7 +235,7 @@ io.on('connection', (socket) => {
         id: savedMsg.id,
         orderId,
         senderId,
-        senderName: senderName || 'User',
+        senderName,
         content: savedMsg.content,
         fileUrl: savedMsg.fileUrl,
         fileName: savedMsg.fileName,
@@ -139,22 +246,34 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Direct chat rooms (Buyer, Seller, Admin)
-  socket.on('join_conversation', ({ conversationId, userId }) => {
-    if (conversationId) {
-      socket.join(`conv_${conversationId}`);
+  // Direct chat rooms (verified against conversation participants)
+  socket.on('join_conversation', async ({ conversationId } = {}) => {
+    try {
+      if (await canAccessConversation(socket.user, conversationId)) {
+        socket.join(`conv_${conversationId}`);
+      }
+    } catch (err) {
+      console.error("Socket error join_conversation:", err);
     }
   });
 
-  socket.on('leave_conversation', ({ conversationId }) => {
+  socket.on('leave_conversation', ({ conversationId } = {}) => {
     if (conversationId) {
       socket.leave(`conv_${conversationId}`);
     }
   });
 
-  socket.on('chat_send_message', async ({ conversationId, senderId, senderName, senderAvatar, senderRole, content, fileUrl, fileName, fileSize }) => {
+  socket.on('chat_send_message', async ({ conversationId, content, fileUrl, fileName, fileSize } = {}) => {
     try {
+      if (!socket.user) return;
+      if (!(await canAccessConversation(socket.user, conversationId))) return;
       if ((!content || !content.trim()) && !fileUrl) return;
+
+      const senderId = socket.user.id;
+      const senderName = socket.user.name || 'User';
+      const senderAvatar = socket.user.avatar || null;
+      const senderRole = socket.user.role || 'USER';
+      const safeFileUrl = fileUrl && String(fileUrl).startsWith('/uploads/') ? String(fileUrl) : null;
 
       const trimmedContent = content ? content.trim() : '';
       const newMsgId = 'dmsg_' + crypto.randomBytes(6).toString('hex');
@@ -164,7 +283,7 @@ io.on('connection', (socket) => {
         INSERT INTO direct_messages (id, "conversationId", "senderId", content, "fileUrl", "fileName", "fileSize", "isRead")
         VALUES ($1, $2, $3, $4, $5, $6, $7, false)
         RETURNING *
-      `, [newMsgId, conversationId, senderId, trimmedContent, fileUrl || null, fileName || null, fileSize || null]);
+      `, [newMsgId, conversationId, senderId, trimmedContent, safeFileUrl, fileName || null, fileSize || null]);
 
       const savedMsg = insertRes.rows[0];
 
@@ -188,9 +307,9 @@ io.on('connection', (socket) => {
         id: savedMsg.id,
         conversationId,
         senderId,
-        senderName: senderName || 'User',
-        senderAvatar: senderAvatar || null,
-        senderRole: senderRole || 'USER',
+        senderName,
+        senderAvatar,
+        senderRole,
         content: savedMsg.content,
         fileUrl: savedMsg.fileUrl,
         fileName: savedMsg.fileName,
@@ -220,9 +339,9 @@ io.on('connection', (socket) => {
         io.to(`user_${p.userId}`).emit('chat_notification', {
           conversationId,
           senderId,
-          senderName: senderName || 'User',
-          senderAvatar: senderAvatar || null,
-          senderRole: senderRole || 'USER',
+          senderName,
+          senderAvatar,
+          senderRole,
           preview: previewText,
           unreadTotal,
           createdAt: savedMsg.createdAt
@@ -249,12 +368,28 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('chat_typing', ({ conversationId, userId, userName, isTyping }) => {
-    socket.to(`conv_${conversationId}`).emit('user_typing', { conversationId, userId, userName, isTyping });
+  socket.on('chat_typing', async ({ conversationId, isTyping } = {}) => {
+    try {
+      if (!socket.user) return;
+      if (await canAccessConversation(socket.user, conversationId)) {
+        socket.to(`conv_${conversationId}`).emit('user_typing', {
+          conversationId,
+          userId: socket.user.id,
+          userName: socket.user.name,
+          isTyping: !!isTyping
+        });
+      }
+    } catch (err) {
+      console.error("Error chat_typing:", err);
+    }
   });
 
-  socket.on('chat_mark_read', async ({ conversationId, userId }) => {
+  socket.on('chat_mark_read', async ({ conversationId } = {}) => {
     try {
+      if (!socket.user) return;
+      const userId = socket.user.id;
+      if (!(await canAccessConversation(socket.user, conversationId))) return;
+
       await pool.query(`
         UPDATE conversation_participants
         SET "unreadCount" = 0, "lastReadAt" = CURRENT_TIMESTAMP
@@ -498,9 +633,10 @@ app.post('/orders/create', ensureAuthenticated, async (req, res) => {
 
     res.redirect('/orders/' + order.id);
   } catch (err) {
+    const safeMsg = JSON.stringify("Erreur : " + (err.message || "Impossible de créer la commande"));
     res.status(400).send(`
       <script>
-        alert("Error: ${err.message}");
+        alert(${safeMsg});
         window.history.back();
       </script>
     `);
@@ -852,6 +988,10 @@ app.post('/api/chat/messages', ensureAuthenticated, upload.single('file'), async
     const { conversationId, content } = req.body;
     if (!conversationId) {
       return res.status(400).json({ success: false, error: 'Missing conversation ID' });
+    }
+
+    if (!(await canAccessConversation(req.user, conversationId))) {
+      return res.status(403).json({ success: false, error: 'Accès refusé à cette conversation' });
     }
 
     let fileUrl = null;
@@ -1243,17 +1383,20 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
     const txId = (req.body.txId || '').trim();
     const binancePayId = (req.body.binancePayId || PLATFORM_BINANCE_PAY_ID).trim();
 
-    if (isNaN(amount) || !Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({ success: false, error: 'Invalid top-up amount' });
+    if (isNaN(amount) || !Number.isFinite(amount) || amount <= 0 || amount > 50000) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: 'Montant de recharge invalide (max 50 000 USDT).' });
     }
 
-    if (!txId) {
-      return res.status(400).json({ success: false, error: 'Please enter your Binance transaction ID / TxID' });
+    if (!txId || !/^[a-zA-Z0-9_-]{6,100}$/.test(txId)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: 'Veuillez saisir un identifiant de transaction Binance (TxID) valide (6 à 100 caractères alphanumériques).' });
     }
 
     const existingTx = await client.query('SELECT id FROM deposits WHERE "txId" = $1', [txId]);
     if (existingTx.rows.length > 0) {
-      return res.status(400).json({ success: false, error: 'This transaction ID / TxID has already been registered.' });
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: 'Cet identifiant de transaction (TxID) a déjà été enregistré.' });
     }
 
     const upd = await client.query(`
@@ -1289,7 +1432,7 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
 
     res.json({
       success: true,
-      message: `Your top-up of ${amount.toFixed(2)} USDT via Binance Pay has been verified successfully!`,
+      message: `Votre recharge de ${amount.toFixed(2)} USDT via Binance Pay a été enregistrée avec succès !`,
       newWalletBalance,
       deposit: depRes.rows[0]
     });
@@ -1301,9 +1444,13 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
   }
 });
 
-// REST AJAX: Top up test mode
+// REST AJAX: Top up test mode (protected by ENABLE_DEMO_MODE)
 app.post('/api/wallet/deposit-test', ensureAuthenticated, async (req, res) => {
   try {
+    if (process.env.ENABLE_DEMO_MODE === 'false') {
+      return res.status(403).json({ success: false, error: 'Le mode recharge de démonstration est désactivé.' });
+    }
+
     const upd = await pool.query(`
       UPDATE users 
       SET "walletBalance" = "walletBalance" + 50.00 
@@ -1378,6 +1525,15 @@ app.post('/disputes/:id/resolve', ensureAuthenticated, async (req, res) => {
   } catch (err) {
     res.status(500).send("Resolution error: " + err.message);
   }
+});
+
+// Global Error Handler (Multer & Unhandled Route Errors)
+app.use((err, req, res, next) => {
+  console.error("[Security/Server Error]:", err.message);
+  if (req.path.startsWith('/api/')) {
+    return res.status(400).json({ success: false, error: err.message || 'Requête invalide.' });
+  }
+  res.status(400).send("Erreur lors du traitement de la requête : " + (err.message || "Requête invalide"));
 });
 
 // Initialize database and start server
