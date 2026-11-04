@@ -7,7 +7,7 @@ function generateId(prefix = 'ord_') {
 }
 
 /**
- * Créer une commande et bloquer l'argent sous séquestre (Transaction ACID PostgreSQL)
+ * Create order and lock funds in escrow (PostgreSQL ACID Transaction)
  */
 async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements }) {
   const client = await pool.connect();
@@ -19,15 +19,15 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
   try {
     await client.query('BEGIN');
 
-    // 1. Verrouiller le service et l'acheteur
+    // 1. Lock service and buyer
     const srvRes = await client.query('SELECT * FROM services WHERE id = $1 FOR UPDATE', [serviceId]);
     srv = srvRes.rows[0];
-    if (!srv) throw new Error("Service introuvable");
-    if (srv.sellerId === buyerId) throw new Error("Vous ne pouvez pas acheter votre propre service");
+    if (!srv) throw new Error("Service not found");
+    if (srv.sellerId === buyerId) throw new Error("You cannot purchase your own guide");
 
     const buyerRes = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [buyerId]);
     buyerUser = buyerRes.rows[0];
-    if (!buyerUser) throw new Error("Acheteur introuvable");
+    if (!buyerUser) throw new Error("Buyer not found");
 
     const sellerRes = await client.query('SELECT * FROM users WHERE id = $1', [srv.sellerId]);
     sellerUser = sellerRes.rows[0];
@@ -36,10 +36,10 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
     const balance = parseFloat(buyerUser.walletBalance);
 
     if (balance < price) {
-      throw new Error(`Solde insuffisant. Vous avez ${balance.toFixed(2)} USDT et ce service coûte ${price.toFixed(2)} USDT`);
+      throw new Error(`Insufficient balance. You have ${balance.toFixed(2)} USDT and this guide costs ${price.toFixed(2)} USDT`);
     }
 
-    // 2. Déplacer l'argent du solde disponible vers le séquestre
+    // 2. Move funds from wallet to escrow
     await client.query(`
       UPDATE users 
       SET "walletBalance" = "walletBalance" - $1, 
@@ -47,11 +47,11 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
       WHERE id = $2
     `, [price, buyerId]);
 
-    // 3. Créer la commande en statut ESCROWED ou DELIVERED si méthode immédiatement disponible
+    // 3. Create order with ESCROWED or DELIVERED status
     const orderId = generateId('ord_');
     const isInstantDelivery = !!srv.fileUrl || (srv.attachments && srv.attachments.length > 0);
     const initialStatus = isInstantDelivery ? 'DELIVERED' : 'ESCROWED';
-    const deliveryNote = isInstantDelivery ? `Votre pack méthode (${srv.fileName || 'pack-fichiers'}) avec ses ressources (PDF, ZIP, scripts, vidéo) est accessible en téléchargement immédiat.` : null;
+    const deliveryNote = isInstantDelivery ? `Your method pack (${srv.fileName || 'file-pack'}) and resources (PDF, ZIP, scripts, video) are available for instant download.` : null;
     const deliveredAt = isInstantDelivery ? new Date() : null;
 
     const attachmentsJson = srv.attachments ? JSON.stringify(srv.attachments) : '[]';
@@ -67,7 +67,7 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
       srv.sellerId,
       price,
       initialStatus,
-      requirements || "Achat du pack méthode",
+      requirements || "Method pack purchase",
       srv.fileUrl || null,
       srv.fileName || null,
       deliveryNote,
@@ -78,7 +78,7 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
     ]);
     createdOrder = orderRes.rows[0];
 
-    // 4. Message initial de confirmation
+    // 4. Initial confirmation message
     const msgId = generateId('msg_');
     await client.query(`
       INSERT INTO messages (id, "orderId", "senderId", content, "fileUrl", "fileName")
@@ -88,8 +88,8 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
       orderId,
       buyerUser.id,
       isInstantDelivery 
-        ? `🎉 Commande validée ! Votre pack méthode "${srv.title}" (PDF, ZIP, Scripts & Vidéo) est prêt au téléchargement immédiat. Vos ${price.toFixed(2)} USDT sont sécurisés sous séquestre jusqu'à votre validation.`
-        : `Commande confirmée ! Un montant de ${price.toFixed(2)} USDT a été prélevé et sécurisé sous séquestre.`,
+        ? `🎉 Order confirmed! Your method pack "${srv.title}" (PDF, ZIP, Scripts & Video) is ready for instant download. Your ${price.toFixed(2)} USDT are protected in escrow until your validation.`
+        : `Order confirmed! An amount of ${price.toFixed(2)} USDT has been charged and secured in escrow.`,
       srv.fileUrl || null,
       srv.fileName || null
     ]);
@@ -102,21 +102,21 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
     client.release();
   }
 
-  // Envoi asynchrone des emails (non bloquant pour la transaction)
+  // Non-blocking email notifications
   if (createdOrder && srv && buyerUser && sellerUser) {
     emailService.notifyNewOrder({
       order: createdOrder,
       service: srv,
       buyer: buyerUser,
       seller: sellerUser
-    }).catch(e => console.error("Erreur email notifyNewOrder:", e));
+    }).catch(e => console.error("Error email notifyNewOrder:", e));
   }
 
   return createdOrder;
 }
 
 /**
- * Le travailleur livre le travail
+ * The author delivers the order
  */
 async function deliverOrder(pool, { orderId, sellerId, deliveryNote }) {
   const client = await pool.connect();
@@ -129,9 +129,9 @@ async function deliverOrder(pool, { orderId, sellerId, deliveryNote }) {
 
     const ordRes = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
     const order = ordRes.rows[0];
-    if (!order) throw new Error("Commande introuvable");
-    if (order.sellerId !== sellerId) throw new Error("Non autorisé (vous n'êtes pas le vendeur)");
-    if (order.status !== "ESCROWED") throw new Error(`Impossible de livrer une commande au statut ${order.status}`);
+    if (!order) throw new Error("Order not found");
+    if (order.sellerId !== sellerId) throw new Error("Unauthorized (you are not the author)");
+    if (order.status !== "ESCROWED") throw new Error(`Cannot deliver an order with status ${order.status}`);
 
     const updatedRes = await client.query(`
       UPDATE orders 
@@ -151,7 +151,7 @@ async function deliverOrder(pool, { orderId, sellerId, deliveryNote }) {
       msgId,
       orderId,
       sellerId,
-      `📦 Le vendeur a soumis sa livraison !\n\nNote de livraison : ${deliveryNote}`
+      `📦 The author has submitted deliverables!\n\nDelivery note: ${deliveryNote}`
     ]);
 
     const bRes = await client.query('SELECT * FROM users WHERE id = $1', [order.buyerId]);
@@ -167,20 +167,19 @@ async function deliverOrder(pool, { orderId, sellerId, deliveryNote }) {
     client.release();
   }
 
-  // Envoi email notification livraison à l'acheteur
   if (updatedOrder && buyerUser && sellerUser) {
     emailService.notifyOrderDelivered({
       order: updatedOrder,
       buyer: buyerUser,
       seller: sellerUser
-    }).catch(e => console.error("Erreur email notifyOrderDelivered:", e));
+    }).catch(e => console.error("Error email notifyOrderDelivered:", e));
   }
 
   return updatedOrder;
 }
 
 /**
- * L'acheteur valide la réception -> Déblocage de l'argent vers le travailleur
+ * Buyer approves delivery -> Release escrow funds to author
  */
 async function completeOrderAndReleaseFunds(pool, { orderId, buyerId }) {
   const client = await pool.connect();
@@ -193,29 +192,29 @@ async function completeOrderAndReleaseFunds(pool, { orderId, buyerId }) {
 
     const ordRes = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
     const order = ordRes.rows[0];
-    if (!order) throw new Error("Commande introuvable");
-    if (order.buyerId !== buyerId) throw new Error("Seul l'acheteur peut valider la réception du service");
+    if (!order) throw new Error("Order not found");
+    if (order.buyerId !== buyerId) throw new Error("Only the buyer can approve delivery");
     if (order.status !== "DELIVERED" && order.status !== "ESCROWED") {
-      throw new Error(`Impossible de clôturer une commande au statut ${order.status}`);
+      throw new Error(`Cannot complete an order with status ${order.status}`);
     }
 
     const amount = parseFloat(order.amount);
 
-    // 1. Déduire du séquestre de l'acheteur
+    // 1. Deduct from buyer escrow
     await client.query(`
       UPDATE users 
       SET "escrowBalance" = GREATEST(0, "escrowBalance" - $1) 
       WHERE id = $2
     `, [amount, order.buyerId]);
 
-    // 2. Créditer le travailleur
+    // 2. Credit author wallet
     await client.query(`
       UPDATE users 
       SET "walletBalance" = "walletBalance" + $1 
       WHERE id = $2
     `, [amount, order.sellerId]);
 
-    // 3. Passer la commande à COMPLETED
+    // 3. Mark COMPLETED
     const updatedRes = await client.query(`
       UPDATE orders 
       SET status = 'COMPLETED', 
@@ -233,7 +232,7 @@ async function completeOrderAndReleaseFunds(pool, { orderId, buyerId }) {
       msgId,
       orderId,
       buyerId,
-      `✅ Commande validée par l'acheteur ! Les fonds sous séquestre (${amount.toFixed(2)} USDT) ont été transférés avec succès au travailleur.`
+      `✅ Order approved by buyer! The escrow funds (${amount.toFixed(2)} USDT) have been successfully transferred to the author.`
     ]);
 
     const bRes = await client.query('SELECT * FROM users WHERE id = $1', [order.buyerId]);
@@ -249,20 +248,19 @@ async function completeOrderAndReleaseFunds(pool, { orderId, buyerId }) {
     client.release();
   }
 
-  // Envoi email gain débloqué au travailleur
   if (updatedOrder && buyerUser && sellerUser) {
     emailService.notifyOrderCompleted({
       order: updatedOrder,
       buyer: buyerUser,
       seller: sellerUser
-    }).catch(e => console.error("Erreur email notifyOrderCompleted:", e));
+    }).catch(e => console.error("Error email notifyOrderCompleted:", e));
   }
 
   return updatedOrder;
 }
 
 /**
- * Ouvrir un litige / enquête
+ * Open a dispute / investigation
  */
 async function openDispute(pool, { orderId, userId, reason, details }) {
   const client = await pool.connect();
@@ -276,12 +274,12 @@ async function openDispute(pool, { orderId, userId, reason, details }) {
 
     const ordRes = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
     ord = ordRes.rows[0];
-    if (!ord) throw new Error("Commande introuvable");
+    if (!ord) throw new Error("Order not found");
     if (ord.buyerId !== userId && ord.sellerId !== userId) {
-      throw new Error("Seules les parties de la transaction peuvent ouvrir une enquête");
+      throw new Error("Only transaction participants can open an investigation");
     }
     if (ord.status === "COMPLETED" || ord.status === "REFUNDED") {
-      throw new Error("Impossible d'ouvrir un litige sur une commande déjà finalisée");
+      throw new Error("Cannot open a dispute on an already completed or refunded order");
     }
 
     await client.query("UPDATE orders SET status = 'DISPUTED' WHERE id = $1", [orderId]);
@@ -302,7 +300,7 @@ async function openDispute(pool, { orderId, userId, reason, details }) {
       msgId,
       orderId,
       userId,
-      `⚠️ ENQUÊTE OUVERTE !\nMotif : ${reason}\nDétails : ${details}\n\n🔒 Les fonds restent entièrement bloqués et protégés par la plateforme jusqu'à décision d'arbitrage.`
+      `⚠️ INVESTIGATION OPENED!\nReason: ${reason}\nDetails: ${details}\n\n🔒 Funds remain fully locked and protected by the platform until an arbitration decision is made.`
     ]);
 
     const otherPartyId = ord.buyerId === userId ? ord.sellerId : ord.buyerId;
@@ -319,21 +317,20 @@ async function openDispute(pool, { orderId, userId, reason, details }) {
     client.release();
   }
 
-  // Alerte email litige
   if (createdDispute && ord && initiatorUser && otherPartyUser) {
     emailService.notifyDisputeOpened({
       order: ord,
       dispute: createdDispute,
       initiator: initiatorUser,
       otherParty: otherPartyUser
-    }).catch(e => console.error("Erreur email notifyDisputeOpened:", e));
+    }).catch(e => console.error("Error email notifyDisputeOpened:", e));
   }
 
   return createdDispute;
 }
 
 /**
- * Arbitrage du litige (Remboursement Acheteur ou Paiement Vendeur)
+ * Arbitrate dispute (Refund buyer or Pay seller)
  */
 async function resolveDispute(pool, { disputeId, resolution, resolutionNote }) {
   const client = await pool.connect();
@@ -342,15 +339,15 @@ async function resolveDispute(pool, { disputeId, resolution, resolutionNote }) {
 
     const dispRes = await client.query('SELECT * FROM disputes WHERE id = $1 FOR UPDATE', [disputeId]);
     const dispute = dispRes.rows[0];
-    if (!dispute) throw new Error("Litige introuvable");
-    if (dispute.status !== "OPEN") throw new Error("Ce litige a déjà été traité");
+    if (!dispute) throw new Error("Dispute not found");
+    if (dispute.status !== "OPEN") throw new Error("This dispute has already been resolved");
 
     const ordRes = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [dispute.orderId]);
     const order = ordRes.rows[0];
     const amount = parseFloat(order.amount);
 
     if (resolution === "REFUND_BUYER") {
-      // 1. Rembourser l'acheteur
+      // 1. Refund buyer
       await client.query(`
         UPDATE users 
         SET "walletBalance" = "walletBalance" + $1, 
@@ -376,10 +373,10 @@ async function resolveDispute(pool, { disputeId, resolution, resolutionNote }) {
         msgId,
         order.id,
         order.buyerId,
-        `⚖️ ARBITRAGE TERMINÉ : Enquête résolue en faveur de l'acheteur.\nDécision : ${resolutionNote}\nL'intégralité des ${amount.toFixed(2)} USDT a été recréditée sur le portefeuille de l'acheteur.`
+        `⚖️ ARBITRATION COMPLETED: Investigation resolved in favor of the buyer.\nDecision: ${resolutionNote}\nThe full amount of ${amount.toFixed(2)} USDT has been refunded to the buyer's wallet.`
       ]);
     } else if (resolution === "PAY_SELLER") {
-      // 2. Débloquer au travailleur
+      // 2. Pay author
       await client.query(`
         UPDATE users 
         SET "escrowBalance" = GREATEST(0, "escrowBalance" - $1) 
@@ -410,7 +407,7 @@ async function resolveDispute(pool, { disputeId, resolution, resolutionNote }) {
         msgId,
         order.id,
         order.sellerId,
-        `⚖️ ARBITRAGE TERMINÉ : Enquête résolue en faveur du travailleur.\nDécision : ${resolutionNote}\nLes fonds (${amount.toFixed(2)} USDT) ont été versés au travailleur.`
+        `⚖️ ARBITRATION COMPLETED: Investigation resolved in favor of the author.\nDecision: ${resolutionNote}\nThe funds (${amount.toFixed(2)} USDT) have been released to the author.`
       ]);
     }
 

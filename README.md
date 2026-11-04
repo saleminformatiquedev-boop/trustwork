@@ -1,95 +1,106 @@
-# 🛡️ TrustWork — Marketplace de Méthodes & Procédures PDF (How-To Tech) avec Séquestre Garanti
+# 🛡️ TrustWork — Practical Tech Procedures & PDF Guides Marketplace with Guaranteed Escrow
 
-Plateforme spécialisée dans la vente et l'achat de **guides et méthodes pratiques en PDF** expliquant pas à pas **comment accomplir des tâches concrètes de développement** (déploiement AWS/Docker, conception d'APIs sécurisées, pipelines CI/CD, audits de sécurité, clean architecture...).
+Specialized platform for buying and selling **practical PDF guides and technical methods** explaining step-by-step **how to accomplish real-world software engineering and DevOps tasks** (AWS/Docker deployments, secure API design, CI/CD pipelines, security audits, clean architecture, and more).
 
-Le modèle combine **téléchargement immédiat du guide PDF** dès l'achat et **séquestre financier 100% garanti (Escrow USDT & Binance Pay)** pour protéger l'acheteur contre les documents non conformes.
-
----
-
-## 🌟 Principes Clés
-
-1. **Guides & Méthodes PDF Orientés Tâches ("How-To")** :
-   - Chaque produit est un document PDF complet (nombre de pages, niveau requis, étapes pas à pas, snippets de code et commandes prêtes à l'emploi).
-   - Accès immédiat au téléchargement dès la commande.
-
-2. **Système de Séquestre Garanti (Escrow)** :
-   - **Verrouillage initial (`ESCROWED` / `DELIVERED`)** : Dès que l'acheteur commande, les USDT sont prélevés de son solde disponible et **bloqués sous séquestre** par la plateforme. Le PDF est immédiatement accessible en téléchargement.
-   - **Validation de la Tâche (`COMPLETED`)** : L'acheteur teste la méthode sur son projet. Dès qu'il valide que la tâche est accomplie, les USDT sont versés à l'auteur du guide, et l'acheteur peut laisser une note.
-
-3. **Protection Enquête / Litige (`DISPUTED`)** :
-   - **Anti-Déception 100%** : Si le fichier PDF est corrompu, illisible ou ne correspond pas au sommaire annoncé, l'acheteur clique sur **"Ouvrir une Enquête / Litige"**.
-   - Les fonds restent **intégralement gelés**.
-   - L'administrateur peut trancher en un clic :
-     - 🛡️ **Rembourser l'Acheteur** (restitution immédiate des USDT).
-     - 💰 **Payer l'Auteur** (si le contenu est conforme au descriptif).
-
-4. **Paiements & Retraits Binance** :
-   - Support complet des transactions en **USDT**.
-   - Enregistrement du **Binance Pay ID** sur le profil pour les retraits directs.
-   - Rechargement direct.
-
-5. **Messagerie en Direct & Support de l'Auteur** :
-   - Messagerie Socket.io intégrée dans chaque commande pour poser des questions à l'auteur ou recevoir des fichiers d'exemples complémentaires.
+The marketplace combines **instant download access** upon purchase with a **100% Guaranteed Financial Escrow (USDT & Binance Pay)** to protect buyers against non-compliant or deceptive documents.
 
 ---
 
-## 🚀 Démarrage Rapide
+## 🌟 Key Principles
 
-### 1. Lancer l'application
-Le serveur est déjà configuré. Pour le lancer ou le relancer :
+1. **Task-Oriented "How-To" PDF Methods & Code Packs**:
+   - Every product is a comprehensive technical guide (page count, difficulty level, step-by-step instructions, ready-to-use code snippets and command lines).
+   - Instant file download available immediately after order placement.
+
+2. **Guaranteed Escrow Protection System**:
+   - **Initial Lock (`ESCROWED` / `DELIVERED`)**: When the buyer places an order, the USDT is deducted from their available balance and **held securely in platform escrow**. The guide and attachments become available for immediate download.
+   - **Task Validation (`COMPLETED`)**: The buyer tests the instructions on their own environment. Once they verify that the task succeeds, funds are released to the author's available balance, and the buyer can leave a review.
+
+3. **Dispute & Investigation Protection (`DISPUTED`)**:
+   - **100% Satisfaction Guarantee**: If the document is corrupt, incomplete, or does not match the advertised table of contents, the buyer can click **"Open Dispute / Investigation"**.
+   - Escrow funds are **frozen immediately**.
+   - Platform administrators can arbitrate with a single click:
+     - 🛡️ **Refund Buyer** (instant restitution of USDT to buyer's balance).
+     - 💰 **Pay Author** (if content complies with the description).
+
+4. **Binance Pay & Crypto Transactions**:
+   - Full support for **USDT** transactions.
+   - Save your **Binance Pay ID** in your profile for direct withdrawals.
+   - Instant top-up / deposit flow with QR code generation.
+
+5. **Multi-User Real-Time Chat (Buyer, Author, Administrator)**:
+   - **Dedicated `/chat` view** with dual-pane layout (conversations list + active conversation).
+   - **Socket.io Real-Time Engine**: instant delivery, live typing indicator ("typing..."), toast notifications, and unread badges.
+   - **Attachment & Deliverable Sharing**: upload up to 25 MB (PDF, ZIP, images, scripts) with live previews.
+   - **Targeted Communications**:
+     - **Buyer ↔ Author**: "Ask a question to author" button from every guide or author profile.
+     - **User ↔ Support Admin**: 1-click direct link to "Contact Support".
+     - **Admin ↔ Users**: direct arbitration from the moderation center with global oversight.
+
+---
+
+## 🚀 Quick Start
+
+### 1. Run the application
+The server is preconfigured. To run it:
 
 ```bash
 npm start
 ```
 
-Rendez-vous ensuite sur : **[http://localhost:3000](http://localhost:3000)**
+Then visit: **[http://localhost:3000](http://localhost:3000)**
 
 ---
 
-## 🧪 Tester l'application immédiatement (Comptes Démo)
+## 🧪 Test Instantly (Demo Profiles)
 
-Des comptes prêts à l'emploi sont configurés :
-- **Acheteur (Thomas)** : Crédité de **250 USDT** pour passer commande et tester le séquestre.
-- **Vendeur (Sarah)** : Dispose déjà de **2 services en ligne** (Landing Page Tailwind, Logo) pour recevoir des commandes et livrer.
-- **Médiateur / Support (Admin)** : Accès au centre d'arbitrage pour trancher les enquêtes et rembourser.
+Ready-to-use demo accounts are configured:
+- **Buyer (Thomas)**: Pre-funded with **250 USDT** to test purchasing and escrow locking.
+- **Author (Sarah)**: Features published technical guides to test receiving orders and fund release.
+- **Mediator / Support (Admin)**: Full access to the disputes center to arbitrate cases and refund/release funds.
 
-Vous pouvez basculer d'un profil à l'autre en un seul clic via le bandeau en haut du site.
+You can switch between demo profiles in one click from the persistent navigation header.
 
 ---
 
-## 🔑 Configurer Google OAuth 2.0 (Optionnel)
+## 🔑 Configure Google OAuth 2.0 (Optional)
 
-Si vous souhaitez activer la véritable connexion avec Google :
-1. Créez un projet sur [Google Cloud Console](https://console.cloud.google.com/).
-2. Activez l'API **Google+ / Identity**.
-3. Dans la section *Identifiants OAuth 2.0*, ajoutez l'URI de redirection autorisée :
+If you want to enable live Google authentication:
+1. Create a project in [Google Cloud Console](https://console.cloud.google.com/).
+2. Enable the **Google+ / Identity API**.
+3. Under *OAuth 2.0 Credentials*, add the authorized redirect URI:
    `http://localhost:3000/auth/google/callback`
-4. Remplissez les clés dans votre fichier `.env` :
+4. Set the keys in your `.env` file:
    ```env
-   GOOGLE_CLIENT_ID="votre-client-id.apps.googleusercontent.com"
-   GOOGLE_CLIENT_SECRET="votre-client-secret"
+   GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+   GOOGLE_CLIENT_SECRET="your-client-secret"
    ```
 
 ---
 
-## 📁 Architecture du Projet
+## 📁 Project Architecture
 
 ```
-├── .env                  # Configuration (Port, Session, Clés Google)
-├── package.json          # Dépendances Node.js
-├── dev.db                # Base de données SQLite locale avec WAL
+├── .env                  # Configuration (Port, Session, Database, Google keys)
+├── package.json          # Node.js dependencies & scripts
+├── prisma/               # Prisma ORM schema
 ├── src/
-│   ├── server.js         # Serveur Express & Routes
-│   ├── db.js             # Initialisation SQLite (Users, Services, Orders, Disputes)
-│   ├── auth.js           # Google OAuth 2.0 & Fast Login
-│   ├── escrow.js         # Moteur de Séquestre atomique (Transactions ACID)
-│   └── views/            # Vues Tailwind CSS
-│       ├── index.ejs            # Catalogue des services & Hero
-│       ├── service-detail.ejs   # Fiche service & commande séquestre
-│       ├── new-service.ejs      # Formulaire de publication travailleur
-│       ├── order-detail.ejs     # Stepper Escrow, Enquêtes & Messagerie
-│       ├── dashboard.ejs        # Portefeuille USDT, Binance ID & commandes
-│       ├── disputes.ejs         # Centre d'arbitrage Admin
-│       ├── login.ejs            # Connexion Google & Démo
-│       └── partials/            # Header avec solde en direct & Footer
+│   ├── server.js         # Express server, Socket.io, REST APIs & SSR routes
+│   ├── db.js             # PostgreSQL client pool & schema initialization
+│   ├── auth.js           # Google OAuth 2.0 & demo fast-login profiles
+│   ├── escrow.js         # Atomic Escrow engine (ACID transactions)
+│   ├── services/
+│   │   └── email.js      # Responsive HTML email notification templates
+│   └── views/            # Tailwind CSS / EJS templates
+│       ├── index.ejs            # Marketplace catalog & search filters
+│       ├── service-detail.ejs   # Guide details, curriculum & order checkout
+│       ├── new-service.ejs      # Technical guide authoring form
+│       ├── order-detail.ejs     # 4-step escrow stepper, downloads & order chat
+│       ├── dashboard.ejs        # USDT wallet, Binance Pay deposit/withdraw & orders
+│       ├── chat.ejs             # Multi-user real-time messaging
+│       ├── disputes.ejs         # Admin arbitration & dispute resolution center
+│       ├── history.ejs          # Global transaction ledger & order history
+│       ├── profile.ejs          # Public author profile & verified reviews
+│       ├── login.ejs            # Google & demo login
+│       └── partials/            # Header with live balance & Footer
 ```

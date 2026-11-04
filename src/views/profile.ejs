@@ -2,7 +2,7 @@
 
 <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
 
-  <!-- Carte Profil Pro -->
+  <!-- Pro Profile Card -->
   <div class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
     <div class="flex items-center gap-4 sm:gap-6 min-w-0">
       <img src="<%= profile.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + profile.name %>" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-emerald-500 shadow-md object-cover flex-shrink-0">
@@ -31,27 +31,35 @@
       </div>
     </div>
 
-    <!-- Garanties Binance & Séquestre -->
+    <!-- Settlement & Guarantee Card -->
     <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-2 w-full md:w-64 flex-shrink-0">
       <div class="flex items-center justify-between text-slate-500">
         <span>Règlement :</span>
         <strong class="text-slate-900 font-semibold"><i class="fa-brands fa-bitcoin text-amber-500 mr-1"></i> Binance Pay</strong>
       </div>
       <div class="flex items-center justify-between text-slate-500">
-        <span>Services actifs :</span>
+        <span>Méthodes actives :</span>
         <strong class="text-emerald-700 font-bold"><%= services.length %></strong>
       </div>
       <div class="flex items-center justify-between text-slate-500">
         <span>Avis clients :</span>
-        <strong class="text-slate-900 font-bold"><%= reviews.length %> note(s)</strong>
+        <strong class="text-slate-900 font-bold"><%= reviews.length %> avis</strong>
       </div>
+      <% if (!user || user.id !== profile.id) { %>
+        <div class="pt-2">
+          <a href="/chat?recipientId=<%= profile.id %>" class="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">
+            <i class="fa-regular fa-comments"></i>
+            <span>💬 Discuter avec ce vendeur</span>
+          </a>
+        </div>
+      <% } %>
     </div>
   </div>
 
-  <!-- Méthodes proposées par cet auteur -->
+  <!-- Methods Offered by this Author -->
   <div class="space-y-4">
     <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-      <i class="fa-solid fa-layer-group text-emerald-600"></i> Méthodes & Packs Techniques proposés (<%= services.length %>)
+      <i class="fa-solid fa-layer-group text-emerald-600"></i> Méthodes publiées & Packs (<%= services.length %>)
     </h2>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -84,15 +92,15 @@
           </div>
         <% }) %>
       <% } else { %>
-        <p class="text-xs text-slate-400 py-6">Aucune méthode publiée par cet auteur pour l'instant.</p>
+        <p class="text-xs text-slate-400 py-6">Aucune méthode publiée par cet auteur pour le moment.</p>
       <% } %>
     </div>
   </div>
 
-  <!-- Avis clients reçus -->
+  <!-- Verified Client Reviews -->
   <div class="space-y-4">
     <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-      <i class="fa-solid fa-star text-amber-500"></i> Avis clients vérifiés (<%= reviews.length %>)
+      <i class="fa-solid fa-star text-amber-500"></i> Avis vérifiés (<%= reviews.length %>)
     </h2>
 
     <% if (reviews && reviews.length > 0) { %>
@@ -108,14 +116,14 @@
                 <% for (let i = 0; i < r.rating; i++) { %><i class="fa-solid fa-star"></i><% } %>
               </div>
             </div>
-            <p class="text-xs text-slate-600 italic">"<%= r.comment || 'Travail livré conforme et dans les temps !' %>"</p>
-            <span class="text-[10px] text-slate-400 block">Sur le service : <%= r.serviceTitle %></span>
+            <p class="text-xs text-slate-600 italic">"<%= r.comment || 'Méthode conforme, explications claires et fichiers complets !' %>"</p>
+            <span class="text-[10px] text-slate-400 block">Sur le guide : <%= r.serviceTitle %></span>
           </div>
         <% }) %>
       </div>
     <% } else { %>
       <div class="text-center py-8 bg-white rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400">
-        Pas encore d'avis déposé sur ce profil.
+        Aucun avis laissé sur ce profil pour l'instant.
       </div>
     <% } %>
   </div>

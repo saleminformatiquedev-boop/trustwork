@@ -30,7 +30,7 @@ function setupAuth(app, pool) {
     }
   });
 
-  // Google OAuth si configuré dans .env
+  // Google OAuth if configured in .env
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     passport.use(
       new GoogleStrategy(
@@ -42,7 +42,7 @@ function setupAuth(app, pool) {
         async (accessToken, refreshToken, profile, done) => {
           try {
             const email = profile.emails && profile.emails[0] ? profile.emails[0].value : null;
-            if (!email) return done(new Error("Email non fourni par Google"));
+            if (!email) return done(new Error("Email not provided by Google"));
 
             const existingRes = await pool.query(
               'SELECT * FROM users WHERE "googleId" = $1 OR email = $2',
@@ -57,7 +57,7 @@ function setupAuth(app, pool) {
                 INSERT INTO users (id, "googleId", email, name, avatar, "walletBalance", "escrowBalance")
                 VALUES ($1, $2, $3, $4, $5, 150.00, 0.00)
                 RETURNING *
-              `, [newId, profile.id, email, profile.displayName || "Utilisateur Google", avatar]);
+              `, [newId, profile.id, email, profile.displayName || "Google User", avatar]);
               user = insertRes.rows[0];
             } else if (!user.googleId) {
               const updRes = await pool.query(
@@ -76,10 +76,10 @@ function setupAuth(app, pool) {
     );
   }
 
-  // Routes Google
+  // Google Routes
   app.get('/auth/google', (req, res, next) => {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-      return res.redirect('/login?msg=Veuillez+renseigner+vos+clés+Google+dans+.env+ou+utiliser+le+mode+démo+ci-dessous');
+      return res.redirect('/login?msg=Please+configure+Google+keys+in+.env+or+use+1-click+demo+mode+below');
     }
     passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
   });
@@ -99,24 +99,32 @@ function setupAuth(app, pool) {
     });
   });
 
-  // Switch démo instantané
+  // Instant demo switch
   app.get('/auth/demo-login/:role', async (req, res) => {
     try {
       const role = req.params.role.toLowerCase();
-      let email = "acheteur@demo.local";
-      if (role === "seller") email = "vendeur@demo.local";
+      let email = "buyer@demo.local";
+      if (role === "seller") email = "seller@demo.local";
       if (role === "admin") email = "admin@demo.local";
 
-      const userRes = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+      // Also check fallback to old french emails if database was already seeded
+      let userRes = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+      if (userRes.rows.length === 0) {
+        if (role === "buyer") email = "acheteur@demo.local";
+        if (role === "seller") email = "vendeur@demo.local";
+        if (role === "admin") email = "admin@demo.local";
+        userRes = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+      }
+
       const user = userRes.rows[0];
-      if (!user) return res.status(404).send("Compte de démo non trouvé. Relancez l'application.");
+      if (!user) return res.status(404).send("Demo account not found. Please restart the application.");
 
       req.login(normalizeUser(user), (err) => {
-        if (err) return res.status(500).send("Erreur de session");
+        if (err) return res.status(500).send("Session error");
         res.redirect('/dashboard');
       });
     } catch (e) {
-      res.status(500).send("Erreur: " + e.message);
+      res.status(500).send("Error: " + e.message);
     }
   });
 }

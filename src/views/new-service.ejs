@@ -1,4 +1,4 @@
-<%- include('partials/header', { title: 'Publier une Méthode PDF' }) %>
+<%- include('partials/header', { title: 'Publish a PDF Method' }) %>
 
 <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
   
@@ -6,11 +6,11 @@
     
     <div class="border-b border-slate-100 pb-5">
       <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-semibold mb-2 border border-rose-100">
-        <i class="fa-solid fa-file-pdf text-[11px] text-rose-600"></i> Méthodes & Procédures PDF
+        <i class="fa-solid fa-file-pdf text-[11px] text-rose-600"></i> PDF Methods & Procedures
       </div>
-      <h1 class="text-xl sm:text-2xl font-black text-slate-900">Publier une Méthode pas à pas pour accomplir une tâche</h1>
+      <h1 class="text-xl sm:text-2xl font-black text-slate-900">Publish a Step-by-Step Method to Accomplish a Task</h1>
       <p class="text-xs text-slate-500 mt-1 leading-relaxed">
-        Définissez le prix en USDT et téléversez votre document PDF. Vos acheteurs pourront télécharger le guide immédiatement dès leur commande avec protection sous séquestre.
+        Set your price in USDT and upload your PDF guide along with supporting files. Buyers will be able to download the guide immediately upon ordering with full escrow protection.
       </p>
     </div>
 
@@ -18,96 +18,96 @@
       
       <div>
         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-          Titre du Guide / Tâche expliquée
+          Guide Title / Task Explained
         </label>
-        <input type="text" name="title" required placeholder="Ex: Guide PDF : Comment déployer une application sur AWS avec Docker & SSL" class="w-full text-xs sm:text-sm px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50/50 focus:bg-white transition">
-        <p class="text-[11px] text-slate-400 mt-1">Formulez clairement la tâche résolue par votre méthode.</p>
+        <input type="text" name="title" required placeholder="e.g. PDF Guide: How to deploy a web application to AWS with Docker & SSL" class="w-full text-xs sm:text-sm px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50/50 focus:bg-white transition">
+        <p class="text-[11px] text-slate-400 mt-1">Clearly state the task or goal achieved by your method.</p>
       </div>
 
-      <!-- Section des Fichiers & Livrables de la Méthode (PDF, ZIP, Texte, Vidéo) -->
+      <!-- Files & Deliverables Section (PDF, ZIP, Text, Video) -->
       <div class="space-y-3 pt-2">
         <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-          📦 Fichiers et Ressources Inclus dans la Méthode
+          📦 Files and Resources Included in the Method
         </label>
-        <p class="text-[11px] text-slate-500">Ajoutez les documents, archives de code, scripts et vidéos qui composeront votre méthode complète.</p>
+        <p class="text-[11px] text-slate-500">Attach the documents, source code archives, scripts, and video tutorial that compose your complete package.</p>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           
-          <!-- 1. Document PDF -->
+          <!-- 1. PDF Document -->
           <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
             <span class="font-bold text-rose-700 flex items-center gap-1.5">
-              <i class="fa-solid fa-file-pdf"></i> 1. Document PDF (Guide Pas à Pas)
+              <i class="fa-solid fa-file-pdf"></i> 1. PDF Document (Step-by-Step Guide)
             </span>
             <input type="file" name="pdfFile" accept=".pdf" class="w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-rose-600 file:text-white hover:file:bg-rose-700 cursor-pointer">
           </div>
 
-          <!-- 2. Archive ZIP -->
+          <!-- 2. ZIP Archive -->
           <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
             <span class="font-bold text-amber-700 flex items-center gap-1.5">
-              <i class="fa-solid fa-file-zipper"></i> 2. Code Source & Templates (ZIP)
+              <i class="fa-solid fa-file-zipper"></i> 2. Source Code & Templates (ZIP)
             </span>
             <input type="file" name="zipFile" accept=".zip,.rar,.tar,.gz" class="w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-700 cursor-pointer">
           </div>
 
-          <!-- 3. Fichier Texte / Scripts -->
+          <!-- 3. Text Files / Scripts -->
           <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
             <span class="font-bold text-blue-700 flex items-center gap-1.5">
-              <i class="fa-solid fa-file-lines"></i> 3. Scripts & Commandes (Texte / .sh / .env)
+              <i class="fa-solid fa-file-lines"></i> 3. Scripts & Commands (Text / .sh / .env)
             </span>
             <input type="file" name="textFile" accept=".txt,.md,.sh,.env,.json,.yml,.yaml" class="w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer">
           </div>
 
-          <!-- 4. Vidéo Démonstrative -->
+          <!-- 4. Video Tutorial -->
           <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
             <span class="font-bold text-purple-700 flex items-center gap-1.5">
-              <i class="fa-solid fa-video"></i> 4. Fichier Vidéo (MP4 / WebM)
+              <i class="fa-solid fa-video"></i> 4. Video File (MP4 / WebM)
             </span>
             <input type="file" name="videoFile" accept=".mp4,.webm,.mov" class="w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer">
           </div>
 
         </div>
 
-        <!-- Ou Lien Vidéo Externe -->
+        <!-- External Video Link -->
         <div class="mt-2">
           <label class="block text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1">
-            <i class="fa-brands fa-youtube text-rose-600"></i> Ou Lien du Tutoriel Vidéo (YouTube, Loom, Vimeo) :
+            <i class="fa-brands fa-youtube text-rose-600"></i> Or Video Tutorial Link (YouTube, Loom, Vimeo):
           </label>
-          <input type="url" name="videoUrl" placeholder="https://www.youtube.com/watch?v=... ou https://www.loom.com/share/..." class="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+          <input type="url" name="videoUrl" placeholder="https://www.youtube.com/watch?v=... or https://www.loom.com/share/..." class="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
         </div>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Catégorie</label>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Category</label>
           <select name="category" class="w-full text-xs sm:text-sm px-3.5 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
-            <option value="Déploiement & Cloud">Déploiement & Cloud</option>
+            <option value="Cloud & Deployment">Cloud & Deployment</option>
             <option value="Backend & API">Backend & API</option>
             <option value="DevOps & CI/CD">DevOps & CI/CD</option>
-            <option value="Sécurité & Blockchain">Sécurité & Blockchain</option>
-            <option value="Architecture Logicielle">Architecture Logicielle</option>
-            <option value="Méthodologie de Développement">Méthodologie de Développement</option>
+            <option value="Security & Blockchain">Security & Blockchain</option>
+            <option value="Software Architecture">Software Architecture</option>
+            <option value="Development Methodology">Development Methodology</option>
           </select>
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Difficulté</label>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Difficulty</label>
           <select name="difficulty" class="w-full text-xs sm:text-sm px-3.5 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
-            <option value="Débutant">Débutant</option>
-            <option value="Intermédiaire" selected>Intermédiaire</option>
-            <option value="Avancé">Avancé</option>
+            <option value="Beginner">Beginner</option>
+            <option value="Intermediate" selected>Intermediate</option>
+            <option value="Advanced">Advanced</option>
             <option value="Expert">Expert</option>
           </select>
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nombre de pages</label>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Page Count</label>
           <input type="number" name="pageCount" min="1" max="1000" value="40" required class="w-full text-xs sm:text-sm px-3.5 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold text-slate-800">
         </div>
       </div>
 
       <div>
         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-          Prix Forfaitaire du Guide (USDT)
+          Fixed Guide Price (USDT)
         </label>
         <div class="relative">
           <input type="number" step="0.5" min="1" name="price" required placeholder="25.00" class="w-full text-sm sm:text-base px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none pr-16 font-black text-slate-900 bg-slate-50/50 focus:bg-white transition">
@@ -116,21 +116,21 @@
           </div>
         </div>
         <p class="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-          <i class="fa-solid fa-shield-halved text-emerald-600 text-[10px]"></i> Ce montant sera sécurisé sous séquestre lors de la commande et reversé dès validation par l'acheteur.
+          <i class="fa-solid fa-shield-halved text-emerald-600 text-[10px]"></i> This amount will be locked in escrow upon order and released to you upon buyer approval.
         </p>
       </div>
 
       <div>
         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-          Sommaire & Étapes expliquées dans la méthode
+          Table of Contents & Step-by-Step Syllabus
         </label>
-        <textarea name="description" rows="5" required placeholder="Détaillez le plan étape par étape de la méthode :&#10;1. Cadrage et prérequis nécessaires&#10;2. Commandes et scripts à exécuter pas à pas&#10;3. Configuration et pièges fréquents à éviter&#10;4. Vérification et validation du résultat..." class="w-full text-xs sm:text-sm p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50/50 focus:bg-white transition"></textarea>
+        <textarea name="description" rows="5" required placeholder="Detail the step-by-step roadmap:&#10;1. Scoping and prerequisites&#10;2. Step-by-step commands and scripts&#10;3. Configuration and common pitfalls to avoid&#10;4. Verification, testing, and result validation..." class="w-full text-xs sm:text-sm p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50/50 focus:bg-white transition"></textarea>
       </div>
 
       <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-        <a href="/" class="px-4 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition">Annuler</a>
+        <a href="/" class="px-4 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition">Cancel</a>
         <button type="submit" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md shadow-emerald-200 transition flex items-center gap-2">
-          <i class="fa-solid fa-file-arrow-up text-xs"></i> Publier la Méthode PDF
+          <i class="fa-solid fa-file-arrow-up text-xs"></i> Publish PDF Method
         </button>
       </div>
 

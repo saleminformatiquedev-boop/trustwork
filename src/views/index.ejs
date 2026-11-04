@@ -1,33 +1,33 @@
-<%- include('partials/header', { title: 'Méthodes & Guides Pratiques de Développement (PDF)' }) %>
+<%- include('partials/header', { title: 'Méthodes & Guides Pratiques PDF (Développeurs)' }) %>
 
-<!-- Hero Banner (Entièrement responsive mobile/tablette/desktop) -->
+<!-- Hero Banner -->
 <section class="bg-gradient-to-b from-emerald-50/70 via-white to-transparent py-8 sm:py-14 border-b border-slate-100">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
     
     <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100/90 text-emerald-800 text-[11px] sm:text-xs font-semibold mb-4 sm:mb-6 max-w-full">
       <i class="fa-solid fa-file-pdf text-emerald-600 flex-shrink-0"></i> 
-      <span class="truncate">Guides Pratiques PDF : Téléchargement Immédiat & Séquestre Garanti</span>
+      <span class="truncate">Guides Pratiques & Packs Ressources : Téléchargement Immédiat & Séquestre Garanti</span>
     </div>
 
     <h1 class="text-2xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight max-w-3xl mx-auto leading-tight sm:leading-tight">
-      Des méthodes PDF pas à pas pour <span class="text-emerald-600">accomplir vos tâches</span> de développement.
+      Méthodes de développement pas-à-pas pour <span class="text-emerald-600">réussir vos tâches techniques</span>.
     </h1>
     
     <p class="mt-3 sm:mt-4 text-xs sm:text-base lg:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
-      Déploiement AWS, APIs sécurisées, architecture logicielle, Docker et CI/CD : téléchargez directement le guide PDF d'un expert pour réussir votre tâche sans blocage. Vos USDT restent protégés sous séquestre.
+      Déploiement Cloud, Sécurité API, Architecture, Docker et CI/CD : téléchargez directement le pack d'un expert (PDF, ZIP de code, scripts et tutoriel vidéo). Vos USDT restent en sécurité dans le séquestre.
     </p>
 
-    <!-- Boutons d'action responsives -->
+    <!-- Action Buttons -->
     <div class="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
       <a href="/services/new" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-emerald-200 transition">
-        <i class="fa-solid fa-circle-arrow-up"></i> Publier une Méthode PDF
+        <i class="fa-solid fa-circle-arrow-up"></i> Publier une Méthode
       </a>
       <a href="#catalogue" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm shadow-sm transition">
-        <i class="fa-solid fa-book-open"></i> Parcourir les Guides PDF
+        <i class="fa-solid fa-book-open"></i> Parcourir les Guides
       </a>
     </div>
 
-    <!-- Mode test rapide compact et responsive -->
+    <!-- Quick Test Mode -->
     <div class="mt-8 max-w-xl mx-auto bg-white p-3 rounded-2xl border border-dashed border-emerald-300 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-slate-600">
       <span class="font-semibold flex items-center gap-1.5 text-slate-800 text-[11px] sm:text-xs">
         <i class="fa-solid fa-vial text-emerald-600"></i> Mode test rapide :
@@ -35,49 +35,49 @@
       <div class="flex items-center gap-1.5 w-full sm:w-auto justify-center">
         <a href="/auth/demo-login/buyer" class="flex-1 sm:flex-initial text-center bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold hover:bg-blue-100 transition">Acheteur (Thomas)</a>
         <a href="/auth/demo-login/seller" class="flex-1 sm:flex-initial text-center bg-purple-50 text-purple-700 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold hover:bg-purple-100 transition">Vendeur (Sarah)</a>
-        <a href="/auth/demo-login/admin" class="flex-1 sm:flex-initial text-center bg-amber-50 text-amber-700 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold hover:bg-amber-100 transition">Médiateur</a>
+        <a href="/auth/demo-login/admin" class="flex-1 sm:flex-initial text-center bg-amber-50 text-amber-700 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold hover:bg-amber-100 transition">Support (Admin)</a>
       </div>
     </div>
 
   </div>
 </section>
 
-<!-- Catalogue Dynamique Responsive -->
+<!-- Dynamic Catalog Section -->
 <section id="catalogue" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
   <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 sm:mb-8">
     <div>
       <h2 class="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
         <i class="fa-solid fa-layer-group text-emerald-600"></i> Guides & Méthodes Disponibles
       </h2>
-      <p class="text-xs sm:text-sm text-slate-500">Accès et téléchargement instantané du document PDF dès validation de la commande.</p>
+      <p class="text-xs sm:text-sm text-slate-500">Accès et téléchargement immédiat dès la confirmation de commande.</p>
     </div>
 
-    <!-- Filtres & Barre de recherche instantanés adaptés mobile -->
+    <!-- Instant Search & Category Filters -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full md:w-auto">
       <div class="relative w-full">
         <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-        <input type="text" id="service-search-input" placeholder="Rechercher une tâche (ex: AWS, JWT, Docker)..." class="w-full text-xs pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        <input type="text" id="service-search-input" placeholder="Rechercher une tâche (AWS, JWT, Docker)..." class="w-full text-xs pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
       </div>
 
       <select id="category-filter-select" class="w-full text-xs px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-slate-700 truncate">
-        <option value="ALL">Toutes catégories</option>
-        <option value="Déploiement & Cloud">Déploiement & Cloud</option>
+        <option value="ALL">Toutes les Catégories</option>
+        <option value="Cloud & Deployment">Déploiement & Cloud</option>
         <option value="Backend & API">Backend & API</option>
         <option value="DevOps & CI/CD">DevOps & CI/CD</option>
-        <option value="Sécurité & Blockchain">Sécurité & Blockchain</option>
-        <option value="Architecture Logicielle">Architecture Logicielle</option>
-        <option value="Méthodologie de Développement">Méthodologie de Développement</option>
+        <option value="Security & Blockchain">Sécurité & Blockchain</option>
+        <option value="Software Architecture">Architecture Logicielle</option>
+        <option value="Development Methodology">Méthodologie de Dév</option>
       </select>
 
       <select id="sort-filter-select" class="w-full text-xs px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-slate-700">
-        <option value="recent">Plus récents</option>
-        <option value="price_asc">Prix croissant</option>
-        <option value="price_desc">Prix décroissant</option>
+        <option value="recent">Plus Récents</option>
+        <option value="price_asc">Prix : Croissant</option>
+        <option value="price_desc">Prix : Décroissant</option>
       </select>
     </div>
   </div>
 
-  <!-- Grille des cartes de services adaptative -->
+  <!-- Adaptive Services Grid -->
   <div id="services-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
     <% if (services && services.length > 0) { %>
       <% services.forEach(service => { %>
@@ -87,14 +87,14 @@
              data-price="<%= service.price %>">
           
           <div class="p-5 sm:p-6">
-            <!-- Vendeur & Badges Formats Inclus (PDF, ZIP, Texte, Vidéo) -->
+            <!-- Author & Format Badges (PDF, ZIP, TXT, VIDEO) -->
             <div class="flex items-center justify-between mb-3.5 gap-2">
               <div class="flex items-center gap-2 min-w-0">
                 <img src="<%= service.sellerAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + service.sellerName %>" alt="<%= service.sellerName %>" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-slate-200 flex-shrink-0 object-cover">
                 <span class="text-xs font-semibold text-slate-700 truncate"><%= service.sellerName %></span>
               </div>
               
-              <!-- Badges de formats -->
+              <!-- Format Badges -->
               <div class="flex items-center gap-1 flex-shrink-0">
                 <span class="text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded" title="Guide PDF inclus">
                   PDF
@@ -102,7 +102,7 @@
                 <span class="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded" title="Code source ZIP inclus">
                   ZIP
                 </span>
-                <span class="text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded" title="Scripts texte inclus">
+                <span class="text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded" title="Scripts et configs inclus">
                   TXT
                 </span>
                 <% if (service.videoUrl || (service.formats && service.formats.includes('VIDEO'))) { %>
@@ -113,7 +113,7 @@
               </div>
             </div>
 
-            <!-- Titre & Description de la tâche -->
+            <!-- Task Title & Description -->
             <h3 class="font-bold text-slate-900 text-sm sm:text-base mb-2 line-clamp-2 group-hover:text-emerald-600 transition">
               <a href="/services/<%= service.id %>"><%= service.title %></a>
             </h3>
@@ -121,7 +121,7 @@
               <%= service.description %>
             </p>
 
-            <!-- Spécifications techniques du document -->
+            <!-- Technical Document Specifications -->
             <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
               <span class="inline-flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200 font-medium">
                 <i class="fa-solid fa-book text-slate-400"></i> <%= service.pageCount || 35 %> pages
@@ -130,22 +130,22 @@
                 <i class="fa-solid fa-bolt text-amber-500"></i> <%= service.difficulty || 'Intermédiaire' %>
               </span>
               <span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-100 font-bold ml-auto">
-                <i class="fa-solid fa-download"></i> Direct
+                <i class="fa-solid fa-download"></i> Immédiat
               </span>
             </div>
           </div>
 
-          <!-- Footer carte avec Prix USDT et Bouton Séquestre -->
+          <!-- Card Footer with USDT Price and Download Action -->
           <div class="px-5 sm:px-6 py-3.5 sm:py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
             <div>
-              <span class="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Prix du Guide</span>
+              <span class="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Prix du pack</span>
               <div class="text-lg sm:text-xl font-extrabold text-slate-900">
                 <%= service.price.toFixed(2) %> <span class="text-xs font-bold text-emerald-600">USDT</span>
               </div>
             </div>
 
             <a href="/services/<%= service.id %>" class="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm transition">
-              <i class="fa-solid fa-file-arrow-down text-[11px]"></i> Obtenir le PDF
+              <i class="fa-solid fa-file-arrow-down text-[11px]"></i> Voir le pack
             </a>
           </div>
 
@@ -154,7 +154,7 @@
     <% } %>
   </div>
 
-  <!-- Message si aucun résultat après filtre -->
+  <!-- Empty Search Results Message -->
   <div id="no-results-message" class="hidden text-center py-12 sm:py-16 bg-white rounded-2xl border border-dashed border-slate-300">
     <i class="fa-solid fa-magnifying-glass text-3xl sm:text-4xl text-slate-300 mb-3"></i>
     <h3 class="text-sm sm:text-base font-semibold text-slate-700">Aucune méthode trouvée</h3>
@@ -162,7 +162,7 @@
   </div>
 </section>
 
-<!-- Script de recherche & filtres instantanés -->
+<!-- Search & Filtering Script -->
 <script>
   const searchInput = document.getElementById('service-search-input');
   const categorySelect = document.getElementById('category-filter-select');
@@ -182,7 +182,11 @@
       const title = card.getAttribute('data-title');
       const cat = card.getAttribute('data-category');
       const matchesSearch = !query || title.includes(query);
-      const matchesCategory = category === 'ALL' || cat === category;
+      const matchesCategory = category === 'ALL' || cat === category || 
+        (category === 'Cloud & Deployment' && (cat === 'Déploiement & Cloud' || cat === 'Cloud & Deployment')) ||
+        (category === 'Development Methodology' && (cat === 'Méthodologie de Développement' || cat === 'Development Methodology')) ||
+        (category === 'Security & Blockchain' && (cat === 'Sécurité & Blockchain' || cat === 'Security & Blockchain')) ||
+        (category === 'Software Architecture' && (cat === 'Architecture Logicielle' || cat === 'Software Architecture'));
 
       if (matchesSearch && matchesCategory) {
         card.style.display = 'flex';

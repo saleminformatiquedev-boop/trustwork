@@ -37,12 +37,12 @@ function getTransporter() {
 }
 
 /**
- * Envoie un email stylisé HTML avec fallback texte brut (non-bloquant)
+ * Send styled HTML email with plain text fallback (non-blocking)
  */
 async function sendEmail({ to, subject, html, text }) {
   const client = getTransporter();
   if (!client) {
-    console.warn(`[EmailService] ⚠️ SMTP_PASS non configuré. Email vers ${to} non envoyé.`);
+    console.warn(`[EmailService] ⚠️ SMTP_PASS not configured. Email to ${to} not sent.`);
     return { success: false, reason: 'SMTP_NOT_CONFIGURED' };
   }
 
@@ -54,16 +54,16 @@ async function sendEmail({ to, subject, html, text }) {
       text: text || '',
       html: html
     });
-    console.log(`[EmailService] 📧 Email envoyé à ${to} (${info.messageId}) - Objet : "${subject}"`);
+    console.log(`[EmailService] 📧 Email sent to ${to} (${info.messageId}) - Subject: "${subject}"`);
     return { success: true, messageId: info.messageId };
   } catch (err) {
-    console.error(`[EmailService] ❌ Erreur lors de l'envoi de l'email vers ${to}:`, err.message);
+    console.error(`[EmailService] ❌ Error sending email to ${to}:`, err.message);
     return { success: false, error: err.message };
   }
 }
 
 /**
- * Modèle HTML élégant pour TrustWork
+ * Elegant HTML template for TrustWork
  */
 function getEmailTemplate({ title, badge, content, ctaText, ctaUrl }) {
   return `
@@ -88,7 +88,7 @@ function getEmailTemplate({ title, badge, content, ctaText, ctaUrl }) {
     <div class="container">
       <div class="header">
         <div class="logo">🛡️ TrustWork</div>
-        <div style="font-size: 13px; opacity: 0.9; margin-top: 4px;">Système de Séquestre Garanti & Binance Pay</div>
+        <div style="font-size: 13px; opacity: 0.9; margin-top: 4px;">Guaranteed Escrow System & Binance Pay</div>
       </div>
       <div class="body">
         ${badge ? `<div class="badge">${badge}</div>` : ''}
@@ -97,8 +97,8 @@ function getEmailTemplate({ title, badge, content, ctaText, ctaUrl }) {
         ${ctaText && ctaUrl ? `<div style="text-align: center;"><a href="${ctaUrl}" class="cta-btn">${ctaText}</a></div>` : ''}
       </div>
       <div class="footer">
-        Ceci est une notification automatique de sécurité TrustWork.<br>
-        Plateforme d'échange de services avec protection des fonds sous séquestre.
+        This is an automated security notification from TrustWork.<br>
+        Developer method platform with guaranteed escrow fund protection.
       </div>
     </div>
   </body>
@@ -107,79 +107,79 @@ function getEmailTemplate({ title, badge, content, ctaText, ctaUrl }) {
 }
 
 // ==========================================
-// NOTIFICATIONS ÉVÉNEMENTIELLES
+// EVENT NOTIFICATIONS
 // ==========================================
 
 /**
- * 1. Nouvelle commande créée (Fonds sous séquestre)
+ * 1. New order created (Funds in escrow)
  */
 async function notifyNewOrder({ order, service, buyer, seller }) {
   const amount = parseFloat(order.amount).toFixed(2);
   const orderUrl = `${BASE_URL}/orders/${order.id}`;
 
-  // Notification Vendeur
+  // Seller Notification
   if (seller && seller.email && !seller.email.endsWith('.local')) {
     sendEmail({
       to: seller.email,
-      subject: `🎉 Nouvelle commande reçue (#${order.id}) - ${amount} USDT sous séquestre`,
+      subject: `🎉 New order received (#${order.id}) - ${amount} USDT in escrow`,
       html: getEmailTemplate({
-        title: `Vous avez reçu une nouvelle commande !`,
-        badge: 'Fonds Séquestrés (Garantis)',
+        title: `You have received a new order!`,
+        badge: 'Escrow Protected (Guaranteed)',
         content: `
-          Bonjour <strong>${seller.name}</strong>,<br><br>
-          L'acheteur <strong>${buyer.name}</strong> vient de passer commande pour votre service :<br>
+          Hello <strong>${seller.name}</strong>,<br><br>
+          Buyer <strong>${buyer.name}</strong> just placed an order for your guide:<br>
           <div class="box">
-            <strong>Service :</strong> ${service.title}<br>
-            <strong>Montant bloqué :</strong> ${amount} USDT<br>
-            <strong>Consignes de l'acheteur :</strong> <em>${order.requirements || 'Aucune'}</em>
+            <strong>Guide:</strong> ${service.title}<br>
+            <strong>Locked amount:</strong> ${amount} USDT<br>
+            <strong>Buyer instructions:</strong> <em>${order.requirements || 'None'}</em>
           </div>
-          🔒 <strong>Les ${amount} USDT sont d'ores et déjà bloqués sur la plateforme.</strong> Vous pouvez commencer à travailler en toute sérénité.
+          🔒 <strong>The ${amount} USDT are already locked on the platform.</strong> You can proceed with full confidence.
         `,
-        ctaText: 'Accéder à la commande & Livrer',
+        ctaText: 'Access Order & Deliver',
         ctaUrl: orderUrl
       })
     });
   }
 
-  // Confirmation Acheteur
+  // Buyer Confirmation
   if (buyer && buyer.email && !buyer.email.endsWith('.local')) {
     sendEmail({
       to: buyer.email,
-      subject: `🔒 Confirmation de votre commande (#${order.id}) - Fonds sécurisés`,
+      subject: `🔒 Order Confirmation (#${order.id}) - Funds Secured`,
       html: getEmailTemplate({
-        title: `Votre commande est confirmée`,
-        badge: 'Séquestre Actif',
+        title: `Your order is confirmed`,
+        badge: 'Escrow Active',
         content: `
-          Bonjour <strong>${buyer.name}</strong>,<br><br>
-          Votre commande a été transmise au travailleur <strong>${seller.name}</strong>.<br>
+          Hello <strong>${buyer.name}</strong>,<br><br>
+          Your order has been transmitted to author <strong>${seller.name}</strong>.<br>
           <div class="box">
-            <strong>Montant sous séquestre :</strong> ${amount} USDT<br>
-            <strong>Délai de réalisation :</strong> ${service.deliveryDays} jours ouvrés
+            <strong>Amount in escrow:</strong> ${amount} USDT<br>
+            <strong>Delivery timeframe:</strong> ${service.deliveryDays} business day(s)
           </div>
-          Votre argent reste protégé jusqu'à ce que vous validiez personnellement la livraison.
+          Your funds remain protected until you validate the delivery.
         `,
-        ctaText: 'Suivre ma commande en direct',
+        ctaText: 'Track Order Live',
         ctaUrl: orderUrl
       })
     });
   }
 
-  // Copie d'administration
+  // Admin Copy
   sendEmail({
     to: NOTIFICATION_EMAIL,
-    subject: `[Admin TrustWork] Nouvelle commande #${order.id} (${amount} USDT)`,
+    subject: `[TrustWork Admin] New order #${order.id} (${amount} USDT)`,
     html: getEmailTemplate({
-      title: `Nouvelle commande enregistrée sur la plateforme`,
+      title: `New order registered on the platform`,
       badge: 'Admin Alert',
-      content: `Acheteur : ${buyer.name} (${buyer.email})<br>Vendeur : ${seller.name} (${seller.email})<br>Montant : ${amount} USDT<br>Service : ${service.title}`,
-      ctaText: 'Voir la commande',
+      content: `Buyer: ${buyer.name} (${buyer.email})<br>Author: ${seller.name} (${seller.email})<br>Amount: ${amount} USDT<br>Guide: ${service.title}`,
+      ctaText: 'View Order',
       ctaUrl: orderUrl
     })
   });
 }
 
 /**
- * 2. Travail livré par le vendeur
+ * 2. Deliverables submitted by author
  */
 async function notifyOrderDelivered({ order, buyer, seller }) {
   const orderUrl = `${BASE_URL}/orders/${order.id}`;
@@ -187,20 +187,20 @@ async function notifyOrderDelivered({ order, buyer, seller }) {
   if (buyer && buyer.email && !buyer.email.endsWith('.local')) {
     sendEmail({
       to: buyer.email,
-      subject: `📦 Votre commande #${order.id} a été livrée !`,
+      subject: `📦 Your order #${order.id} has been delivered!`,
       html: getEmailTemplate({
-        title: `Le travailleur a livré votre prestation`,
-        badge: 'Livraison à valider',
+        title: `The author has delivered your work`,
+        badge: 'Review Deliverables',
         content: `
-          Bonjour <strong>${buyer.name}</strong>,<br><br>
-          <strong>${seller.name}</strong> a terminé la mission et a déposé les livrables.<br>
+          Hello <strong>${buyer.name}</strong>,<br><br>
+          <strong>${seller.name}</strong> has submitted the deliverables.<br>
           <div class="box">
-            <strong>Note de livraison :</strong><br>
-            ${order.deliveryNote || 'Consultez les fichiers et liens sur le site.'}
+            <strong>Delivery note:</strong><br>
+            ${order.deliveryNote || 'Check the files and links on the website.'}
           </div>
-          Prenez le temps d'examiner le travail. Si tout est parfait, cliquez ci-dessous pour libérer les <strong>${parseFloat(order.amount).toFixed(2)} USDT</strong>.
+          Please take the time to review the work. If everything is complete, click below to release the <strong>${parseFloat(order.amount).toFixed(2)} USDT</strong>.
         `,
-        ctaText: 'Vérifier & Valider la livraison',
+        ctaText: 'Verify & Approve Delivery',
         ctaUrl: orderUrl
       })
     });
@@ -208,7 +208,7 @@ async function notifyOrderDelivered({ order, buyer, seller }) {
 }
 
 /**
- * 3. Commande validée et fonds débloqués
+ * 3. Order completed and funds released
  */
 async function notifyOrderCompleted({ order, buyer, seller }) {
   const amount = parseFloat(order.amount).toFixed(2);
@@ -217,16 +217,16 @@ async function notifyOrderCompleted({ order, buyer, seller }) {
   if (seller && seller.email && !seller.email.endsWith('.local')) {
     sendEmail({
       to: seller.email,
-      subject: `💰 Paiement libéré ! +${amount} USDT reçus (Commande #${order.id})`,
+      subject: `💰 Payment Released! +${amount} USDT received (Order #${order.id})`,
       html: getEmailTemplate({
-        title: `Félicitations ! Vos gains sont disponibles`,
-        badge: 'Paiement Effectué',
+        title: `Congratulations! Your earnings are available`,
+        badge: 'Payment Released',
         content: `
-          Bonjour <strong>${seller.name}</strong>,<br><br>
-          L'acheteur a validé la commande. Le séquestre de <strong>${amount} USDT</strong> a été libéré et crédité sur votre solde disponible.<br>
-          Vous pouvez retirer vos fonds sur votre portefeuille Binance Pay à tout moment.
+          Hello <strong>${seller.name}</strong>,<br><br>
+          The buyer has approved the order. The escrow of <strong>${amount} USDT</strong> has been released and credited to your available balance.<br>
+          You can withdraw your funds to your Binance Pay wallet at any time.
         `,
-        ctaText: 'Voir mon portefeuille',
+        ctaText: 'View My Wallet',
         ctaUrl: `${BASE_URL}/dashboard`
       })
     });
@@ -234,56 +234,55 @@ async function notifyOrderCompleted({ order, buyer, seller }) {
 }
 
 /**
- * 4. Ouverture d'un litige / enquête
+ * 4. Dispute / investigation opened
  */
 async function notifyDisputeOpened({ order, dispute, initiator, otherParty }) {
   const orderUrl = `${BASE_URL}/orders/${order.id}`;
 
-  // Notification aux parties
   const emailContent = `
-    Un dossier d'enquête (litige) a été ouvert par <strong>${initiator.name}</strong> sur la commande #${order.id}.<br>
+    An investigation (dispute) has been opened by <strong>${initiator.name}</strong> regarding order #${order.id}.<br>
     <div class="box">
-      <strong>Motif :</strong> ${dispute.reason}<br>
-      <strong>Détails :</strong> ${dispute.details}
+      <strong>Reason:</strong> ${dispute.reason}<br>
+      <strong>Details:</strong> ${dispute.details}
     </div>
-    🔒 <strong>Protection active :</strong> Les fonds restent intégralement gelés sous séquestre jusqu'à décision d'arbitrage.
+    🔒 <strong>Active Protection:</strong> Funds remain completely frozen in escrow until an arbitration decision is made.
   `;
 
   if (otherParty && otherParty.email && !otherParty.email.endsWith('.local')) {
     sendEmail({
       to: otherParty.email,
-      subject: `⚠️ Enquête ouverte sur la commande #${order.id}`,
+      subject: `⚠️ Investigation opened on order #${order.id}`,
       html: getEmailTemplate({
-        title: `Dossier de litige ouvert`,
-        badge: 'Fonds Gelés',
+        title: `Dispute Case Opened`,
+        badge: 'Funds Frozen',
         content: emailContent,
-        ctaText: 'Participer à l\'échange',
+        ctaText: 'Join the Discussion',
         ctaUrl: orderUrl
       })
     });
   }
 
-  // Alerte Administrateur urgente
+  // Admin alert
   sendEmail({
     to: NOTIFICATION_EMAIL,
-    subject: `🚨 [Alerte Litige Admin] Enquête ouverte sur commande #${order.id}`,
+    subject: `🚨 [Admin Dispute Alert] Investigation opened on order #${order.id}`,
     html: getEmailTemplate({
-      title: `Nouveau litige nécessitant un arbitrage`,
-      badge: 'Action Requise',
+      title: `New dispute requiring arbitration`,
+      badge: 'Action Required',
       content: `
-        <strong>Initié par :</strong> ${initiator.name} (${initiator.email})<br>
-        <strong>Motif :</strong> ${dispute.reason}<br>
-        <strong>Montant gelé :</strong> ${parseFloat(order.amount).toFixed(2)} USDT<br>
-        <strong>Explications :</strong> ${dispute.details}
+        <strong>Initiated by:</strong> ${initiator.name} (${initiator.email})<br>
+        <strong>Reason:</strong> ${dispute.reason}<br>
+        <strong>Frozen amount:</strong> ${parseFloat(order.amount).toFixed(2)} USDT<br>
+        <strong>Details:</strong> ${dispute.details}
       `,
-      ctaText: 'Arbitrer le dossier',
+      ctaText: 'Arbitrate Case',
       ctaUrl: `${BASE_URL}/admin/disputes`
     })
   });
 }
 
 /**
- * 5. Demande de retrait USDT vers Binance Pay
+ * 5. Withdrawal request
  */
 async function notifyWithdrawalRequested({ user, amount, binanceId }) {
   const amtStr = parseFloat(amount).toFixed(2);
@@ -291,59 +290,133 @@ async function notifyWithdrawalRequested({ user, amount, binanceId }) {
   if (user && user.email && !user.email.endsWith('.local')) {
     sendEmail({
       to: user.email,
-      subject: `📤 Demande de retrait enregistrée - ${amtStr} USDT vers Binance Pay`,
+      subject: `📤 Withdrawal request received - ${amtStr} USDT to Binance Pay`,
       html: getEmailTemplate({
-        title: `Votre demande de retrait est prise en compte`,
-        badge: 'Retrait en cours',
+        title: `Your withdrawal request is being processed`,
+        badge: 'Withdrawal Pending',
         content: `
-          Bonjour <strong>${user.name}</strong>,<br><br>
-          Votre demande de retrait de <strong>${amtStr} USDT</strong> vers le compte Binance Pay ID <code>${binanceId}</code> a bien été enregistrée.<br>
-          Le virement sera traité sous peu.
+          Hello <strong>${user.name}</strong>,<br><br>
+          Your withdrawal request of <strong>${amtStr} USDT</strong> to Binance Pay ID <code>${binanceId}</code> has been recorded.<br>
+          The transfer will be processed shortly.
         `,
-        ctaText: 'Accéder à mon tableau de bord',
+        ctaText: 'Go to Dashboard',
         ctaUrl: `${BASE_URL}/dashboard`
       })
     });
   }
 
-  // Notif Admin
   sendEmail({
     to: NOTIFICATION_EMAIL,
-    subject: `[Admin Retrait] Demande de ${amtStr} USDT par ${user.name}`,
+    subject: `[Admin Withdrawal] Request of ${amtStr} USDT by ${user.name}`,
     html: getEmailTemplate({
-      title: `Demande de retrait Binance Pay reçue`,
-      badge: 'Demande Retrait',
-      content: `Utilisateur : ${user.name} (${user.email})<br>Montant : ${amtStr} USDT<br>Binance Pay ID : <code>${binanceId}</code>`,
-      ctaText: 'Vérifier sur le Dashboard Admin',
+      title: `Binance Pay withdrawal request received`,
+      badge: 'Withdrawal Request',
+      content: `User: ${user.name} (${user.email})<br>Amount: ${amtStr} USDT<br>Binance Pay ID: <code>${binanceId}</code>`,
+      ctaText: 'Check on Admin Dashboard',
       ctaUrl: `${BASE_URL}/dashboard`
     })
   });
 }
 
 /**
- * 6. Nouvel avis déposé
+ * 6. Review submitted
  */
 async function notifyReviewSubmitted({ review, order, seller, buyer }) {
   if (seller && seller.email && !seller.email.endsWith('.local')) {
     sendEmail({
       to: seller.email,
-      subject: `⭐ Nouvel avis reçu de ${buyer.name} (${review.rating}/5)`,
+      subject: `⭐ New review received from ${buyer.name} (${review.rating}/5)`,
       html: getEmailTemplate({
-        title: `Vous avez reçu une nouvelle note client !`,
-        badge: 'Avis Client',
+        title: `You received a new client rating!`,
+        badge: 'Client Review',
         content: `
-          Bonjour <strong>${seller.name}</strong>,<br><br>
-          <strong>${buyer.name}</strong> a laissé une évaluation sur votre commande :<br>
+          Hello <strong>${seller.name}</strong>,<br><br>
+          <strong>${buyer.name}</strong> left a review on your order:<br>
           <div class="box">
-            <strong>Note :</strong> ${review.rating} / 5 ⭐<br>
-            <strong>Commentaire :</strong> <em>"${review.comment}"</em>
+            <strong>Rating:</strong> ${review.rating} / 5 ⭐<br>
+            <strong>Comment:</strong> <em>"${review.comment}"</em>
           </div>
         `,
-        ctaText: 'Voir mon profil public',
+        ctaText: 'View Public Profile',
         ctaUrl: `${BASE_URL}/profile/${seller.id}`
       })
     });
   }
+}
+
+/**
+ * 7. Deposit confirmation via Binance Pay
+ */
+async function notifyDepositReceived({ user, amount, txId, binancePayId }) {
+  const amtStr = parseFloat(amount).toFixed(2);
+  
+  if (user && user.email && !user.email.endsWith('.local')) {
+    sendEmail({
+      to: user.email,
+      subject: `💰 Deposit confirmed: +${amtStr} USDT in your account`,
+      html: getEmailTemplate({
+        title: `Your account has been credited!`,
+        badge: 'Binance Pay Deposit',
+        content: `
+          Hello <strong>${user.name}</strong>,<br><br>
+          Your deposit of <strong>${amtStr} USDT</strong> via Binance Pay has been validated successfully.<br>
+          <div class="box">
+            <strong>Amount credited:</strong> ${amtStr} USDT<br>
+            <strong>Transaction ID (TxID):</strong> <code>${txId || 'N/A'}</code><br>
+            <strong>Binance Pay ID:</strong> <code>${binancePayId || 'N/A'}</code>
+          </div>
+          Your funds are immediately available to purchase guides and methods.
+        `,
+        ctaText: 'View My Dashboard',
+        ctaUrl: `${BASE_URL}/dashboard`
+      })
+    });
+  }
+
+  sendEmail({
+    to: NOTIFICATION_EMAIL,
+    subject: `[Admin Deposit] Deposit of ${amtStr} USDT received (${user.name})`,
+    html: getEmailTemplate({
+      title: `New Binance Pay deposit recorded`,
+      badge: 'Client Deposit',
+      content: `User: ${user.name} (${user.email})<br>Amount: ${amtStr} USDT<br>TxID: <code>${txId || 'N/A'}</code><br>Binance Pay ID: <code>${binancePayId || 'N/A'}</code>`,
+      ctaText: 'Admin Dashboard',
+      ctaUrl: `${BASE_URL}/dashboard`
+    })
+  });
+}
+
+/**
+ * 8. Unread chat message notification
+ */
+async function notifyUnreadChatMessage({ recipient, sender, conversationId, messageText }) {
+  if (!recipient || !recipient.email) return;
+
+  if (recipient.email.endsWith('.local')) {
+    console.log(`[EmailService] 💬 [Demo Simulation] Unread chat notification for ${recipient.email} (${recipient.name}) from ${sender.name}: "${messageText}"`);
+    return;
+  }
+
+  const roleLabel = sender.role === 'ADMIN' ? 'Support & Moderation' : (sender.role === 'USER' ? 'User' : sender.role);
+
+  sendEmail({
+    to: recipient.email,
+    subject: `💬 New message from ${sender.name} on TrustWork`,
+    html: getEmailTemplate({
+      title: `You have received a new private message`,
+      badge: 'Direct Messaging',
+      content: `
+        Hello <strong>${recipient.name}</strong>,<br><br>
+        <strong>${sender.name}</strong> (${roleLabel}) sent you a message on TrustWork:
+        <div class="box" style="border-left: 4px solid #059669; font-style: italic; color: #1e293b; background: #f0fdf4;">
+          "${messageText}"
+        </div>
+        Log in to your account to reply or view any attachments.
+      `,
+      ctaText: 'Open Conversation',
+      ctaUrl: `${BASE_URL}/chat?conversationId=${conversationId}`
+    })
+  });
 }
 
 module.exports = {
@@ -353,5 +426,7 @@ module.exports = {
   notifyOrderCompleted,
   notifyDisputeOpened,
   notifyWithdrawalRequested,
-  notifyReviewSubmitted
+  notifyReviewSubmitted,
+  notifyDepositReceived,
+  notifyUnreadChatMessage
 };

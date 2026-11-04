@@ -34,7 +34,7 @@ async function initDatabase() {
         "sellerId" VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         title VARCHAR(255) NOT NULL,
         description TEXT NOT NULL,
-        category VARCHAR(64) DEFAULT 'Méthodologie de Développement',
+        category VARCHAR(64) DEFAULT 'Development Methodology',
         price NUMERIC(14, 2) NOT NULL,
         "deliveryDays" INTEGER DEFAULT 1,
         "fileUrl" TEXT,
@@ -102,15 +102,63 @@ async function initDatabase() {
         "processedAt" TIMESTAMP WITH TIME ZONE,
         "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS deposits (
+        id VARCHAR(64) PRIMARY KEY,
+        "userId" VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount NUMERIC(14, 2) NOT NULL,
+        "binancePayId" VARCHAR(128),
+        "txId" VARCHAR(128),
+        status VARCHAR(32) DEFAULT 'COMPLETED',
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS conversations (
+        id VARCHAR(64) PRIMARY KEY,
+        type VARCHAR(32) DEFAULT 'DIRECT', -- 'DIRECT', 'SUPPORT', 'ORDER'
+        "orderId" VARCHAR(64) REFERENCES orders(id) ON DELETE SET NULL,
+        "serviceId" VARCHAR(64) REFERENCES services(id) ON DELETE SET NULL,
+        subject VARCHAR(255),
+        "lastMessageText" TEXT,
+        "lastMessageAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS conversation_participants (
+        "conversationId" VARCHAR(64) NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        "userId" VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        "unreadCount" INTEGER DEFAULT 0,
+        "lastReadAt" TIMESTAMP WITH TIME ZONE,
+        "joinedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY ("conversationId", "userId")
+      );
+
+      CREATE TABLE IF NOT EXISTS direct_messages (
+        id VARCHAR(64) PRIMARY KEY,
+        "conversationId" VARCHAR(64) NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        "senderId" VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        "fileUrl" TEXT,
+        "fileName" TEXT,
+        "fileSize" TEXT,
+        "fileType" TEXT,
+        "isRead" BOOLEAN DEFAULT FALSE,
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_conv_participants_user ON conversation_participants("userId");
+      CREATE INDEX IF NOT EXISTS idx_direct_messages_conv ON direct_messages("conversationId");
+      CREATE INDEX IF NOT EXISTS idx_conversations_lastmsg ON conversations("lastMessageAt" DESC);
     `);
 
-    // Migrations idempotentes pour le support des Méthodes Multi-formats (PDF, ZIP, Texte, Vidéo)
+    // Migrations for Multi-format methods (PDF, ZIP, Text, Video)
     await client.query(`
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "fileUrl" TEXT;
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "fileName" TEXT;
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "fileSize" TEXT;
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "pageCount" INTEGER DEFAULT 25;
-      ALTER TABLE services ADD COLUMN IF NOT EXISTS "difficulty" VARCHAR(32) DEFAULT 'Intermédiaire';
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "difficulty" VARCHAR(32) DEFAULT 'Intermediate';
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "formats" VARCHAR(255) DEFAULT 'PDF,ZIP,TEXT,VIDEO';
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "videoUrl" TEXT;
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "attachments" JSONB DEFAULT '[]'::jsonb;
@@ -122,12 +170,12 @@ async function initDatabase() {
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS "attachments" JSONB DEFAULT '[]'::jsonb;
     `);
 
-    // Mise à jour des services existants pour inclure les packs multi-fichiers
+    // Standard multi-file packages
     const defaultAttachments = JSON.stringify([
-      { type: "pdf", name: "guide-methode-pas-a-pas.pdf", url: "/uploads/guide-methode-developpement-ideale.pdf", size: "2.4 Mo", label: "Guide Complet (PDF)" },
-      { type: "zip", name: "code-source-projet.zip", url: "/uploads/code-source-template.zip", size: "5.1 Mo", label: "Code Source & Fichiers Prêts (ZIP)" },
-      { type: "text", name: "commandes-scripts.txt", url: "/uploads/commandes-scripts.txt", size: "15 Ko", label: "Scripts Shell & Variables .env (Texte)" },
-      { type: "video", name: "tutoriel-video.mp4", url: "https://www.youtube.com/watch?v=gAkwW2tuIqE", size: "18 min", label: "Tutoriel Vidéo de Démonstration (Vidéo)" }
+      { type: "pdf", name: "guide-method-step-by-step.pdf", url: "/uploads/guide-methode-developpement-ideale.pdf", size: "2.4 MB", label: "Complete Guide (PDF)" },
+      { type: "zip", name: "source-code-project.zip", url: "/uploads/code-source-template.zip", size: "5.1 MB", label: "Source Code & Ready Files (ZIP)" },
+      { type: "text", name: "commands-scripts.txt", url: "/uploads/commandes-scripts.txt", size: "15 KB", label: "Shell Scripts & .env Variables (Text)" },
+      { type: "video", name: "video-tutorial.mp4", url: "https://www.youtube.com/watch?v=gAkwW2tuIqE", size: "18 min", label: "Demo Video Walkthrough (Video)" }
     ]);
 
     await client.query(`
@@ -137,10 +185,10 @@ async function initDatabase() {
           "attachments" = CASE WHEN "attachments" IS NULL OR "attachments" = '[]'::jsonb THEN $1::jsonb ELSE "attachments" END
     `, [defaultAttachments]);
 
-    // Données de test initiales si la base est vide
+    // Initial demo data if table is empty
     const res = await client.query('SELECT count(*) as total FROM users');
     if (parseInt(res.rows[0].total, 10) === 0) {
-      console.log("🌱 Initialisation des données de démo dans PostgreSQL...");
+      console.log("🌱 Initializing demo seed data in PostgreSQL...");
 
       const buyerId = "usr_buyer_demo";
       await client.query(`
@@ -148,14 +196,14 @@ async function initDatabase() {
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `, [
         buyerId,
-        "acheteur@demo.local",
-        "Thomas Bernard (Acheteur)",
+        "buyer@demo.local",
+        "Thomas Bernard (Buyer)",
         "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
         "USER",
         250.00,
         0.00,
-        "Développeur & créateur de projets à la recherche de méthodes fiables pour accomplir ses tâches.",
-        "Gestion de projet, JavaScript, Python"
+        "Developer and project creator looking for reliable methods to accomplish technical tasks.",
+        "Project Management, JavaScript, Python"
       ]);
 
       const sellerId = "usr_seller_demo";
@@ -164,14 +212,14 @@ async function initDatabase() {
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `, [
         sellerId,
-        "vendeur@demo.local",
-        "Sarah Méthodes Dev",
+        "seller@demo.local",
+        "Sarah Dev Methods",
         "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80",
         "USER",
         45.00,
         0.00,
-        "Architecte logicielle & Auteure de guides méthodologiques pas à pas.",
-        "DevOps, Architecture, Sécurité, Clean Code",
+        "Software Architect and author of step-by-step developer guides.",
+        "DevOps, Architecture, Security, Clean Code",
         "BINANCE-PAY-789456"
       ]);
 
@@ -182,30 +230,30 @@ async function initDatabase() {
       `, [
         adminId,
         "admin@demo.local",
-        "Support Arbitrage",
+        "Arbitration Support",
         "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80",
         "ADMIN",
         0.00,
         0.00
       ]);
 
-      // Guides & Méthodes PDF orientés "Comment accomplir des tâches"
+      // PDF Guides & Methods
       await client.query(`
         INSERT INTO services (id, "sellerId", title, description, category, price, "deliveryDays", "fileUrl", "fileName", "fileSize", "pageCount", "difficulty")
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       `, [
         "srv_guide_aws_docker",
         sellerId,
-        "Guide PDF : Comment déployer une application Web sur AWS avec Docker & HTTPS",
-        "Méthode pas à pas pour accomplir cette tâche de A à Z : création de l'instance EC2, configuration Nginx, SSL Let's Encrypt automatique, Docker Compose, monitoring et gestion des pannes. Avec scripts shell prêts à copier-coller.",
-        "Déploiement & Cloud",
+        "PDF Guide: How to deploy a Web application to AWS with Docker & HTTPS",
+        "Step-by-step method to accomplish this task from A to Z: EC2 instance creation, Nginx configuration, automated Let's Encrypt SSL, Docker Compose, monitoring, and failover management. With copy-paste ready shell scripts.",
+        "Cloud & Deployment",
         29.00,
         1,
         "/uploads/guide-methode-developpement-ideale.pdf",
-        "methode-deploiement-aws-docker.pdf",
-        "2.4 Mo",
+        "method-deployment-aws-docker.pdf",
+        "2.4 MB",
         42,
-        "Intermédiaire"
+        "Intermediate"
       ]);
 
       await client.query(`
@@ -214,16 +262,16 @@ async function initDatabase() {
       `, [
         "srv_guide_api_rest",
         sellerId,
-        "Méthode PDF : Comment concevoir une API REST sécurisée avec JWT & PostgreSQL",
-        "Fiche de procédure pratique pour réaliser une API robuste : validation stricte des entrées, hash des mots de passe avec bcrypt, gestion sécurisée des tokens JWT, middleware d'autorisation et transactions ACID protégées contre les doubles dépenses.",
+        "PDF Method: How to design a secure REST API with JWT & PostgreSQL",
+        "Practical procedure sheet to build a robust API: strict input validation, password hashing with bcrypt, secure JWT token management, authorization middleware, and ACID transactions protected against double-spending.",
         "Backend & API",
         19.00,
         1,
         "/uploads/guide-methode-developpement-ideale.pdf",
-        "methode-api-rest-securisee.pdf",
-        "1.8 Mo",
+        "method-api-rest-secure.pdf",
+        "1.8 MB",
         35,
-        "Débutant"
+        "Beginner"
       ]);
 
       await client.query(`
@@ -232,30 +280,169 @@ async function initDatabase() {
       `, [
         "srv_guide_cicd_actions",
         sellerId,
-        "Playbook PDF : Comment mettre en place une Pipeline CI/CD avec GitHub Actions",
-        "Procédure pas à pas pour automatiser vos tests et déploiements : configuration des fichiers YAML, gestion sécurisée des secrets d'infrastructure, exécution des tests unitaires et intégration sans interruption de service.",
+        "PDF Playbook: How to build a CI/CD Pipeline with GitHub Actions",
+        "Step-by-step playbook to automate your tests and deployments: YAML configuration, secure infrastructure secrets management, automated unit test runs, and zero-downtime deployment.",
         "DevOps & CI/CD",
         39.00,
         1,
         "/uploads/guide-methode-developpement-ideale.pdf",
         "playbook-cicd-github-actions.pdf",
-        "3.1 Mo",
+        "3.1 MB",
         55,
-        "Avancé"
+        "Advanced"
       ]);
 
-      console.log("✅ Base de données PostgreSQL initialisée avec succès !");
+      console.log("✅ PostgreSQL database successfully initialized!");
     } else {
-      // S'assurer que les guides de démo existants ont des PDF attachés
+      // Ensure existing records have English translations and files attached
       await client.query(`
+        UPDATE users
+        SET bio = 'Developer and project creator looking for reliable methods to accomplish technical tasks.',
+            skills = 'Project Management, JavaScript, Python',
+            name = 'Thomas Bernard (Buyer)'
+        WHERE id = 'usr_buyer_demo';
+
+        UPDATE users
+        SET bio = 'Software Architect and author of step-by-step developer guides.',
+            skills = 'DevOps, Architecture, Security, Clean Code',
+            name = 'Sarah Dev Methods'
+        WHERE id = 'usr_seller_demo';
+
+        UPDATE users
+        SET name = 'Arbitration Support'
+        WHERE id = 'usr_admin_demo';
+
+        UPDATE services
+        SET title = 'PDF Guide: How to deploy a Web application to AWS with Docker & HTTPS',
+            description = 'Step-by-step method to accomplish this task from A to Z: EC2 instance creation, Nginx configuration, automated Let''s Encrypt SSL, Docker Compose, monitoring, and failover management. With copy-paste ready shell scripts.',
+            category = 'Cloud & Deployment',
+            difficulty = 'Intermediate'
+        WHERE id = 'srv_guide_aws_docker';
+
+        UPDATE services
+        SET title = 'PDF Method: How to design a secure REST API with JWT & PostgreSQL',
+            description = 'Practical procedure sheet to build a robust API: strict input validation, password hashing with bcrypt, secure JWT token management, authorization middleware, and ACID transactions protected against double-spending.',
+            category = 'Backend & API',
+            difficulty = 'Beginner'
+        WHERE id = 'srv_guide_api_rest';
+
+        UPDATE services
+        SET title = 'PDF Playbook: How to build a CI/CD Pipeline with GitHub Actions',
+            description = 'Step-by-step playbook to automate your tests and deployments: YAML configuration, secure infrastructure secrets management, automated unit test runs, and zero-downtime deployment.',
+            category = 'DevOps & CI/CD',
+            difficulty = 'Advanced'
+        WHERE id = 'srv_guide_cicd_actions';
+
         UPDATE services 
-        SET "fileUrl" = '/uploads/guide-methode-developpement-ideale.pdf',
-            "fileName" = 'methode-tache-developpement.pdf',
-            "fileSize" = '2.4 Mo',
-            "pageCount" = 45,
-            "difficulty" = 'Intermédiaire'
-        WHERE "fileUrl" IS NULL;
+        SET "fileUrl" = COALESCE("fileUrl", '/uploads/guide-methode-developpement-ideale.pdf'),
+            "fileName" = COALESCE("fileName", 'developer-task-method.pdf'),
+            "fileSize" = COALESCE("fileSize", '2.4 MB'),
+            "pageCount" = COALESCE("pageCount", 45),
+            "difficulty" = CASE 
+              WHEN "difficulty" = 'Intermédiaire' THEN 'Intermediate'
+              WHEN "difficulty" = 'Débutant' THEN 'Beginner'
+              WHEN "difficulty" = 'Avancé' THEN 'Advanced'
+              ELSE COALESCE("difficulty", 'Intermediate')
+            END,
+            "category" = CASE
+              WHEN "category" = 'Déploiement & Cloud' THEN 'Cloud & Deployment'
+              WHEN "category" = 'Méthodologie de Développement' THEN 'Development Methodology'
+              WHEN "category" = 'Sécurité & Blockchain' THEN 'Security & Blockchain'
+              WHEN "category" = 'Architecture Logicielle' THEN 'Software Architecture'
+              ELSE "category"
+            END;
       `);
+    }
+
+    // Initialize demo conversations if empty
+    const convCountRes = await client.query('SELECT count(*) as total FROM conversations');
+    if (parseInt(convCountRes.rows[0].total, 10) === 0) {
+      console.log("💬 Initialisation des conversations de démonstration...");
+
+      const buyerId = "usr_buyer_demo";
+      const sellerId = "usr_seller_demo";
+      const adminId = "usr_admin_demo";
+
+      // Récupérer un serviceId existant ou null
+      const srvCheck = await client.query('SELECT id FROM services LIMIT 1');
+      const sampleSrvId = srvCheck.rows.length > 0 ? srvCheck.rows[0].id : null;
+
+      // 1. Direct discussion Buyer <-> Author
+      const conv1Id = "conv_buyer_seller";
+      await client.query(`
+        INSERT INTO conversations (id, type, "serviceId", subject, "lastMessageText", "lastMessageAt")
+        VALUES ($1, 'DIRECT', $2, $3, $4, CURRENT_TIMESTAMP - INTERVAL '15 minutes')
+      `, [
+        conv1Id,
+        sampleSrvId,
+        "Question sur la méthode et les fichiers",
+        "Avec plaisir ! Si vous avez la moindre question, écrivez-moi ici."
+      ]);
+
+      await client.query(`
+        INSERT INTO conversation_participants ("conversationId", "userId", "unreadCount")
+        VALUES ($1, $2, 0), ($1, $3, 0)
+      `, [conv1Id, buyerId, sellerId]);
+
+      await client.query(`
+        INSERT INTO direct_messages (id, "conversationId", "senderId", content, "isRead", "createdAt")
+        VALUES 
+        ('dmsg_1_1', $1, $2, 'Hello Sarah! I am very interested in your AWS Docker deployment method. Do the provided scripts also handle automatic Let''s Encrypt SSL renewal?', true, CURRENT_TIMESTAMP - INTERVAL '45 minutes'),
+        ('dmsg_1_2', $1, $3, 'Hello Thomas! Yes absolutely, everything is automated with Certbot and an Nginx reverse proxy container. A single bash command is all it takes to set up secure SSL.', true, CURRENT_TIMESTAMP - INTERVAL '30 minutes'),
+        ('dmsg_1_3', $1, $2, 'Awesome, thank you so much! Placing the order for the guide now.', true, CURRENT_TIMESTAMP - INTERVAL '20 minutes'),
+        ('dmsg_1_4', $1, $3, 'My pleasure! If you have any questions while running the playbook, feel free to ask here.', true, CURRENT_TIMESTAMP - INTERVAL '15 minutes')
+      `, [conv1Id, buyerId, sellerId]);
+
+      // 2. Support discussion Buyer <-> Admin
+      const conv2Id = "conv_buyer_admin";
+      await client.query(`
+        INSERT INTO conversations (id, type, subject, "lastMessageText", "lastMessageAt")
+        VALUES ($1, 'SUPPORT', $2, $3, CURRENT_TIMESTAMP - INTERVAL '1 hour')
+      `, [
+        conv2Id,
+        "Escrow Protection & Top-Up Assistance",
+        "Always at your service! Let us know if you need any assistance."
+      ]);
+
+      await client.query(`
+        INSERT INTO conversation_participants ("conversationId", "userId", "unreadCount")
+        VALUES ($1, $2, 0), ($1, $3, 0)
+      `, [conv2Id, buyerId, adminId]);
+
+      await client.query(`
+        INSERT INTO direct_messages (id, "conversationId", "senderId", content, "isRead", "createdAt")
+        VALUES 
+        ('dmsg_2_1', $1, $2, 'Hello TrustWork team, I wanted to double-check how the guarantee works if there''s any issue with a guide?', true, CURRENT_TIMESTAMP - INTERVAL '2 hours'),
+        ('dmsg_2_2', $1, $3, 'Hello Thomas! Your USDT funds are held securely in escrow. The author is never credited until you approve the deliverable. In case of non-compliance, our arbitration team resolves disputes within 24 hours.', true, CURRENT_TIMESTAMP - INTERVAL '1 hour 30 minutes'),
+        ('dmsg_2_3', $1, $2, 'Perfect, that is very clear and reassuring. Thank you for the quick reply!', true, CURRENT_TIMESTAMP - INTERVAL '1 hour 15 minutes'),
+        ('dmsg_2_4', $1, $3, 'Always at your service! Let us know if you need any assistance.', true, CURRENT_TIMESTAMP - INTERVAL '1 hour')
+      `, [conv2Id, buyerId, adminId]);
+
+      // 3. Discussion Author <-> Admin
+      const conv3Id = "conv_seller_admin";
+      await client.query(`
+        INSERT INTO conversations (id, type, subject, "lastMessageText", "lastMessageAt")
+        VALUES ($1, 'DIRECT', $2, $3, CURRENT_TIMESTAMP - INTERVAL '3 hours')
+      `, [
+        conv3Id,
+        "Author Account Verification & Binance Pay Payouts",
+        "Exactly, payouts to your Binance Pay ID are processed quickly. Happy selling on TrustWork!"
+      ]);
+
+      await client.query(`
+        INSERT INTO conversation_participants ("conversationId", "userId", "unreadCount")
+        VALUES ($1, $2, 0), ($1, $3, 0)
+      `, [conv3Id, sellerId, adminId]);
+
+      await client.query(`
+        INSERT INTO direct_messages (id, "conversationId", "senderId", content, "isRead", "createdAt")
+        VALUES 
+        ('dmsg_3_1', $1, $3, 'Hello Sarah, your author profile has been verified successfully. Your method packages are now live.', true, CURRENT_TIMESTAMP - INTERVAL '4 hours'),
+        ('dmsg_3_2', $1, $2, 'Thank you so much! For Binance Pay withdrawals, are USDT payouts processed automatically upon request?', true, CURRENT_TIMESTAMP - INTERVAL '3 hours 30 minutes'),
+        ('dmsg_3_3', $1, $3, 'Exactly, payouts to your Binance Pay ID are processed quickly. Happy selling on TrustWork!', true, CURRENT_TIMESTAMP - INTERVAL '3 hours')
+      `, [conv3Id, sellerId, adminId]);
+
+      console.log("✅ Demo conversations initialized successfully!");
     }
   } finally {
     client.release();
