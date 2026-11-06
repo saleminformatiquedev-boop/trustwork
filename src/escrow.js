@@ -32,8 +32,12 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
     const sellerRes = await client.query('SELECT * FROM users WHERE id = $1', [srv.sellerId]);
     sellerUser = sellerRes.rows[0];
 
-    const price = parseFloat(srv.price);
-    const balance = parseFloat(buyerUser.walletBalance);
+    const price = Math.round(parseFloat(srv.price) * 100) / 100;
+    const balance = Math.round(parseFloat(buyerUser.walletBalance) * 100) / 100;
+
+    if (!Number.isFinite(price) || price < 1.00 || price > 50000.00) {
+      throw new Error("Invalid service price");
+    }
 
     if (balance < price) {
       throw new Error(`Insufficient balance. You have ${balance.toFixed(2)} USDT and this guide costs ${price.toFixed(2)} USDT`);
@@ -198,12 +202,25 @@ async function completeOrderAndReleaseFunds(pool, { orderId, buyerId }) {
       throw new Error(`Cannot complete an order with status ${order.status}`);
     }
 
-    const amount = parseFloat(order.amount);
+    const amount = Math.round(parseFloat(order.amount) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error("Invalid order amount");
+    }
+
+    // Lock buyer and seller in deterministic order to prevent deadlocks
+    const [firstId, secondId] = [order.buyerId, order.sellerId].sort();
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [firstId]);
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [secondId]);
+
+    const bCheck = await client.query('SELECT "escrowBalance" FROM users WHERE id = $1', [order.buyerId]);
+    if (!bCheck.rows[0] || parseFloat(bCheck.rows[0].escrowBalance) < amount) {
+      throw new Error("Insufficient escrow balance to complete this transaction");
+    }
 
     // 1. Deduct from buyer escrow
     await client.query(`
       UPDATE users 
-      SET "escrowBalance" = GREATEST(0, "escrowBalance" - $1) 
+      SET "escrowBalance" = "escrowBalance" - $1 
       WHERE id = $2
     `, [amount, order.buyerId]);
 
@@ -344,14 +361,35 @@ async function resolveDispute(pool, { disputeId, resolution, resolutionNote }) {
 
     const ordRes = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [dispute.orderId]);
     const order = ordRes.rows[0];
-    const amount = parseFloat(order.amount);
+    if (!order) throw new Error("Associated order not found");
+    if (order.status === 'COMPLETED' || order.status === 'REFUNDED') {
+      throw new Error("Order has already been finalized");
+    }
+
+    const amount = Math.round(parseFloat(order.amount) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error("Invalid order amount");
+    }
+
+    if (resolution !== "REFUND_BUYER" && resolution !== "PAY_SELLER") {
+      throw new Error("Invalid arbitration resolution");
+    }
+
+    const [firstId, secondId] = [order.buyerId, order.sellerId].sort();
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [firstId]);
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [secondId]);
+
+    const bCheck = await client.query('SELECT "escrowBalance" FROM users WHERE id = $1', [order.buyerId]);
+    if (!bCheck.rows[0] || parseFloat(bCheck.rows[0].escrowBalance) < amount) {
+      throw new Error("Insufficient escrow balance on buyer account");
+    }
 
     if (resolution === "REFUND_BUYER") {
       // 1. Refund buyer
       await client.query(`
         UPDATE users 
         SET "walletBalance" = "walletBalance" + $1, 
-            "escrowBalance" = GREATEST(0, "escrowBalance" - $1) 
+            "escrowBalance" = "escrowBalance" - $1 
         WHERE id = $2
       `, [amount, order.buyerId]);
 
@@ -379,7 +417,7 @@ async function resolveDispute(pool, { disputeId, resolution, resolutionNote }) {
       // 2. Pay author
       await client.query(`
         UPDATE users 
-        SET "escrowBalance" = GREATEST(0, "escrowBalance" - $1) 
+        SET "escrowBalance" = "escrowBalance" - $1 
         WHERE id = $2
       `, [amount, order.buyerId]);
 

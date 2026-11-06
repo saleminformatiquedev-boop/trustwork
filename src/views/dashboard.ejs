@@ -17,12 +17,13 @@
       </div>
     </div>
 
-    <div class="flex items-center gap-1.5 text-xs">
-      <span class="text-slate-400 mr-1 hidden sm:inline">Demo role:</span>
-      <a href="/auth/demo-login/buyer" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition">Buyer</a>
-      <a href="/auth/demo-login/seller" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition">Seller</a>
-      <a href="/auth/demo-login/admin" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition">Admin</a>
-    </div>
+    <% if (typeof demoModeEnabled !== 'undefined' && demoModeEnabled) { %>
+      <div class="flex items-center gap-1.5 text-xs">
+        <span class="text-slate-400 mr-1 hidden sm:inline">Demo role:</span>
+        <a href="/auth/demo-login/buyer" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition">Buyer</a>
+        <a href="/auth/demo-login/seller" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition">Seller</a>
+      </div>
+    <% } %>
   </div>
 
   <!-- Wallet & Escrow Summary -->
@@ -161,7 +162,9 @@
               <div class="text-xs font-bold <%= tx.txType === 'DEPOSIT' ? 'text-emerald-600' : 'text-slate-900' %>">
                 <%= tx.txType === 'DEPOSIT' ? '+' : '-' %><%= tx.amount.toFixed(2) %> USDT
               </div>
-              <span class="text-[10px] text-slate-400"><%= tx.status === 'COMPLETED' ? 'Completed' : 'Pending' %></span>
+              <span class="text-[10px] font-semibold <%= tx.status === 'COMPLETED' ? 'text-emerald-600' : (tx.status === 'REJECTED' ? 'text-rose-600' : 'text-amber-600') %>">
+                <%= tx.status === 'COMPLETED' ? 'Completed' : (tx.status === 'REJECTED' ? 'Rejected' : 'Pending Verification') %>
+              </span>
             </div>
           </div>
         <% }) %>

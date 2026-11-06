@@ -1,16 +1,108 @@
-<%- include('partials/header', { title: 'Disputes & Arbitration' }) %>
+<%- include('partials/header', { title: 'Admin Security & Arbitration' }) %>
 
-<div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-6">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
   
   <div>
-    <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900">Dispute Arbitration Center</h1>
+    <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900">Admin Financial & Arbitration Center</h1>
     <p class="text-xs sm:text-sm text-slate-500 mt-1">
-      Review claims and either refund the buyer or release escrow funds to the seller.
+      Verify Binance Pay deposits, process USDT withdrawals, and arbitrate escrow disputes.
     </p>
   </div>
 
-  <% if (disputes && disputes.length > 0) { %>
-    <div class="space-y-4">
+  <!-- 1. Pending Binance Pay Deposits -->
+  <div class="bg-white rounded-2xl border border-slate-200/90 overflow-hidden">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+      <h2 class="text-sm font-bold text-slate-900">Binance Pay Deposits (Verification Queue)</h2>
+      <span class="text-xs text-slate-400">Verify TxID in Binance before approving</span>
+    </div>
+    <% if (typeof deposits !== 'undefined' && deposits.length > 0) { %>
+      <div class="divide-y divide-slate-100">
+        <% deposits.forEach(dep => { %>
+          <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <strong class="text-slate-900 text-sm">+<%= dep.amount.toFixed(2) %> USDT</strong>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold <%= dep.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : (dep.status === 'REJECTED' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700') %>">
+                  <%= dep.status %>
+                </span>
+              </div>
+              <div class="text-slate-500">
+                User: <strong><%= dep.userName %></strong> (<%= dep.userEmail %>) • TxID: <code class="font-mono font-bold text-slate-800"><%= dep.txId %></code>
+              </div>
+            </div>
+            <% if (dep.status === 'PENDING') { %>
+              <div class="flex items-center gap-2">
+                <form action="/admin/deposits/<%= dep.id %>/decision" method="POST">
+                  <input type="hidden" name="action" value="APPROVE">
+                  <button type="submit" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition">
+                    Approve & Credit
+                  </button>
+                </form>
+                <form action="/admin/deposits/<%= dep.id %>/decision" method="POST">
+                  <input type="hidden" name="action" value="REJECT">
+                  <button type="submit" class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold rounded-xl transition">
+                    Reject
+                  </button>
+                </form>
+              </div>
+            <% } %>
+          </div>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="p-8 text-center text-xs text-slate-400">No deposit requests recorded.</div>
+    <% } %>
+  </div>
+
+  <!-- 2. Pending USDT Withdrawals -->
+  <div class="bg-white rounded-2xl border border-slate-200/90 overflow-hidden">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+      <h2 class="text-sm font-bold text-slate-900">USDT Withdrawal Requests</h2>
+      <span class="text-xs text-slate-400">Send payout via Binance Pay then mark completed</span>
+    </div>
+    <% if (typeof withdrawals !== 'undefined' && withdrawals.length > 0) { %>
+      <div class="divide-y divide-slate-100">
+        <% withdrawals.forEach(w => { %>
+          <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <strong class="text-slate-900 text-sm"><%= w.amount.toFixed(2) %> USDT</strong>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold <%= w.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : (w.status === 'REJECTED' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700') %>">
+                  <%= w.status %>
+                </span>
+              </div>
+              <div class="text-slate-500">
+                User: <strong><%= w.userName %></strong> (<%= w.userEmail %>) • Binance Pay ID: <code class="font-mono font-bold text-slate-800"><%= w.binanceId %></code>
+              </div>
+            </div>
+            <% if (w.status === 'PENDING') { %>
+              <div class="flex items-center gap-2">
+                <form action="/admin/withdrawals/<%= w.id %>/decision" method="POST">
+                  <input type="hidden" name="action" value="APPROVE">
+                  <button type="submit" class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl transition">
+                    Mark Sent
+                  </button>
+                </form>
+                <form action="/admin/withdrawals/<%= w.id %>/decision" method="POST">
+                  <input type="hidden" name="action" value="REJECT">
+                  <button type="submit" class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold rounded-xl transition">
+                    Reject & Refund
+                  </button>
+                </form>
+              </div>
+            <% } %>
+          </div>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="p-8 text-center text-xs text-slate-400">No withdrawal requests recorded.</div>
+    <% } %>
+  </div>
+
+  <!-- 3. Order Disputes -->
+  <div class="space-y-4">
+    <h2 class="text-sm font-bold text-slate-900">Escrow Disputes</h2>
+    <% if (disputes && disputes.length > 0) { %>
       <% disputes.forEach(disp => { %>
         <div class="bg-white p-6 rounded-2xl border border-slate-200/90 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           
@@ -55,12 +147,12 @@
 
         </div>
       <% }) %>
-    </div>
-  <% } else { %>
-    <div class="text-center py-14 bg-white rounded-2xl border border-slate-200/90 text-xs text-slate-400">
-      No active disputes.
-    </div>
-  <% } %>
+    <% } else { %>
+      <div class="text-center py-10 bg-white rounded-2xl border border-slate-200/90 text-xs text-slate-400">
+        No active disputes.
+      </div>
+    <% } %>
+  </div>
 
 </div>
 

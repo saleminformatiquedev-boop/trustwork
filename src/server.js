@@ -12,7 +12,7 @@ const multer = require('multer');
 const QRCode = require('qrcode');
 
 const { pool, initDatabase } = require('./db');
-const { setupAuth, ensureAuthenticated, normalizeUser } = require('./auth');
+const { setupAuth, ensureAuthenticated, normalizeUser, isDemoModeEnabled } = require('./auth');
 const escrow = require('./escrow');
 const emailService = require('./services/email');
 
@@ -20,35 +20,57 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Trust Nginx reverse proxy & hide Express fingerprint
+// Trust local Nginx reverse proxy & hide Express fingerprint
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
+const HOST = process.env.HOST || '127.0.0.1';
 const PLATFORM_BINANCE_PAY_ID = process.env.PLATFORM_BINANCE_PAY_ID || process.env.BINANCE_PAY_ID || 'BINANCE-PAY-789456';
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(48).toString('hex');
 
-// Security Headers Middleware
+// Strict Security Headers Middleware
 app.use((req, res, next) => {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=()');
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
   next();
 });
 
-// Lightweight Rate Limiter for sensitive endpoints (120 req / min / IP)
-const rateLimitStore = new Map();
-setInterval(() => rateLimitStore.clear(), 60 * 1000).unref();
-function rateLimiter(req, res, next) {
-  const ip = req.ip || req.socket.remoteAddress || 'unknown';
-  const count = (rateLimitStore.get(ip) || 0) + 1;
-  rateLimitStore.set(ip, count);
-  if (count > 120) {
-    return res.status(429).json({ success: false, error: 'Too many requests, please slow down.' });
-  }
-  next();
+// Bounded Two-Tier Rate Limiter (prevents brute-force, flood, and memory exhaustion)
+const generalRateMap = new Map();
+const strictRateMap = new Map();
+setInterval(() => {
+  generalRateMap.clear();
+  strictRateMap.clear();
+}, 60 * 1000).unref();
+
+function createRateLimiter(store, maxRequests, errorMessage) {
+  return (req, res, next) => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    if (store.size > 10000 && !store.has(ip)) {
+      store.clear();
+    }
+    const count = (store.get(ip) || 0) + 1;
+    store.set(ip, count);
+    if (count > maxRequests) {
+      if (req.path.startsWith('/api/') || req.xhr) {
+        return res.status(429).json({ success: false, error: errorMessage });
+      }
+      return res.status(429).send(errorMessage);
+    }
+    next();
+  };
 }
-app.use(['/api', '/auth', '/orders', '/disputes'], rateLimiter);
+
+app.use(createRateLimiter(generalRateMap, 120, 'Too many requests, please wait a moment.'));
+app.use(
+  ['/auth', '/api/wallet', '/orders/create', '/disputes', '/admin'],
+  createRateLimiter(strictRateMap, 25, 'Rate limit exceeded on sensitive endpoint. Please wait 1 minute.')
+);
 
 // Upload Directory configuration & Strict Whitelist
 const uploadDir = path.join(__dirname, '../public/uploads');
@@ -58,7 +80,7 @@ if (!fs.existsSync(uploadDir)) {
 
 const ALLOWED_EXTENSIONS = new Set([
   '.pdf', '.zip', '.rar', '.tar', '.gz', '.7z',
-  '.txt', '.md', '.sh', '.env', '.json', '.yml', '.yaml',
+  '.txt', '.md', '.sh', '.json', '.yml', '.yaml',
   '.png', '.jpg', '.jpeg', '.webp', '.gif',
   '.mp4', '.mov', '.webm', '.doc', '.docx'
 ]);
@@ -68,14 +90,14 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const rawExt = path.extname(file.originalname || '').toLowerCase().replace(/[^a-z0-9.]/g, '');
     const safeExt = ALLOWED_EXTENSIONS.has(rawExt) ? rawExt : '.bin';
-    const uniqueName = Date.now() + '-' + crypto.randomBytes(6).toString('hex') + safeExt;
+    const uniqueName = Date.now() + '-' + crypto.randomBytes(8).toString('hex') + safeExt;
     cb(null, uniqueName);
   }
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB max
+  limits: { fileSize: 25 * 1024 * 1024, files: 6 }, // 25 MB max, up to 6 files
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname || '').toLowerCase();
     if (!ALLOWED_EXTENSIONS.has(ext)) {
@@ -85,21 +107,52 @@ const upload = multer({
   }
 });
 
-// Middleware Express
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
-app.use(express.json({ limit: '2mb' }));
+/**
+ * Inspect uploaded file magic bytes & block polyglot HTML/script payloads
+ */
+function verifyUploadedFileSafety(filePath, ext) {
+  try {
+    const fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.alloc(4096);
+    const bytesRead = fs.readSync(fd, buf, 0, 4096, 0);
+    fs.closeSync(fd);
+    const slice = buf.subarray(0, bytesRead);
+    const headAscii = slice.toString('utf8').toLowerCase();
 
-// Harden /uploads static serving to prevent stored XSS execution
-app.use('/uploads', (req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'");
-  const ext = path.extname(req.path).toLowerCase();
-  if (!['.png', '.jpg', '.jpeg', '.webp', '.gif', '.pdf', '.mp4', '.webm'].includes(ext)) {
-    res.setHeader('Content-Disposition', 'attachment');
+    // Block disguised HTML/SVG/JS/PHP files regardless of extension
+    if (
+      headAscii.includes('<script') ||
+      headAscii.includes('<!doctype html') ||
+      headAscii.includes('<html') ||
+      headAscii.includes('<?php') ||
+      headAscii.includes('javascript:')
+    ) {
+      fs.unlinkSync(filePath);
+      throw new Error('Security check failed: executable HTML/Script content detected inside file.');
+    }
+
+    // Verify PDF magic header (%PDF-)
+    if (ext === '.pdf' && bytesRead >= 4 && slice.subarray(0, 4).toString('ascii') !== '%PDF') {
+      fs.unlinkSync(filePath);
+      throw new Error('Invalid PDF file signature.');
+    }
+
+    // Verify ZIP magic header (PK\x03\x04 or PK\x05\x06)
+    if (ext === '.zip' && bytesRead >= 2 && slice.subarray(0, 2).toString('ascii') !== 'PK') {
+      fs.unlinkSync(filePath);
+      throw new Error('Invalid ZIP archive signature.');
+    }
+  } catch (err) {
+    if (fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (_) {}
+    }
+    throw err;
   }
-  next();
-});
-app.use(express.static(path.join(__dirname, '../public')));
+}
+
+// Body Parsers
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.json({ limit: '1mb' }));
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -107,7 +160,7 @@ app.set('views', path.join(__dirname, 'views'));
 // Hardened Session Configuration (shared with Socket.io)
 const sessionMiddleware = session({
   name: 'trustwork.sid',
-  secret: process.env.SESSION_SECRET || 'escrow-secret-key-1234-change-in-prod',
+  secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   proxy: true,
@@ -115,13 +168,71 @@ const sessionMiddleware = session({
     httpOnly: true,
     sameSite: 'lax',
     secure: 'auto',
-    maxAge: 7 * 24 * 60 * 60 * 1000
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 });
 
 app.use(sessionMiddleware);
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Synchronizer CSRF Token Generation & Verification Middleware
+app.use((req, res, next) => {
+  if (req.session) {
+    if (!req.session.csrfToken) {
+      req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+    }
+    res.locals.csrfToken = req.session.csrfToken;
+  } else {
+    res.locals.csrfToken = '';
+  }
+
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    // 1. Verify Origin / Referer host matches target Host when present
+    const host = req.get('host');
+    const origin = req.get('origin');
+    const referer = req.get('referer');
+    if (origin && host) {
+      try {
+        if (new URL(origin).host !== host) {
+          return res.status(403).json({ success: false, error: 'Cross-origin request blocked (Origin mismatch).' });
+        }
+      } catch (_) {
+        return res.status(403).json({ success: false, error: 'Malformed Origin header.' });
+      }
+    } else if (referer && host) {
+      try {
+        if (new URL(referer).host !== host) {
+          return res.status(403).json({ success: false, error: 'Cross-origin request blocked (Referer mismatch).' });
+        }
+      } catch (_) {
+        return res.status(403).json({ success: false, error: 'Malformed Referer header.' });
+      }
+    }
+
+    // 2. Verify cryptographic CSRF token
+    const expectedToken = req.session ? req.session.csrfToken : null;
+    const providedToken =
+      req.headers['x-csrf-token'] ||
+      (req.body && req.body._csrf) ||
+      (req.query && req.query._csrf);
+
+    if (
+      !expectedToken ||
+      !providedToken ||
+      typeof providedToken !== 'string' ||
+      providedToken.length !== expectedToken.length ||
+      !crypto.timingSafeEqual(Buffer.from(providedToken), Buffer.from(expectedToken))
+    ) {
+      if (req.path.startsWith('/api/') || req.xhr) {
+        return res.status(403).json({ success: false, error: 'Invalid or expired security token (CSRF). Please refresh the page.' });
+      }
+      return res.status(403).send('Invalid or expired security token (CSRF). Please go back and refresh the page.');
+    }
+  }
+
+  next();
+});
 
 // Share session with Socket.io and authenticate socket connections
 io.engine.use(sessionMiddleware);
@@ -161,6 +272,108 @@ app.use(async (req, res, next) => {
 // Setup auth
 setupAuth(app, pool);
 
+// ==========================================
+// PROTECTED PAID FILE GATEKEEPER (/uploads/:filename)
+// ==========================================
+const DEFAULT_SAMPLE_FILES = new Set([
+  'guide-methode-developpement-ideale.pdf',
+  'code-source-template.zip',
+  'commandes-scripts.txt'
+]);
+
+async function canAccessUploadedFile(user, filename) {
+  if (!user || !filename) return false;
+  if (user.role === 'ADMIN') return true;
+  const filePathUrl = `/uploads/${filename}`;
+
+  // 1. Is user the author of a service containing this file?
+  const sellerCheck = await pool.query(
+    `SELECT 1 FROM services 
+     WHERE "sellerId" = $1 
+       AND ("fileUrl" = $2 OR "attachments"::text LIKE $3)
+     LIMIT 1`,
+    [user.id, filePathUrl, `%${filename}%`]
+  );
+  if (sellerCheck.rows.length > 0) return true;
+
+  // 2. Has user purchased an order that includes this file (or default sample files if they have any valid order)?
+  if (DEFAULT_SAMPLE_FILES.has(filename)) {
+    const anyOrderCheck = await pool.query(
+      `SELECT 1 FROM orders 
+       WHERE ("buyerId" = $1 OR "sellerId" = $1)
+         AND status IN ('ESCROWED', 'DELIVERED', 'COMPLETED', 'DISPUTED')
+       LIMIT 1`,
+      [user.id]
+    );
+    if (anyOrderCheck.rows.length > 0) return true;
+  }
+
+  const buyerOrderCheck = await pool.query(
+    `SELECT 1 FROM orders o
+     JOIN services s ON o."serviceId" = s.id
+     WHERE (o."buyerId" = $1 OR o."sellerId" = $1)
+       AND o.status IN ('ESCROWED', 'DELIVERED', 'COMPLETED', 'DISPUTED')
+       AND (o."fileUrl" = $2 OR s."fileUrl" = $2 OR o."attachments"::text LIKE $3 OR s."attachments"::text LIKE $3)
+     LIMIT 1`,
+    [user.id, filePathUrl, `%${filename}%`]
+  );
+  if (buyerOrderCheck.rows.length > 0) return true;
+
+  // 3. Was the file sent in an order chat message where the user is buyer or seller?
+  const orderMsgCheck = await pool.query(
+    `SELECT 1 FROM messages m
+     JOIN orders o ON m."orderId" = o.id
+     WHERE m."fileUrl" = $1
+       AND (o."buyerId" = $2 OR o."sellerId" = $2)
+     LIMIT 1`,
+    [filePathUrl, user.id]
+  );
+  if (orderMsgCheck.rows.length > 0) return true;
+
+  // 4. Was the file sent in a direct message conversation where the user is a participant?
+  const directMsgCheck = await pool.query(
+    `SELECT 1 FROM direct_messages dm
+     JOIN conversation_participants cp ON dm."conversationId" = cp."conversationId"
+     WHERE dm."fileUrl" = $1
+       AND cp."userId" = $2
+     LIMIT 1`,
+    [filePathUrl, user.id]
+  );
+  if (directMsgCheck.rows.length > 0) return true;
+
+  return false;
+}
+
+app.get('/uploads/:filename', ensureAuthenticated, async (req, res) => {
+  try {
+    const safeFilename = path.basename(req.params.filename || '');
+    if (!safeFilename || safeFilename.includes('..')) {
+      return res.status(400).send('Invalid file name.');
+    }
+
+    const fullPath = path.join(uploadDir, safeFilename);
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).send('File not found.');
+    }
+
+    const allowed = await canAccessUploadedFile(req.user, safeFilename);
+    if (!allowed) {
+      return res.status(403).send('Access denied: You must purchase this method before downloading its package files.');
+    }
+
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'");
+    const ext = path.extname(safeFilename).toLowerCase();
+    if (!['.png', '.jpg', '.jpeg', '.webp', '.gif', '.pdf'].includes(ext)) {
+      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    }
+    return res.sendFile(fullPath);
+  } catch (err) {
+    console.error('Error serving protected upload:', err.message);
+    return res.status(500).send('Error retrieving file.');
+  }
+});
+
 // Helper for row formatting
 function formatRows(rows) {
   return rows.map(r => ({
@@ -170,6 +383,24 @@ function formatRows(rows) {
     walletBalance: r.walletBalance !== undefined ? parseFloat(r.walletBalance) : undefined,
     escrowBalance: r.escrowBalance !== undefined ? parseFloat(r.escrowBalance) : undefined
   }));
+}
+
+/**
+ * Strip secret file URLs and private video links from public catalog & service pages
+ */
+function sanitizePublicService(srv) {
+  if (!srv) return srv;
+  const copy = { ...srv };
+  delete copy.fileUrl;
+  delete copy.videoUrl;
+  if (Array.isArray(copy.attachments)) {
+    copy.attachments = copy.attachments.map(att => ({
+      type: att.type,
+      label: att.label,
+      size: att.size
+    }));
+  }
+  return copy;
 }
 
 // ==========================================
@@ -194,21 +425,19 @@ async function canAccessConversation(user, conversationId) {
 }
 
 io.on('connection', (socket) => {
-  // User rooms for notifications / badges (strictly bound to authenticated session user)
   socket.on('join_user', () => {
     if (socket.user && socket.user.id) {
       socket.join(`user_${socket.user.id}`);
     }
   });
 
-  // Order rooms (verified against order participants)
   socket.on('join_order', async ({ orderId } = {}) => {
     try {
       if (await canAccessOrder(socket.user, orderId)) {
         socket.join(`order_${orderId}`);
       }
     } catch (err) {
-      console.error("Socket error join_order:", err);
+      console.error("Socket error join_order:", err.message);
     }
   });
 
@@ -220,14 +449,15 @@ io.on('connection', (socket) => {
 
       const senderId = socket.user.id;
       const senderName = socket.user.name || 'User';
-      const safeFileUrl = fileUrl && String(fileUrl).startsWith('/uploads/') ? String(fileUrl) : null;
+      const safeFileUrl = fileUrl && /^\/uploads\/[a-zA-Z0-9._-]+$/.test(String(fileUrl)) ? String(fileUrl) : null;
+      const trimmedContent = content ? String(content).trim().slice(0, 4000) : '';
 
-      const newId = 'msg_' + crypto.randomBytes(6).toString('hex');
+      const newId = 'msg_' + crypto.randomBytes(8).toString('hex');
       const insertRes = await pool.query(`
         INSERT INTO messages (id, "orderId", "senderId", content, "fileUrl", "fileName")
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
-      `, [newId, orderId, senderId, content ? content.trim() : '', safeFileUrl, fileName || null]);
+      `, [newId, orderId, senderId, trimmedContent, safeFileUrl, fileName ? String(fileName).slice(0, 255) : null]);
 
       const savedMsg = insertRes.rows[0];
 
@@ -242,18 +472,17 @@ io.on('connection', (socket) => {
         createdAt: savedMsg.createdAt
       });
     } catch (err) {
-      console.error("Socket error send_message:", err);
+      console.error("Socket error send_message:", err.message);
     }
   });
 
-  // Direct chat rooms (verified against conversation participants)
   socket.on('join_conversation', async ({ conversationId } = {}) => {
     try {
       if (await canAccessConversation(socket.user, conversationId)) {
         socket.join(`conv_${conversationId}`);
       }
     } catch (err) {
-      console.error("Socket error join_conversation:", err);
+      console.error("Socket error join_conversation:", err.message);
     }
   });
 
@@ -273,21 +502,19 @@ io.on('connection', (socket) => {
       const senderName = socket.user.name || 'User';
       const senderAvatar = socket.user.avatar || null;
       const senderRole = socket.user.role || 'USER';
-      const safeFileUrl = fileUrl && String(fileUrl).startsWith('/uploads/') ? String(fileUrl) : null;
+      const safeFileUrl = fileUrl && /^\/uploads\/[a-zA-Z0-9._-]+$/.test(String(fileUrl)) ? String(fileUrl) : null;
 
-      const trimmedContent = content ? content.trim() : '';
-      const newMsgId = 'dmsg_' + crypto.randomBytes(6).toString('hex');
+      const trimmedContent = content ? String(content).trim().slice(0, 4000) : '';
+      const newMsgId = 'dmsg_' + crypto.randomBytes(8).toString('hex');
 
-      // 1. Save in direct_messages
       const insertRes = await pool.query(`
         INSERT INTO direct_messages (id, "conversationId", "senderId", content, "fileUrl", "fileName", "fileSize", "isRead")
         VALUES ($1, $2, $3, $4, $5, $6, $7, false)
         RETURNING *
-      `, [newMsgId, conversationId, senderId, trimmedContent, safeFileUrl, fileName || null, fileSize || null]);
+      `, [newMsgId, conversationId, senderId, trimmedContent, safeFileUrl, fileName ? String(fileName).slice(0, 255) : null, fileSize || null]);
 
       const savedMsg = insertRes.rows[0];
 
-      // 2. Update last message preview in conversations
       const previewText = trimmedContent || (fileName ? `📎 File: ${fileName}` : 'Attachment');
       await pool.query(`
         UPDATE conversations
@@ -295,14 +522,12 @@ io.on('connection', (socket) => {
         WHERE id = $2
       `, [previewText, conversationId]);
 
-      // 3. Increment unread counter for other participants
       await pool.query(`
         UPDATE conversation_participants
         SET "unreadCount" = "unreadCount" + 1
         WHERE "conversationId" = $1 AND "userId" != $2
       `, [conversationId, senderId]);
 
-      // 4. Message payload to broadcast in the conversation room
       const msgPayload = {
         id: savedMsg.id,
         conversationId,
@@ -320,7 +545,6 @@ io.on('connection', (socket) => {
 
       io.to(`conv_${conversationId}`).emit('new_chat_message', msgPayload);
 
-      // 5. Notify recipients on their personal channels user_...
       const partRes = await pool.query(
         `SELECT cp."userId", cp."unreadCount", u.name, u.email, u.role
          FROM conversation_participants cp
@@ -347,7 +571,6 @@ io.on('connection', (socket) => {
           createdAt: savedMsg.createdAt
         });
 
-        // Email notification if first unread message
         if (p.unreadCount <= 1) {
           (async () => {
             try {
@@ -364,7 +587,7 @@ io.on('connection', (socket) => {
         }
       }
     } catch (err) {
-      console.error("Socket error chat_send_message:", err);
+      console.error("Socket error chat_send_message:", err.message);
     }
   });
 
@@ -380,7 +603,7 @@ io.on('connection', (socket) => {
         });
       }
     } catch (err) {
-      console.error("Error chat_typing:", err);
+      console.error("Error chat_typing:", err.message);
     }
   });
 
@@ -404,20 +627,22 @@ io.on('connection', (socket) => {
 
       socket.to(`conv_${conversationId}`).emit('messages_read', { conversationId, userId });
     } catch (err) {
-      console.error("Error chat_mark_read:", err);
+      console.error("Error chat_mark_read:", err.message);
     }
   });
 });
 
 // ==========================================
-// PUBLIC ROUTES
+// PUBLIC ROUTES (SANITIZED)
 // ==========================================
 
 // Homepage: Guides & Methods Catalog
 app.get('/', async (req, res) => {
   try {
     const srvRes = await pool.query(`
-      SELECT s.*, u.name as "sellerName", u.avatar as "sellerAvatar",
+      SELECT s.id, s."sellerId", s.title, s.description, s.category, s.price,
+             s."deliveryDays", s."pageCount", s.difficulty, s.formats, s."createdAt",
+             u.name as "sellerName", u.avatar as "sellerAvatar",
              COALESCE(AVG(r.rating), 5.0) as "avgRating",
              COUNT(r.id) as "reviewsCount"
       FROM services s
@@ -426,9 +651,10 @@ app.get('/', async (req, res) => {
       GROUP BY s.id, u.name, u.avatar
       ORDER BY s."createdAt" DESC
     `);
-    res.render('index', { services: formatRows(srvRes.rows) });
+    res.render('index', { services: formatRows(srvRes.rows).map(sanitizePublicService) });
   } catch (err) {
-    res.status(500).send("Server error: " + err.message);
+    console.error("Homepage error:", err.message);
+    res.status(500).send("Unable to load catalog at the moment.");
   }
 });
 
@@ -442,7 +668,7 @@ app.get('/services/new', ensureAuthenticated, (req, res) => {
   res.render('new-service');
 });
 
-// Detail of a guide/service with reviews
+// Detail of a guide/service with reviews (strips private download links before purchase)
 app.get('/services/:id', async (req, res) => {
   try {
     const srvRes = await pool.query(`
@@ -453,7 +679,7 @@ app.get('/services/:id', async (req, res) => {
     `, [req.params.id]);
 
     if (srvRes.rows.length === 0) return res.status(404).send("Guide not found");
-    const service = formatRows(srvRes.rows)[0];
+    const service = sanitizePublicService(formatRows(srvRes.rows)[0]);
 
     const reviewsRes = await pool.query(`
       SELECT r.*, u.name as "buyerName", u.avatar as "buyerAvatar"
@@ -465,19 +691,25 @@ app.get('/services/:id', async (req, res) => {
 
     res.render('service-detail', { service, reviews: reviewsRes.rows });
   } catch (err) {
-    res.status(500).send("Error: " + err.message);
+    console.error("Service detail error:", err.message);
+    res.status(500).send("Unable to load guide details.");
   }
 });
 
-// Public Author Profile
+// Public Author Profile (never exposes private email or balance)
 app.get('/profile/:id', async (req, res) => {
   try {
-    const uRes = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
+    const uRes = await pool.query(
+      'SELECT id, name, avatar, bio, skills, role, "createdAt" FROM users WHERE id = $1',
+      [req.params.id]
+    );
     if (uRes.rows.length === 0) return res.status(404).send("User profile not found");
-    const profile = normalizeUser(uRes.rows[0]);
+    const profile = uRes.rows[0];
 
     const srvRes = await pool.query(`
-      SELECT s.*, u.name as "sellerName", u.avatar as "sellerAvatar"
+      SELECT s.id, s."sellerId", s.title, s.description, s.category, s.price,
+             s."deliveryDays", s."pageCount", s.difficulty, s.formats, s."createdAt",
+             u.name as "sellerName", u.avatar as "sellerAvatar"
       FROM services s
       JOIN users u ON s."sellerId" = u.id
       WHERE s."sellerId" = $1
@@ -493,9 +725,10 @@ app.get('/profile/:id', async (req, res) => {
       ORDER BY r."createdAt" DESC
     `, [profile.id]);
 
-    res.render('profile', { profile, services: formatRows(srvRes.rows), reviews: revRes.rows });
+    res.render('profile', { profile, services: formatRows(srvRes.rows).map(sanitizePublicService), reviews: revRes.rows });
   } catch (err) {
-    res.status(500).send("Profile error: " + err.message);
+    console.error("Profile error:", err.message);
+    res.status(500).send("Unable to load profile.");
   }
 });
 
@@ -505,23 +738,57 @@ app.get('/profile/:id', async (req, res) => {
 
 // File upload in chat / order
 app.post('/api/upload', ensureAuthenticated, upload.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ success: false, error: 'No file provided' });
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file provided' });
+    }
+    const ext = path.extname(req.file.filename).toLowerCase();
+    verifyUploadedFileSafety(req.file.path, ext);
+
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({
+      success: true,
+      fileUrl,
+      fileName: req.file.originalname,
+      fileSize: req.file.size
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message || 'File validation failed' });
   }
-  const fileUrl = `/uploads/${req.file.filename}`;
-  res.json({
-    success: true,
-    fileUrl,
-    fileName: req.file.originalname,
-    fileSize: req.file.size
-  });
 });
 
 // Publish new multi-format method (PDF, ZIP, Text, Video)
 app.post('/services/new', ensureAuthenticated, upload.any(), async (req, res) => {
   try {
     const { title, description, category, price, pageCount, difficulty, videoUrl, formats } = req.body;
-    const newId = 'srv_' + crypto.randomBytes(6).toString('hex');
+
+    const cleanTitle = String(title || '').trim();
+    const cleanDesc = String(description || '').trim();
+    const numericPrice = Math.round(parseFloat(price) * 100) / 100;
+
+    if (!cleanTitle || cleanTitle.length < 5 || cleanTitle.length > 200) {
+      return res.status(400).send("Invalid title (must be between 5 and 200 characters).");
+    }
+    if (!cleanDesc || cleanDesc.length < 10 || cleanDesc.length > 10000) {
+      return res.status(400).send("Invalid description (must be between 10 and 10,000 characters).");
+    }
+    if (!Number.isFinite(numericPrice) || numericPrice < 1.00 || numericPrice > 50000.00) {
+      return res.status(400).send("Invalid price: must be between 1.00 USDT and 50,000.00 USDT.");
+    }
+
+    let safeVideoUrl = null;
+    if (videoUrl && String(videoUrl).trim()) {
+      try {
+        const parsedUrl = new URL(String(videoUrl).trim());
+        if (parsedUrl.protocol === 'https:' || parsedUrl.protocol === 'http:') {
+          safeVideoUrl = parsedUrl.toString();
+        }
+      } catch (_) {
+        return res.status(400).send("Invalid external video URL.");
+      }
+    }
+
+    const newId = 'srv_' + crypto.randomBytes(8).toString('hex');
 
     const attachments = [];
     let primaryFileUrl = null;
@@ -529,21 +796,23 @@ app.post('/services/new', ensureAuthenticated, upload.any(), async (req, res) =>
     let primaryFileSize = null;
 
     if (req.files && req.files.length > 0) {
-      req.files.forEach(f => {
-        const ext = path.extname(f.originalname).toLowerCase();
+      for (const f of req.files) {
+        const ext = path.extname(f.filename).toLowerCase();
+        verifyUploadedFileSafety(f.path, ext);
+
         let type = 'other';
         let label = f.originalname;
 
         if (ext === '.pdf') {
           type = 'pdf';
           label = `Complete Guide (${f.originalname})`;
-        } else if (['.zip', '.rar', '.tar', '.gz'].includes(ext)) {
+        } else if (['.zip', '.rar', '.tar', '.gz', '.7z'].includes(ext)) {
           type = 'zip';
           label = `Source Code & Archives (${f.originalname})`;
-        } else if (['.txt', '.md', '.sh', '.env', '.json', '.yml', '.yaml'].includes(ext)) {
+        } else if (['.txt', '.md', '.sh', '.json', '.yml', '.yaml'].includes(ext)) {
           type = 'text';
           label = `Scripts & Configuration (${f.originalname})`;
-        } else if (['.mp4', '.mov', '.webm', '.mkv'].includes(ext)) {
+        } else if (['.mp4', '.mov', '.webm'].includes(ext)) {
           type = 'video';
           label = `Video Tutorial (${f.originalname})`;
         }
@@ -565,35 +834,32 @@ app.post('/services/new', ensureAuthenticated, upload.any(), async (req, res) =>
           primaryFileName = f.originalname;
           primaryFileSize = sizeStr;
         }
-      });
+      }
     }
 
-    if (videoUrl && videoUrl.trim()) {
+    if (safeVideoUrl) {
       attachments.push({
         type: 'video',
         name: 'Online Video Tutorial',
-        url: videoUrl.trim(),
+        url: safeVideoUrl,
         size: 'Video Stream',
         label: 'Step-by-Step Video Tutorial'
       });
     }
 
-    // Fallback demo pack if no files uploaded
     if (attachments.length === 0) {
       attachments.push(
         { type: "pdf", name: "guide-method-step-by-step.pdf", url: "/uploads/guide-methode-developpement-ideale.pdf", size: "2.4 MB", label: "Complete Step-by-Step Guide (PDF)" },
         { type: "zip", name: "source-code-template.zip", url: "/uploads/code-source-template.zip", size: "5.1 MB", label: "Source Code & Ready Files (ZIP)" },
-        { type: "text", name: "commands-scripts.txt", url: "/uploads/commandes-scripts.txt", size: "15 KB", label: "Shell Scripts & .env Variables (Text)" }
+        { type: "text", name: "commands-scripts.txt", url: "/uploads/commandes-scripts.txt", size: "15 KB", label: "Shell Scripts & Variables (Text)" }
       );
-      if (videoUrl && videoUrl.trim()) {
-        attachments.push({ type: "video", name: "video-tutorial", url: videoUrl.trim(), size: "Stream", label: "Video Tutorial" });
-      }
       primaryFileUrl = '/uploads/guide-methode-developpement-ideale.pdf';
       primaryFileName = 'complete-method-pack.zip';
       primaryFileSize = '7.5 MB';
     }
 
     const activeFormats = Array.isArray(formats) ? formats.join(',') : (formats || 'PDF,ZIP,TEXT');
+    const safePages = Math.min(Math.max(parseInt(pageCount, 10) || 40, 1), 5000);
 
     await pool.query(`
       INSERT INTO services (id, "sellerId", title, description, category, price, "deliveryDays", "fileUrl", "fileName", "fileSize", "pageCount", "difficulty", "formats", "videoUrl", "attachments")
@@ -601,23 +867,24 @@ app.post('/services/new', ensureAuthenticated, upload.any(), async (req, res) =>
     `, [
       newId,
       req.user.id,
-      title,
-      description,
+      cleanTitle,
+      cleanDesc,
       category || 'Development Methodology',
-      parseFloat(price),
+      numericPrice,
       primaryFileUrl,
       primaryFileName,
       primaryFileSize,
-      parseInt(pageCount, 10) || 30,
+      safePages,
       difficulty || 'Intermediate',
       activeFormats,
-      videoUrl || null,
+      safeVideoUrl,
       JSON.stringify(attachments)
     ]);
 
     res.redirect('/services/' + newId);
   } catch (err) {
-    res.status(500).send("Error creating method pack: " + err.message);
+    console.error("Error creating service:", err.message);
+    res.status(400).send("Unable to publish method: " + (err.message || "Invalid input"));
   }
 });
 
@@ -625,10 +892,16 @@ app.post('/services/new', ensureAuthenticated, upload.any(), async (req, res) =>
 app.post('/orders/create', ensureAuthenticated, async (req, res) => {
   try {
     const { serviceId, requirements } = req.body;
+
+    // Prevent demo accounts from purchasing real users' methods if demo mode is off
+    if (req.user.email && req.user.email.endsWith('.local') && !isDemoModeEnabled()) {
+      throw new Error("Demo accounts cannot execute transactions in production.");
+    }
+
     const order = await escrow.createOrderWithEscrow(pool, {
       buyerId: req.user.id,
       serviceId,
-      requirements
+      requirements: requirements ? String(requirements).slice(0, 2000) : ''
     });
 
     res.redirect('/orders/' + order.id);
@@ -643,14 +916,14 @@ app.post('/orders/create', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// Order detail & tracking
+// Order detail & tracking (strictly restricted to Buyer, Seller, or Admin)
 app.get('/orders/:id', ensureAuthenticated, async (req, res) => {
   try {
     const ordRes = await pool.query(`
       SELECT o.*, 
              s.title as "serviceTitle",
-             b.name as "buyerName", b.email as "buyerEmail",
-             sl.name as "sellerName", sl.email as "sellerEmail"
+             b.name as "buyerName",
+             sl.name as "sellerName"
       FROM orders o
       JOIN services s ON o."serviceId" = s.id
       JOIN users b ON o."buyerId" = b.id
@@ -681,7 +954,8 @@ app.get('/orders/:id', ensureAuthenticated, async (req, res) => {
 
     res.render('order-detail', { order, dispute, review, messages: msgRes.rows });
   } catch (err) {
-    res.status(500).send("Error: " + err.message);
+    console.error("Order detail error:", err.message);
+    res.status(500).send("Unable to load order.");
   }
 });
 
@@ -691,7 +965,7 @@ app.post('/orders/:id/deliver', ensureAuthenticated, async (req, res) => {
     const updated = await escrow.deliverOrder(pool, {
       orderId: req.params.id,
       sellerId: req.user.id,
-      deliveryNote: req.body.deliveryNote
+      deliveryNote: String(req.body.deliveryNote || '').slice(0, 2000)
     });
 
     io.to(`order_${req.params.id}`).emit('order_updated', { status: 'DELIVERED', order: updated });
@@ -730,12 +1004,15 @@ app.post('/orders/:id/review', ensureAuthenticated, async (req, res) => {
       return res.status(400).send("Reviews can only be left on completed orders.");
     }
 
-    const reviewId = 'rev_' + crypto.randomBytes(6).toString('hex');
+    const safeRating = Math.min(Math.max(parseInt(rating, 10) || 5, 1), 5);
+    const safeComment = String(comment || '').trim().slice(0, 1500);
+
+    const reviewId = 'rev_' + crypto.randomBytes(8).toString('hex');
     await pool.query(`
       INSERT INTO reviews (id, "orderId", "serviceId", "buyerId", "sellerId", rating, comment)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       ON CONFLICT ("orderId") DO UPDATE SET rating = $6, comment = $7
-    `, [reviewId, order.id, order.serviceId, order.buyerId, order.sellerId, parseInt(rating, 10), comment || '']);
+    `, [reviewId, order.id, order.serviceId, order.buyerId, order.sellerId, safeRating, safeComment]);
 
     (async () => {
       try {
@@ -743,7 +1020,7 @@ app.post('/orders/:id/review', ensureAuthenticated, async (req, res) => {
         const uBuyer = await pool.query('SELECT * FROM users WHERE id = $1', [order.buyerId]);
         if (uSeller.rows[0] && uBuyer.rows[0]) {
           emailService.notifyReviewSubmitted({
-            review: { rating: parseInt(rating, 10), comment: comment || '' },
+            review: { rating: safeRating, comment: safeComment },
             order,
             seller: uSeller.rows[0],
             buyer: uBuyer.rows[0]
@@ -756,7 +1033,8 @@ app.post('/orders/:id/review', ensureAuthenticated, async (req, res) => {
 
     res.redirect('/orders/' + req.params.id);
   } catch (err) {
-    res.status(500).send("Review error: " + err.message);
+    console.error("Review error:", err.message);
+    res.status(500).send("Unable to save review.");
   }
 });
 
@@ -767,8 +1045,8 @@ app.post('/orders/:id/dispute', ensureAuthenticated, async (req, res) => {
     await escrow.openDispute(pool, {
       orderId: req.params.id,
       userId: req.user.id,
-      reason,
-      details
+      reason: String(reason || '').slice(0, 250),
+      details: String(details || '').slice(0, 3000)
     });
 
     io.to(`order_${req.params.id}`).emit('order_updated', { status: 'DISPUTED' });
@@ -782,17 +1060,15 @@ app.post('/orders/:id/dispute', ensureAuthenticated, async (req, res) => {
 // DIRECT MESSAGING & CHAT
 // ==========================================
 
-// Support shortcut
 app.get('/support', ensureAuthenticated, (req, res) => {
   res.redirect('/chat?support=1');
 });
 
-// Messages alias
 app.get('/messages', ensureAuthenticated, (req, res) => {
   res.redirect('/chat');
 });
 
-// Main Chat Page
+// Main Chat Page (never leaks private user emails)
 app.get('/chat', ensureAuthenticated, async (req, res) => {
   try {
     const currentUserId = req.user.id;
@@ -800,17 +1076,13 @@ app.get('/chat', ensureAuthenticated, async (req, res) => {
     let serviceId = req.query.serviceId || null;
     let requestedConvId = req.query.conversationId || null;
 
-    // Support assistance shortcut: ?support=1
     if (req.query.support === '1' || req.query.support === 'true') {
       const adminRes = await pool.query("SELECT id, name FROM users WHERE role = 'ADMIN' LIMIT 1");
-      if (adminRes.rows.length > 0) {
-        if (req.user.role !== 'ADMIN') {
-          targetUserId = adminRes.rows[0].id;
-        }
+      if (adminRes.rows.length > 0 && req.user.role !== 'ADMIN') {
+        targetUserId = adminRes.rows[0].id;
       }
     }
 
-    // If starting a chat with a specific user
     if (targetUserId && targetUserId !== currentUserId) {
       const existRes = await pool.query(`
         SELECT c.id 
@@ -824,36 +1096,37 @@ app.get('/chat', ensureAuthenticated, async (req, res) => {
         return res.redirect(`/chat?conversationId=${existRes.rows[0].id}`);
       } else {
         const recipientUserRes = await pool.query('SELECT role, name FROM users WHERE id = $1', [targetUserId]);
-        const recipientUser = recipientUserRes.rows[0];
-        const convType = (recipientUser && recipientUser.role === 'ADMIN') || req.user.role === 'ADMIN' ? 'SUPPORT' : 'DIRECT';
+        if (recipientUserRes.rows.length > 0) {
+          const recipientUser = recipientUserRes.rows[0];
+          const convType = recipientUser.role === 'ADMIN' || req.user.role === 'ADMIN' ? 'SUPPORT' : 'DIRECT';
 
-        let subject = req.query.subject || null;
-        if (!subject && serviceId) {
-          const srvRes = await pool.query('SELECT title FROM services WHERE id = $1', [serviceId]);
-          if (srvRes.rows.length > 0) {
-            subject = `Regarding: ${srvRes.rows[0].title}`;
+          let subject = req.query.subject ? String(req.query.subject).slice(0, 200) : null;
+          if (!subject && serviceId) {
+            const srvRes = await pool.query('SELECT title FROM services WHERE id = $1', [serviceId]);
+            if (srvRes.rows.length > 0) {
+              subject = `Regarding: ${srvRes.rows[0].title}`;
+            }
           }
+          if (!subject) {
+            subject = convType === 'SUPPORT' ? 'Support Assistance' : 'Direct Conversation';
+          }
+
+          const newConvId = 'conv_' + crypto.randomBytes(8).toString('hex');
+          await pool.query(`
+            INSERT INTO conversations (id, type, "serviceId", subject, "lastMessageText")
+            VALUES ($1, $2, $3, $4, 'Conversation initialized')
+          `, [newConvId, convType, serviceId, subject]);
+
+          await pool.query(`
+            INSERT INTO conversation_participants ("conversationId", "userId", "unreadCount")
+            VALUES ($1, $2, 0), ($1, $3, 0)
+          `, [newConvId, currentUserId, targetUserId]);
+
+          return res.redirect(`/chat?conversationId=${newConvId}`);
         }
-        if (!subject) {
-          subject = convType === 'SUPPORT' ? 'Support Assistance' : 'Direct Conversation';
-        }
-
-        const newConvId = 'conv_' + crypto.randomBytes(6).toString('hex');
-        await pool.query(`
-          INSERT INTO conversations (id, type, "serviceId", subject, "lastMessageText")
-          VALUES ($1, $2, $3, $4, 'Conversation initialized')
-        `, [newConvId, convType, serviceId, subject]);
-
-        await pool.query(`
-          INSERT INTO conversation_participants ("conversationId", "userId", "unreadCount")
-          VALUES ($1, $2, 0), ($1, $3, 0)
-        `, [newConvId, currentUserId, targetUserId]);
-
-        return res.redirect(`/chat?conversationId=${newConvId}`);
       }
     }
 
-    // Retrieve all conversations user participates in
     const convsRes = await pool.query(`
       SELECT c.*,
              p."unreadCount",
@@ -862,7 +1135,6 @@ app.get('/chat', ensureAuthenticated, async (req, res) => {
              u.avatar as "partnerAvatar", 
              u.role as "partnerRole", 
              u.bio as "partnerBio",
-             u.email as "partnerEmail",
              s.title as "serviceTitle", 
              s.price as "servicePrice",
              s.id as "serviceId"
@@ -917,7 +1189,7 @@ app.get('/chat', ensureAuthenticated, async (req, res) => {
 
     if (activeConversation) {
       const partnerRes = await pool.query(`
-        SELECT u.id, u.name, u.avatar, u.role, u.bio, u.email
+        SELECT u.id, u.name, u.avatar, u.role, u.bio
         FROM conversation_participants cp
         JOIN users u ON cp."userId" = u.id
         WHERE cp."conversationId" = $1 AND cp."userId" != $2
@@ -928,7 +1200,7 @@ app.get('/chat', ensureAuthenticated, async (req, res) => {
         activePartner = partnerRes.rows[0];
       } else {
         const firstUserRes = await pool.query(`
-          SELECT u.id, u.name, u.avatar, u.role, u.bio, u.email
+          SELECT u.id, u.name, u.avatar, u.role, u.bio
           FROM conversation_participants cp
           JOIN users u ON cp."userId" = u.id
           WHERE cp."conversationId" = $1
@@ -960,14 +1232,12 @@ app.get('/chat', ensureAuthenticated, async (req, res) => {
     }
 
     const contactsRes = await pool.query(`
-      SELECT u.id, u.name, u.email, u.avatar, u.role, u.bio,
+      SELECT u.id, u.name, u.avatar, u.role, u.bio,
              (SELECT count(*) FROM services s WHERE s."sellerId" = u.id) as "servicesCount"
       FROM users u
       WHERE u.id != $1
       ORDER BY (u.role = 'ADMIN') DESC, (u.role = 'USER') DESC, u.name ASC
     `, [currentUserId]);
-
-    const contacts = contactsRes.rows;
 
     res.render('chat', {
       conversations,
@@ -975,10 +1245,11 @@ app.get('/chat', ensureAuthenticated, async (req, res) => {
       activeConversation,
       activePartner,
       messages,
-      contacts
+      contacts: contactsRes.rows
     });
   } catch (err) {
-    res.status(500).send("Messaging error: " + err.message);
+    console.error("Chat error:", err.message);
+    res.status(500).send("Unable to load messaging.");
   }
 });
 
@@ -1000,20 +1271,22 @@ app.post('/api/chat/messages', ensureAuthenticated, upload.single('file'), async
     let fileType = null;
 
     if (req.file) {
+      const ext = path.extname(req.file.filename).toLowerCase();
+      verifyUploadedFileSafety(req.file.path, ext);
+
       fileUrl = `/uploads/${req.file.filename}`;
       fileName = req.file.originalname;
       const sizeMb = (req.file.size / (1024 * 1024)).toFixed(1);
       fileSize = sizeMb > 0 ? `${sizeMb} MB` : `${(req.file.size / 1024).toFixed(0)} KB`;
-      const ext = path.extname(fileName).toLowerCase();
       fileType = ext.replace('.', '');
     }
 
-    const trimmedContent = content ? content.trim() : '';
+    const trimmedContent = content ? String(content).trim().slice(0, 4000) : '';
     if (!trimmedContent && !fileUrl) {
       return res.status(400).json({ success: false, error: 'Please enter a message or attach a file' });
     }
 
-    const newMsgId = 'dmsg_' + crypto.randomBytes(6).toString('hex');
+    const newMsgId = 'dmsg_' + crypto.randomBytes(8).toString('hex');
     const insertRes = await pool.query(`
       INSERT INTO direct_messages (id, "conversationId", "senderId", content, "fileUrl", "fileName", "fileSize", "fileType", "isRead")
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)
@@ -1097,7 +1370,7 @@ app.post('/api/chat/messages', ensureAuthenticated, upload.single('file'), async
 
     res.json({ success: true, message: msgPayload });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(400).json({ success: false, error: err.message || 'Unable to send message' });
   }
 });
 
@@ -1110,7 +1383,7 @@ app.get('/api/chat/unread-count', ensureAuthenticated, async (req, res) => {
     );
     res.json({ success: true, count: parseInt(unreadRes.rows[0].total, 10) || 0 });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'Error retrieving unread count' });
   }
 });
 
@@ -1135,13 +1408,16 @@ app.post('/api/chat/start', ensureAuthenticated, async (req, res) => {
       convId = existRes.rows[0].id;
     } else {
       const recipientRes = await pool.query('SELECT role FROM users WHERE id = $1', [recipientId]);
-      const convType = (recipientRes.rows[0] && recipientRes.rows[0].role === 'ADMIN') || req.user.role === 'ADMIN' ? 'SUPPORT' : 'DIRECT';
+      if (recipientRes.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Recipient not found' });
+      }
+      const convType = recipientRes.rows[0].role === 'ADMIN' || req.user.role === 'ADMIN' ? 'SUPPORT' : 'DIRECT';
 
-      convId = 'conv_' + crypto.randomBytes(6).toString('hex');
+      convId = 'conv_' + crypto.randomBytes(8).toString('hex');
       await pool.query(`
         INSERT INTO conversations (id, type, "serviceId", subject, "lastMessageText")
         VALUES ($1, $2, $3, $4, $5)
-      `, [convId, convType, serviceId || null, subject || 'Direct Conversation', initialMessage || 'Conversation started']);
+      `, [convId, convType, serviceId || null, subject ? String(subject).slice(0, 200) : 'Direct Conversation', initialMessage ? String(initialMessage).slice(0, 500) : 'Conversation started']);
 
       await pool.query(`
         INSERT INTO conversation_participants ("conversationId", "userId", "unreadCount")
@@ -1149,18 +1425,19 @@ app.post('/api/chat/start', ensureAuthenticated, async (req, res) => {
       `, [convId, req.user.id, recipientId]);
     }
 
-    if (initialMessage && initialMessage.trim()) {
-      const newMsgId = 'dmsg_' + crypto.randomBytes(6).toString('hex');
+    if (initialMessage && String(initialMessage).trim()) {
+      const cleanMsg = String(initialMessage).trim().slice(0, 4000);
+      const newMsgId = 'dmsg_' + crypto.randomBytes(8).toString('hex');
       await pool.query(`
         INSERT INTO direct_messages (id, "conversationId", "senderId", content, "isRead")
         VALUES ($1, $2, $3, $4, false)
-      `, [newMsgId, convId, req.user.id, initialMessage.trim()]);
+      `, [newMsgId, convId, req.user.id, cleanMsg]);
 
       await pool.query(`
         UPDATE conversations
         SET "lastMessageText" = $1, "lastMessageAt" = CURRENT_TIMESTAMP
         WHERE id = $2
-      `, [initialMessage.trim(), convId]);
+      `, [cleanMsg, convId]);
 
       await pool.query(`
         UPDATE conversation_participants
@@ -1171,7 +1448,7 @@ app.post('/api/chat/start', ensureAuthenticated, async (req, res) => {
 
     res.json({ success: true, conversationId: convId });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'Unable to start conversation' });
   }
 });
 
@@ -1203,11 +1480,11 @@ app.get('/dashboard', ensureAuthenticated, async (req, res) => {
     `, [user.id]);
 
     const withRes = await pool.query(`
-      SELECT * FROM withdrawals WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 10
+      SELECT * FROM withdrawals WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 20
     `, [user.id]);
 
     const depRes = await pool.query(`
-      SELECT * FROM deposits WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 10
+      SELECT * FROM deposits WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 20
     `, [user.id]);
 
     res.render('dashboard', {
@@ -1219,35 +1496,44 @@ app.get('/dashboard', ensureAuthenticated, async (req, res) => {
       platformBinancePayId: PLATFORM_BINANCE_PAY_ID
     });
   } catch (err) {
-    res.status(500).send("Dashboard error: " + err.message);
+    console.error("Dashboard error:", err.message);
+    res.status(500).send("Unable to load dashboard.");
   }
 });
 
-// Request withdrawal to Binance Pay
+// Request withdrawal to Binance Pay (ACID locked, properly rolled back on error)
 app.post('/api/wallet/withdraw', ensureAuthenticated, async (req, res) => {
+  if (req.user.email && req.user.email.endsWith('.local')) {
+    return res.status(403).json({ success: false, error: 'Demo accounts cannot withdraw real USDT.' });
+  }
+
+  const rawAmount = parseFloat(req.body.amount);
+  const amount = Math.round(rawAmount * 100) / 100;
+
+  if (!Number.isFinite(amount) || amount < 1.00 || amount > 50000.00) {
+    return res.status(400).json({ success: false, error: 'Invalid withdrawal amount (min 1.00 USDT).' });
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const amount = parseFloat(req.body.amount);
-
-    if (isNaN(amount) || amount <= 0) {
-      return res.status(400).json({ success: false, error: 'Invalid withdrawal amount' });
-    }
 
     const uRes = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.user.id]);
     const user = uRes.rows[0];
 
-    if (!user.binanceId) {
-      return res.status(400).json({ success: false, error: 'Please configure your Binance Pay ID before requesting a withdrawal' });
+    if (!user || !user.binanceId) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: 'Please save your Binance Pay ID before requesting a withdrawal.' });
     }
 
     if (parseFloat(user.walletBalance) < amount) {
-      return res.status(400).json({ success: false, error: 'Insufficient available balance' });
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: 'Insufficient available balance.' });
     }
 
     await client.query('UPDATE users SET "walletBalance" = "walletBalance" - $1 WHERE id = $2', [amount, user.id]);
 
-    const withId = 'wth_' + crypto.randomBytes(6).toString('hex');
+    const withId = 'wth_' + crypto.randomBytes(8).toString('hex');
     await client.query(`
       INSERT INTO withdrawals (id, "userId", amount, "binanceId", status)
       VALUES ($1, $2, $3, $4, 'PENDING')
@@ -1267,10 +1553,11 @@ app.post('/api/wallet/withdraw', ensureAuthenticated, async (req, res) => {
       }
     })();
 
-    res.json({ success: true, message: `Withdrawal request of ${amount.toFixed(2)} USDT submitted successfully.` });
+    res.json({ success: true, message: `Withdrawal request of ${amount.toFixed(2)} USDT submitted for processing.` });
   } catch (err) {
     await client.query('ROLLBACK');
-    res.status(500).json({ success: false, error: err.message });
+    console.error("Withdrawal error:", err.message);
+    res.status(500).json({ success: false, error: 'Unable to process withdrawal request.' });
   } finally {
     client.release();
   }
@@ -1335,7 +1622,8 @@ app.get('/history', ensureAuthenticated, async (req, res) => {
       completedCount
     });
   } catch (err) {
-    res.status(500).send("History error: " + err.message);
+    console.error("History error:", err.message);
+    res.status(500).send("Unable to load history.");
   }
 });
 
@@ -1343,8 +1631,8 @@ app.get('/history', ensureAuthenticated, async (req, res) => {
 app.get('/api/wallet/deposit-qr', ensureAuthenticated, async (req, res) => {
   try {
     const rawAmount = parseFloat(req.query.amount) || 50;
-    const amount = isNaN(rawAmount) || rawAmount <= 0 ? 50 : rawAmount;
-    const binancePayId = (req.query.binancePayId || PLATFORM_BINANCE_PAY_ID).trim();
+    const amount = !Number.isFinite(rawAmount) || rawAmount < 1 || rawAmount > 50000 ? 50 : Math.round(rawAmount * 100) / 100;
+    const binancePayId = PLATFORM_BINANCE_PAY_ID;
 
     const deepLink = `https://app.binance.com/qr/dlink?deeplink=binance%3A%2F%2Fpay%3FpayeeId%3D${encodeURIComponent(binancePayId)}%26amount%3D${amount.toFixed(2)}%26currency%3DUSDT`;
     const appScheme = `binance://pay?payeeId=${encodeURIComponent(binancePayId)}&amount=${amount.toFixed(2)}&currency=USDT`;
@@ -1369,49 +1657,41 @@ app.get('/api/wallet/deposit-qr', ensureAuthenticated, async (req, res) => {
       appScheme
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'Unable to generate QR code' });
   }
 });
 
-// REST AJAX: Record Binance Pay Top-Up & Credit Account
+// REST AJAX: Record Binance Pay Top-Up Request (Strictly PENDING until Admin Verification!)
 app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    const amount = parseFloat(req.body.amount);
-    const txId = (req.body.txId || '').trim();
-    const binancePayId = (req.body.binancePayId || PLATFORM_BINANCE_PAY_ID).trim();
+    const rawAmount = parseFloat(req.body.amount);
+    const amount = Math.round(rawAmount * 100) / 100;
+    const txId = String(req.body.txId || '').trim();
+    const binancePayId = PLATFORM_BINANCE_PAY_ID;
 
-    if (isNaN(amount) || !Number.isFinite(amount) || amount <= 0 || amount > 50000) {
+    if (!Number.isFinite(amount) || amount < 1.00 || amount > 50000.00) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ success: false, error: 'Invalid top-up amount (max 50,000 USDT).' });
+      return res.status(400).json({ success: false, error: 'Invalid top-up amount (between 1 and 50,000 USDT).' });
     }
 
-    if (!txId || !/^[a-zA-Z0-9_-]{6,100}$/.test(txId)) {
+    if (!txId || !/^[a-zA-Z0-9_-]{8,100}$/.test(txId)) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ success: false, error: 'Please enter a valid Binance Transaction ID (TxID, 6 to 100 alphanumeric characters).' });
+      return res.status(400).json({ success: false, error: 'Please enter a valid Binance Pay Order/Transaction ID (8 to 100 alphanumeric characters).' });
     }
 
     const existingTx = await client.query('SELECT id FROM deposits WHERE "txId" = $1', [txId]);
     if (existingTx.rows.length > 0) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ success: false, error: 'This Transaction ID (TxID) has already been used.' });
+      return res.status(400).json({ success: false, error: 'This Transaction ID (TxID) has already been submitted.' });
     }
 
-    const upd = await client.query(`
-      UPDATE users 
-      SET "walletBalance" = "walletBalance" + $1 
-      WHERE id = $2 
-      RETURNING "walletBalance"
-    `, [amount, req.user.id]);
-
-    const newWalletBalance = parseFloat(upd.rows[0].walletBalance);
-
-    const depId = 'dep_' + crypto.randomBytes(6).toString('hex');
+    const depId = 'dep_' + crypto.randomBytes(8).toString('hex');
     const depRes = await client.query(`
       INSERT INTO deposits (id, "userId", amount, "binancePayId", "txId", status)
-      VALUES ($1, $2, $3, $4, $5, 'COMPLETED')
+      VALUES ($1, $2, $3, $4, $5, 'PENDING')
       RETURNING *
     `, [depId, req.user.id, amount, binancePayId, txId]);
 
@@ -1432,63 +1712,50 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
 
     res.json({
       success: true,
-      message: `Your top-up of ${amount.toFixed(2)} USDT via Binance Pay has been credited!`,
-      newWalletBalance,
+      message: `Deposit of ${amount.toFixed(2)} USDT (TxID: ${txId}) submitted for verification. Your balance will be credited as soon as an administrator confirms receipt.`,
       deposit: depRes.rows[0]
     });
   } catch (err) {
     await client.query('ROLLBACK');
-    res.status(500).json({ success: false, error: err.message });
+    console.error("Deposit submission error:", err.message);
+    res.status(500).json({ success: false, error: 'Unable to submit deposit request.' });
   } finally {
     client.release();
-  }
-});
-
-// REST AJAX: Top up test mode (protected by ENABLE_DEMO_MODE)
-app.post('/api/wallet/deposit-test', ensureAuthenticated, async (req, res) => {
-  try {
-    if (process.env.ENABLE_DEMO_MODE === 'false') {
-      return res.status(403).json({ success: false, error: 'Demo top-up mode is disabled.' });
-    }
-
-    const upd = await pool.query(`
-      UPDATE users 
-      SET "walletBalance" = "walletBalance" + 50.00 
-      WHERE id = $1 
-      RETURNING "walletBalance"
-    `, [req.user.id]);
-
-    res.json({ success: true, newWalletBalance: parseFloat(upd.rows[0].walletBalance) });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // REST AJAX: Update Binance Pay ID & Bio
 app.post('/api/wallet/update-binance', ensureAuthenticated, async (req, res) => {
   try {
-    const { binanceId, bio, skills } = req.body;
+    const binanceId = req.body.binanceId ? String(req.body.binanceId).trim().slice(0, 100) : null;
+    const bio = req.body.bio ? String(req.body.bio).trim().slice(0, 1000) : null;
+    const skills = req.body.skills ? String(req.body.skills).trim().slice(0, 500) : null;
+
+    if (binanceId && !/^[a-zA-Z0-9_@.-]{4,100}$/.test(binanceId)) {
+      return res.status(400).json({ success: false, error: 'Invalid Binance Pay ID format.' });
+    }
+
     await pool.query(`
       UPDATE users 
       SET "binanceId" = COALESCE($1, "binanceId"),
           bio = COALESCE($2, bio),
           skills = COALESCE($3, skills)
       WHERE id = $4
-    `, [binanceId || null, bio || null, skills || null, req.user.id]);
+    `, [binanceId, bio, skills, req.user.id]);
     res.json({ success: true, binanceId });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'Unable to update profile settings.' });
   }
 });
 
 // ==========================================
-// ADMIN ARBITRATION (DISPUTES)
+// ADMIN ARBITRATION & FINANCIAL APPROVALS
 // ==========================================
 
 app.get('/admin/disputes', ensureAuthenticated, async (req, res) => {
   try {
     if (req.user.role !== 'ADMIN') {
-      return res.status(403).send("Access restricted to moderators.");
+      return res.status(403).send("Access restricted to administrators.");
     }
 
     const dispRes = await pool.query(`
@@ -1502,9 +1769,30 @@ app.get('/admin/disputes', ensureAuthenticated, async (req, res) => {
       ORDER BY d."createdAt" DESC
     `);
 
-    res.render('disputes', { disputes: formatRows(dispRes.rows) });
+    const depRes = await pool.query(`
+      SELECT d.*, u.name as "userName", u.email as "userEmail"
+      FROM deposits d
+      JOIN users u ON d."userId" = u.id
+      ORDER BY (d.status = 'PENDING') DESC, d."createdAt" DESC
+      LIMIT 50
+    `);
+
+    const withRes = await pool.query(`
+      SELECT w.*, u.name as "userName", u.email as "userEmail"
+      FROM withdrawals w
+      JOIN users u ON w."userId" = u.id
+      ORDER BY (w.status = 'PENDING') DESC, w."createdAt" DESC
+      LIMIT 50
+    `);
+
+    res.render('disputes', {
+      disputes: formatRows(dispRes.rows),
+      deposits: formatRows(depRes.rows),
+      withdrawals: formatRows(withRes.rows)
+    });
   } catch (err) {
-    res.status(500).send("Arbitration error: " + err.message);
+    console.error("Admin center error:", err.message);
+    res.status(500).send("Unable to load admin center.");
   }
 });
 
@@ -1518,14 +1806,92 @@ app.post('/disputes/:id/resolve', ensureAuthenticated, async (req, res) => {
     await escrow.resolveDispute(pool, {
       disputeId: req.params.id,
       resolution,
-      resolutionNote
+      resolutionNote: String(resolutionNote || '').slice(0, 1000)
     });
 
     res.redirect('/admin/disputes');
   } catch (err) {
-    res.status(500).send("Resolution error: " + err.message);
+    res.status(400).send("Resolution error: " + err.message);
   }
 });
+
+// Admin: Approve or Reject a Pending Deposit
+app.post('/admin/deposits/:id/decision', ensureAuthenticated, async (req, res) => {
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).send("Unauthorized");
+  }
+  const { action } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const depRes = await client.query('SELECT * FROM deposits WHERE id = $1 FOR UPDATE', [req.params.id]);
+    const deposit = depRes.rows[0];
+    if (!deposit || deposit.status !== 'PENDING') {
+      await client.query('ROLLBACK');
+      return res.redirect('/admin/disputes');
+    }
+
+    if (action === 'APPROVE') {
+      const amount = Math.round(parseFloat(deposit.amount) * 100) / 100;
+      await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [deposit.userId]);
+      await client.query('UPDATE users SET "walletBalance" = "walletBalance" + $1 WHERE id = $2', [amount, deposit.userId]);
+      await client.query("UPDATE deposits SET status = 'COMPLETED' WHERE id = $1", [deposit.id]);
+    } else if (action === 'REJECT') {
+      await client.query("UPDATE deposits SET status = 'REJECTED' WHERE id = $1", [deposit.id]);
+    }
+
+    await client.query('COMMIT');
+    res.redirect('/admin/disputes');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error("Admin deposit decision error:", err.message);
+    res.status(500).send("Error processing deposit decision.");
+  } finally {
+    client.release();
+  }
+});
+
+// Admin: Approve or Reject (and refund) a Pending Withdrawal
+app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, async (req, res) => {
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).send("Unauthorized");
+  }
+  const { action } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const withRes = await client.query('SELECT * FROM withdrawals WHERE id = $1 FOR UPDATE', [req.params.id]);
+    const withdrawal = withRes.rows[0];
+    if (!withdrawal || withdrawal.status !== 'PENDING') {
+      await client.query('ROLLBACK');
+      return res.redirect('/admin/disputes');
+    }
+
+    if (action === 'APPROVE') {
+      await client.query("UPDATE withdrawals SET status = 'COMPLETED', \"processedAt\" = CURRENT_TIMESTAMP WHERE id = $1", [withdrawal.id]);
+    } else if (action === 'REJECT') {
+      const amount = Math.round(parseFloat(withdrawal.amount) * 100) / 100;
+      await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [withdrawal.userId]);
+      await client.query('UPDATE users SET "walletBalance" = "walletBalance" + $1 WHERE id = $2', [amount, withdrawal.userId]);
+      await client.query("UPDATE withdrawals SET status = 'REJECTED', \"processedAt\" = CURRENT_TIMESTAMP WHERE id = $1", [withdrawal.id]);
+    }
+
+    await client.query('COMMIT');
+    res.redirect('/admin/disputes');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error("Admin withdrawal decision error:", err.message);
+    res.status(500).send("Error processing withdrawal decision.");
+  } finally {
+    client.release();
+  }
+});
+
+// Static assets (ONLY CSS/JS/images if any — /uploads is intercepted above!)
+app.use(express.static(path.join(__dirname, '../public'), {
+  index: false,
+  dotfiles: 'deny'
+}));
 
 // Global Error Handler (Multer & Unhandled Route Errors)
 app.use((err, req, res, next) => {
@@ -1533,18 +1899,16 @@ app.use((err, req, res, next) => {
   if (req.path.startsWith('/api/')) {
     return res.status(400).json({ success: false, error: err.message || 'Invalid request.' });
   }
-  res.status(400).send("Error processing request: " + (err.message || "Invalid request"));
+  res.status(400).send("Request rejected: " + (err.message || "Invalid request"));
 });
 
-// Initialize database and start server
+// Initialize database and start server bound to HOST (127.0.0.1 by default)
 initDatabase().then(() => {
-  server.listen(PORT, () => {
-    console.log(`\n🚀 TrustWork Server running on http://localhost:${PORT}`);
-    console.log(`⚡ WebSocket / Socket.io: Active (Real-Time)`);
-    console.log(`📎 File & Attachment Uploads: Active`);
-    console.log(`🐘 Database: PostgreSQL (ACID Enabled)`);
-    console.log(`🔒 Escrow Protection System: Active`);
-    console.log(`💰 Binance Pay & USDT Mode: Active\n`);
+  server.listen(PORT, HOST, () => {
+    console.log(`\n🚀 TrustWork Server running on http://${HOST}:${PORT}`);
+    console.log(`🛡️ Security: CSRF, HSTS, Magic-Byte Upload Filter, Protected /uploads Active`);
+    console.log(`🐘 Database: PostgreSQL (ACID + Non-Negative Check Constraints Enabled)`);
+    console.log(`🔒 Escrow & Admin Deposit Verification: Active\n`);
   });
 }).catch(err => {
   console.error("❌ Error starting PostgreSQL / Server:", err);

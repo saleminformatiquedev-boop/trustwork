@@ -2,15 +2,15 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-const SMTP_USER = process.env.SMTP_USER || 'saleminformatiquedev@gmail.com';
-const SMTP_PASS = process.env.SMTP_PASS || 'zelcssnlnwpluzxv';
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
 const SMTP_SECURE = process.env.SMTP_SECURE !== undefined
   ? process.env.SMTP_SECURE === 'true'
   : (SMTP_PORT === 465);
 
-const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || 'saleminformatiquedev@gmail.com';
+const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || process.env.SMTP_USER || '';
 const BASE_URL = process.env.BASE_URL || 'https://51.20.182.245.sslip.io';
 
 let transporter = null;

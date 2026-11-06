@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
   <title><%= typeof title !== 'undefined' ? title + ' — ' : '' %>TrustWork</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -169,6 +170,49 @@
         setTimeout(() => toast.remove(), 300);
       }, 3200);
     };
+
+    // Automatic CSRF Token Protection for all POST forms and fetch() calls
+    (function() {
+      const meta = document.querySelector('meta[name="csrf-token"]');
+      const token = meta ? meta.getAttribute('content') : '';
+      if (!token) return;
+
+      const origFetch = window.fetch;
+      window.fetch = function(input, init = {}) {
+        const method = (init.method || 'GET').toUpperCase();
+        if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+          init.headers = Object.assign({}, init.headers || {}, { 'X-CSRF-Token': token });
+        }
+        return origFetch.call(this, input, init);
+      };
+
+      function protectForms() {
+        document.querySelectorAll('form').forEach(form => {
+          const method = (form.getAttribute('method') || 'GET').toUpperCase();
+          if (method === 'POST') {
+            if (!form.querySelector('input[name="_csrf"]')) {
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = '_csrf';
+              input.value = token;
+              form.appendChild(input);
+            }
+            const enctype = (form.getAttribute('enctype') || '').toLowerCase();
+            const action = form.getAttribute('action') || '';
+            if (enctype === 'multipart/form-data' && action && !action.includes('_csrf=')) {
+              const sep = action.includes('?') ? '&' : '?';
+              form.setAttribute('action', action + sep + '_csrf=' + encodeURIComponent(token));
+            }
+          }
+        });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', protectForms);
+      } else {
+        protectForms();
+      }
+    })();
   </script>
 
   <main class="flex-grow">
