@@ -503,6 +503,18 @@ io.on('connection', (socket) => {
         fileName: savedMsg.fileName,
         createdAt: savedMsg.createdAt
       });
+
+      // Also notify the other participant on their global user channel for browser notification
+      const ordRes = await pool.query('SELECT "buyerId", "sellerId" FROM orders WHERE id = $1', [orderId]);
+      if (ordRes.rows[0]) {
+        const targetId = ordRes.rows[0].buyerId === senderId ? ordRes.rows[0].sellerId : ordRes.rows[0].buyerId;
+        io.to(`user_${targetId}`).emit('user_notification', {
+          title: `Order Message from ${senderName}`,
+          body: trimmedContent || (fileName ? `Attachment: ${fileName}` : 'New message on your order'),
+          url: `/orders/${orderId}`,
+          type: 'order_message'
+        });
+      }
     } catch (err) {
       console.error("Socket error send_message:", err.message);
     }
@@ -931,6 +943,13 @@ app.post('/orders/create', ensureAuthenticated, async (req, res) => {
       requirements: requirements ? String(requirements).slice(0, 2000) : ''
     });
 
+    io.to(`user_${order.sellerId}`).emit('user_notification', {
+      title: '🎉 New Order Received!',
+      body: `${req.user.name} purchased your method (${parseFloat(order.amount).toFixed(2)} USDT locked in escrow).`,
+      url: `/orders/${order.id}`,
+      type: 'new_order'
+    });
+
     res.redirect('/orders/' + order.id);
   } catch (err) {
     const safeMsg = JSON.stringify("Error: " + (err.message || "Unable to create order"));
@@ -1003,6 +1022,12 @@ app.post('/orders/:id/deliver', ensureAuthenticated, async (req, res) => {
     });
 
     io.to(`order_${req.params.id}`).emit('order_updated', { status: 'DELIVERED', order: updated });
+    io.to(`user_${updated.buyerId}`).emit('user_notification', {
+      title: '📦 Order Delivered!',
+      body: 'The author has delivered your order files. Review and approve when ready.',
+      url: `/orders/${req.params.id}`,
+      type: 'order_delivered'
+    });
     res.redirect('/orders/' + req.params.id);
   } catch (err) {
     res.status(400).send("Error: " + err.message);
@@ -1017,7 +1042,14 @@ app.post('/orders/:id/complete', ensureAuthenticated, async (req, res) => {
       buyerId: req.user.id
     });
 
+    const netAmt = parseFloat(updated.sellerNetAmount || (updated.amount * 0.85)).toFixed(2);
     io.to(`order_${req.params.id}`).emit('order_updated', { status: 'COMPLETED', order: updated });
+    io.to(`user_${updated.sellerId}`).emit('user_notification', {
+      title: '💰 Payment Released!',
+      body: `Order approved! +${netAmt} USDT (85% net) has been credited to your wallet.`,
+      url: `/orders/${req.params.id}`,
+      type: 'order_completed'
+    });
     res.redirect('/orders/' + req.params.id);
   } catch (err) {
     res.status(400).send("Error: " + err.message);
@@ -1951,6 +1983,16 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, async (req, res) =
     }
 
     await client.query('COMMIT');
+
+    io.to(`user_${deposit.userId}`).emit('user_notification', {
+      title: action === 'APPROVE' ? '💰 Deposit Confirmed!' : '⚠️ Deposit Rejected',
+      body: action === 'APPROVE'
+        ? `+${parseFloat(deposit.amount).toFixed(2)} USDT has been credited to your available balance.`
+        : `Your deposit request (${parseFloat(deposit.amount).toFixed(2)} USDT) was rejected.`,
+      url: '/dashboard',
+      type: 'deposit_decision'
+    });
+
     res.redirect('/admin/disputes');
   } catch (err) {
     await client.query('ROLLBACK');
@@ -1993,6 +2035,16 @@ app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, async (req, res
     }
 
     await client.query('COMMIT');
+
+    io.to(`user_${withdrawal.userId}`).emit('user_notification', {
+      title: action === 'APPROVE' ? '💸 Withdrawal Sent!' : '↩️ Withdrawal Refunded',
+      body: action === 'APPROVE'
+        ? `Your withdrawal of ${parseFloat(withdrawal.amount).toFixed(2)} USDT has been processed.`
+        : `Your withdrawal of ${parseFloat(withdrawal.amount).toFixed(2)} USDT was cancelled and refunded to your wallet.`,
+      url: '/dashboard',
+      type: 'withdrawal_decision'
+    });
+
     res.redirect('/admin/disputes');
   } catch (err) {
     await client.query('ROLLBACK');

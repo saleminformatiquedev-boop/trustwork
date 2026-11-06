@@ -79,8 +79,19 @@
       </nav>
 
       <!-- User / Wallet -->
-      <div class="flex items-center gap-2.5">
+      <div class="flex items-center gap-2">
         <% if (user) { %>
+          <!-- Browser Notification Toggle Button -->
+          <button
+            type="button"
+            id="browser-notif-btn"
+            onclick="window.requestBrowserNotificationPermission(true)"
+            title="Enable Browser Notifications"
+            class="relative w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-600 hover:text-slate-900 flex items-center justify-center transition">
+            <i id="browser-notif-icon" class="fa-regular fa-bell text-xs"></i>
+            <span id="browser-notif-dot" class="hidden absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+          </button>
+
           <a href="/dashboard" class="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200/70 transition py-1.5 px-3 rounded-lg text-xs font-semibold text-slate-800">
             <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span id="header-wallet-balance"><%= user.walletBalance.toFixed(2) %></span>
@@ -132,10 +143,141 @@
   </nav>
 
   <script>
+    // Register Service Worker for Native Browser Notifications (Desktop & Mobile)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+
+    window.playNotificationSound = function() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08); // A5
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.28);
+      } catch (e) {}
+    };
+
+    window.updateBrowserNotifButton = function() {
+      const btn = document.getElementById('browser-notif-btn');
+      const icon = document.getElementById('browser-notif-icon');
+      const dot = document.getElementById('browser-notif-dot');
+      if (!btn || !('Notification' in window)) {
+        if (btn) btn.classList.add('hidden');
+        return;
+      }
+      const perm = Notification.permission;
+      if (perm === 'granted') {
+        icon.className = 'fa-solid fa-bell text-xs text-emerald-600';
+        dot.className = ' absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white';
+        btn.title = 'Browser Notifications Enabled (Click to test)';
+      } else if (perm === 'denied') {
+        icon.className = 'fa-regular fa-bell-slash text-xs text-rose-500';
+        dot.className = 'hidden';
+        btn.title = 'Browser Notifications Blocked in Browser Settings';
+      } else {
+        icon.className = 'fa-regular fa-bell text-xs text-slate-600';
+        dot.className = ' absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse ring-2 ring-white';
+        btn.title = 'Click to Enable Browser Notifications';
+      }
+    };
+
+    window.triggerBrowserNotification = async function({ title, body, url = '/dashboard', tag = 'trustwork-notif', skipToast = false }) {
+      window.playNotificationSound();
+      if (!skipToast) {
+        window.showToast(`${title} — ${body}`, 'info', url);
+      }
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+      const options = {
+        body: body || '',
+        tag: tag + '-' + Date.now(),
+        renotify: true,
+        data: { url }
+      };
+
+      try {
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration();
+          if (reg && typeof reg.showNotification === 'function') {
+            await reg.showNotification(title, options);
+            return;
+          }
+        }
+        const n = new Notification(title, options);
+        n.onclick = function() {
+          window.focus();
+          if (url) window.location.href = url;
+          n.close();
+        };
+      } catch (err) {
+        console.warn('Browser notification fallback error:', err);
+      }
+    };
+
+    window.requestBrowserNotificationPermission = async function(manualClick = false) {
+      if (!('Notification' in window)) {
+        if (manualClick) window.showToast('This browser does not support desktop/mobile notifications.', 'error');
+        return;
+      }
+      if (Notification.permission === 'granted') {
+        window.updateBrowserNotifButton();
+        if (manualClick) {
+          window.triggerBrowserNotification({
+            title: '🔔 TrustWork Notifications Active',
+            body: 'You will receive real-time alerts for messages, orders, and payments.',
+            url: window.location.pathname
+          });
+        }
+        return;
+      }
+      if (Notification.permission === 'denied') {
+        window.updateBrowserNotifButton();
+        if (manualClick) {
+          window.showToast('Notifications are blocked. Please allow notifications in your browser address bar settings.', 'error');
+        }
+        return;
+      }
+      try {
+        const perm = await Notification.requestPermission();
+        window.updateBrowserNotifButton();
+        if (perm === 'granted') {
+          window.triggerBrowserNotification({
+            title: '🔔 Browser Notifications Enabled!',
+            body: 'Instant alerts for messages and escrow updates are now active.',
+            url: window.location.pathname
+          });
+        }
+      } catch (e) {}
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      window.updateBrowserNotifButton();
+      // Gently prompt on first user click if permission is still 'default'
+      if ('Notification' in window && Notification.permission === 'default' && !sessionStorage.getItem('tw_notif_prompted')) {
+        const autoAsk = () => {
+          sessionStorage.setItem('tw_notif_prompted', '1');
+          window.requestBrowserNotificationPermission(false);
+          document.removeEventListener('click', autoAsk);
+        };
+        document.addEventListener('click', autoAsk, { once: true });
+      }
+    });
+
     <% if (user) { %>
       if (typeof io !== 'undefined') {
         const globalUserSocket = io();
         globalUserSocket.emit('join_user');
+
         globalUserSocket.on('chat_notification', (notif) => {
           const badges = [
             document.getElementById('header-unread-badge'),
@@ -147,28 +289,55 @@
               b.classList.remove('hidden');
             }
           });
-          if (window.location.pathname !== '/chat' || !window.location.search.includes(notif.conversationId)) {
-            window.showToast(`New message from ${notif.senderName}`, 'info');
+          const isViewingThisConversation = (window.location.pathname === '/chat' && window.location.search.includes(notif.conversationId) && document.visibilityState === 'visible');
+          if (!isViewingThisConversation) {
+            window.triggerBrowserNotification({
+              title: `💬 New message from ${notif.senderName}`,
+              body: notif.preview || 'Tap to view conversation',
+              url: `/chat?conversationId=${notif.conversationId}`,
+              tag: `chat-${notif.conversationId}`
+            });
+          }
+        });
+
+        globalUserSocket.on('user_notification', (notif) => {
+          if (!notif) return;
+          const isSameVisibleOrderPage = (notif.url && window.location.pathname === notif.url && document.visibilityState === 'visible' && notif.type === 'order_message');
+          if (!isSameVisibleOrderPage) {
+            window.triggerBrowserNotification({
+              title: notif.title || '🔔 TrustWork Notification',
+              body: notif.body || 'You have a new update on TrustWork.',
+              url: notif.url || '/dashboard',
+              tag: notif.type || 'trustwork-event'
+            });
           }
         });
       }
     <% } %>
 
-    window.showToast = function(message, type = 'success') {
+    window.showToast = function(message, type = 'success', url = null) {
       const container = document.getElementById('toast-container');
       if (!container) return;
       const toast = document.createElement('div');
       const bg = type === 'success' ? 'bg-slate-900' : (type === 'error' ? 'bg-rose-600' : 'bg-slate-800');
-      toast.className = `toast-anim pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl text-white text-xs font-medium shadow-lg ${bg}`;
+      toast.className = `toast-anim pointer-events-auto flex items-center justify-between gap-2.5 px-4 py-3 rounded-xl text-white text-xs font-medium shadow-lg ${bg} ${url ? 'cursor-pointer hover:bg-slate-700 transition' : ''}`;
       const textSpan = document.createElement('span');
       textSpan.textContent = message;
       toast.appendChild(textSpan);
+      if (url) {
+        const arrow = document.createElement('i');
+        arrow.className = 'fa-solid fa-chevron-right text-[10px] text-slate-400 shrink-0';
+        toast.appendChild(arrow);
+        toast.addEventListener('click', () => {
+          window.location.href = url;
+        });
+      }
       container.appendChild(toast);
       setTimeout(() => {
         toast.style.opacity = '0';
         toast.style.transition = 'opacity 0.3s';
         setTimeout(() => toast.remove(), 300);
-      }, 3200);
+      }, 4000);
     };
 
     // Automatic CSRF Token Protection for all POST forms and fetch() calls
