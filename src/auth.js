@@ -29,7 +29,7 @@ function normalizeUser(u) {
 async function findOrCreateGoogleUser(pool, { googleId, email, displayName, avatar }) {
   if (!email) throw new Error("Email not provided by Google");
   const cleanEmail = String(email).trim().toLowerCase();
-  const adminEmail = (process.env.ADMIN_EMAIL || process.env.NOTIFICATION_EMAIL || 'saleminformatiquedev@gmail.com').trim().toLowerCase();
+  const adminEmail = getAdminEmail();
   const targetRole = cleanEmail === adminEmail ? 'ADMIN' : 'USER';
 
   const existingRes = await pool.query(
@@ -59,6 +59,75 @@ async function findOrCreateGoogleUser(pool, { googleId, email, displayName, avat
   return normalizeUser(user);
 }
 
+function getAdminEmail() {
+  return (process.env.ADMIN_EMAIL || process.env.NOTIFICATION_EMAIL || 'saleminformatiquedev@gmail.com').trim().toLowerCase();
+}
+
+// Admin hardening: absolute session lifetime + "fresh login" required for sensitive money actions
+const ADMIN_MAX_SESSION_MS = 4 * 60 * 60 * 1000; // real admin sessions last 4h max
+const ADMIN_FRESH_LOGIN_MS = 30 * 60 * 1000;     // sensitive admin actions need a Google sign-in within 30 min
+
+function isRealAdmin(user) {
+  return Boolean(user && user.role === 'ADMIN' && !isDemoUser(user));
+}
+
+function wantsJson(req) {
+  return req.path.startsWith('/api/') || req.xhr || (req.headers.accept || '').includes('application/json');
+}
+
+function destroySessionAndReply(req, res, message) {
+  const done = () => {
+    res.clearCookie('trustwork.sid');
+    if (wantsJson(req)) {
+      return res.status(401).json({ success: false, error: message, reauth: true });
+    }
+    return res.redirect('/login?msg=' + encodeURIComponent(message));
+  };
+  req.logout(() => {
+    if (req.session) req.session.destroy(done);
+    else done();
+  });
+}
+
+// Global: a real admin session expires after 4h (or if it predates this protection)
+function enforceAdminSessionLimit(req, res, next) {
+  if (isRealAdmin(req.user)) {
+    const at = req.session && req.session.loginAt;
+    if (!at || Date.now() - at > ADMIN_MAX_SESSION_MS) {
+      return destroySessionAndReply(req, res, 'Admin session expired. Please sign in again with Google.');
+    }
+  }
+  next();
+}
+
+// Sensitive routes: optional admin IP allow-list + Google sign-in within the last 30 minutes
+function requireFreshAdmin(req, res, next) {
+  const u = req.user;
+  if (!isRealAdmin(u)) {
+    if (wantsJson(req)) return res.status(403).json({ success: false, error: 'Real administrator account required.' });
+    return res.status(403).send('Unauthorized: Real Administrator account required.');
+  }
+  const allowed = (process.env.ADMIN_ALLOWED_IPS || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (allowed.length > 0 && !allowed.includes(req.ip)) {
+    console.warn('[ADMIN-AUDIT] blocked admin action from non-allow-listed IP', req.ip);
+    if (wantsJson(req)) return res.status(403).json({ success: false, error: 'Admin actions are not allowed from this IP address.' });
+    return res.status(403).send('Admin actions are not allowed from this IP address.');
+  }
+  const at = req.session && req.session.loginAt;
+  if (!at || Date.now() - at > ADMIN_FRESH_LOGIN_MS) {
+    return destroySessionAndReply(req, res, 'For your security, please sign in again with Google to confirm this sensitive admin action.');
+  }
+  next();
+}
+
+// Same fresh-login rule, but only when the caller is the admin (regular users pass through)
+function requireFreshIfAdmin(req, res, next) {
+  if (req.user && req.user.role === 'ADMIN' && !isDemoUser(req.user)) {
+    return requireFreshAdmin(req, res, next);
+  }
+  next();
+}
+
 function loginWithRegeneratedSession(req, user, cb) {
   const prevCsrf = req.session ? req.session.csrfToken : null;
   req.session.regenerate((regenErr) => {
@@ -66,6 +135,7 @@ function loginWithRegeneratedSession(req, user, cb) {
     req.session.csrfToken = prevCsrf || crypto.randomBytes(32).toString('hex');
     req.login(user, (loginErr) => {
       if (loginErr) return cb(loginErr);
+      req.session.loginAt = Date.now();
       req.session.save(cb);
     });
   });
@@ -103,7 +173,7 @@ function setupAuth(app, pool) {
           clientID: process.env.GOOGLE_CLIENT_ID,
           clientSecret: process.env.GOOGLE_CLIENT_SECRET,
           callbackURL: process.env.GOOGLE_CALLBACK_URL || "/auth/google/callback",
-          state: false
+          state: true
         },
         async (accessToken, refreshToken, profile, done) => {
           try {
@@ -155,6 +225,17 @@ function setupAuth(app, pool) {
         return res.status(401).json({ success: false, error: "Unable to verify Google email." });
       }
 
+      // The admin identity must come from a genuine Google sign-in (never email/password or any other provider)
+      if (String(fbUser.email).trim().toLowerCase() === getAdminEmail()) {
+        const viaGoogle = Array.isArray(fbUser.providerUserInfo) &&
+          fbUser.providerUserInfo.some(p => p.providerId === 'google.com');
+        if (!viaGoogle) {
+          console.warn('[ADMIN-AUDIT] rejected admin-email login without Google provider from', req.ip);
+          return res.status(401).json({ success: false, error: 'The administrator account must sign in with Google.' });
+        }
+        console.log('[ADMIN-AUDIT]', JSON.stringify({ ts: new Date().toISOString(), action: 'ADMIN_LOGIN', ip: req.ip, ua: String(req.headers['user-agent'] || '').slice(0, 120) }));
+      }
+
       const user = await findOrCreateGoogleUser(pool, {
         googleId: fbUser.localId,
         email: fbUser.email,
@@ -185,6 +266,10 @@ function setupAuth(app, pool) {
     '/auth/google/callback',
     passport.authenticate('google', { failureRedirect: '/login?msg=Google+sign-in+failed' }),
     (req, res) => {
+      req.session.loginAt = Date.now();
+      if (isRealAdmin(req.user)) {
+        console.log('[ADMIN-AUDIT]', JSON.stringify({ ts: new Date().toISOString(), action: 'ADMIN_LOGIN', ip: req.ip, via: 'oauth' }));
+      }
       res.redirect('/dashboard');
     }
   );
@@ -251,4 +336,13 @@ function ensureAuthenticated(req, res, next) {
   res.redirect('/login');
 }
 
-module.exports = { setupAuth, ensureAuthenticated, normalizeUser, isDemoModeEnabled, isDemoUser };
+module.exports = {
+  setupAuth,
+  ensureAuthenticated,
+  normalizeUser,
+  isDemoModeEnabled,
+  isDemoUser,
+  enforceAdminSessionLimit,
+  requireFreshAdmin,
+  requireFreshIfAdmin
+};

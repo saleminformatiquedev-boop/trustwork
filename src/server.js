@@ -12,7 +12,10 @@ const multer = require('multer');
 const QRCode = require('qrcode');
 
 const { pool, initDatabase } = require('./db');
-const { setupAuth, ensureAuthenticated, normalizeUser, isDemoModeEnabled, isDemoUser } = require('./auth');
+const {
+  setupAuth, ensureAuthenticated, normalizeUser, isDemoModeEnabled, isDemoUser,
+  enforceAdminSessionLimit, requireFreshAdmin, requireFreshIfAdmin
+} = require('./auth');
 const escrow = require('./escrow');
 const emailService = require('./services/email');
 const binanceService = require('./services/binance');
@@ -182,6 +185,18 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(enforceAdminSessionLimit);
+
+// Structured audit trail of every sensitive admin action (visible with `pm2 logs trustwork`)
+function adminAudit(req, action, detail = {}) {
+  console.log('[ADMIN-AUDIT]', JSON.stringify({
+    ts: new Date().toISOString(),
+    adminId: req.user && req.user.id,
+    ip: req.ip,
+    action,
+    ...detail
+  }));
+}
 
 // Parse cookies helper for stateless HttpOnly CSRF seed when unauthenticated
 function parseCookie(req, name) {
@@ -259,6 +274,11 @@ io.use(async (socket, next) => {
     if (userId) {
       const uRes = await pool.query('SELECT id, name, email, avatar, role FROM users WHERE id = $1', [userId]);
       socket.user = uRes.rows[0] || null;
+      const sock = socket.user;
+      if (sock && sock.role === 'ADMIN' && !String(sock.email || '').toLowerCase().endsWith('.local')) {
+        const at = socket.request.session && socket.request.session.loginAt;
+        if (!at || Date.now() - at > 4 * 60 * 60 * 1000) socket.user = null;
+      }
     } else {
       socket.user = null;
     }
@@ -1081,7 +1101,7 @@ app.post('/orders/:id/deliver', ensureAuthenticated, async (req, res) => {
 });
 
 // Buyer (within 2 days) or Admin approves and releases funds
-app.post('/orders/:id/complete', ensureAuthenticated, async (req, res) => {
+app.post('/orders/:id/complete', ensureAuthenticated, requireFreshIfAdmin, async (req, res) => {
   try {
     const updated = await escrow.completeOrderAndReleaseFunds(pool, {
       orderId: req.params.id,
@@ -1737,7 +1757,7 @@ async function verifyRealUserSolvency(client, user) {
 }
 
 // Request withdrawal via Binance API (On-Chain TRC20/BEP20 or Binance Pay ID)
-app.post('/api/wallet/withdraw', ensureAuthenticated, async (req, res) => {
+app.post('/api/wallet/withdraw', ensureAuthenticated, requireFreshIfAdmin, async (req, res) => {
   if (isDemoUser(req.user)) {
     return res.status(403).json({ success: false, error: 'Demo accounts cannot withdraw real USDT.' });
   }
@@ -2065,7 +2085,7 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
 });
 
 // REST AJAX: Update Binance Pay ID / USDT Address & Bio
-app.post('/api/wallet/update-binance', ensureAuthenticated, async (req, res) => {
+app.post('/api/wallet/update-binance', ensureAuthenticated, requireFreshIfAdmin, async (req, res) => {
   try {
     if (isDemoUser(req.user)) {
       return res.status(403).json({ success: false, error: 'Shared demo accounts cannot modify profile or payout settings.' });
@@ -2076,6 +2096,15 @@ app.post('/api/wallet/update-binance', ensureAuthenticated, async (req, res) => 
 
     if (binanceId && !/^[a-zA-Z0-9_@.-]{4,100}$/.test(binanceId)) {
       return res.status(400).json({ success: false, error: 'Invalid USDT Address or Binance Pay ID format.' });
+    }
+
+    // The administrator payout destination is locked in the web app (a stolen session can never redirect funds)
+    if (binanceId && req.user.role === 'ADMIN' && binanceId !== req.user.binanceId) {
+      adminAudit(req, 'ADMIN_PAYOUT_CHANGE_BLOCKED', { attempted: binanceId });
+      return res.status(403).json({
+        success: false,
+        error: 'The administrator payout address is locked for security. Change it directly on the server.'
+      });
     }
 
     await pool.query(`
@@ -2163,7 +2192,7 @@ app.get('/admin/disputes', ensureAuthenticated, async (req, res) => {
   }
 });
 
-app.post('/disputes/:id/resolve', ensureAuthenticated, async (req, res) => {
+app.post('/disputes/:id/resolve', ensureAuthenticated, requireFreshAdmin, async (req, res) => {
   try {
     if (req.user.role !== 'ADMIN') {
       return res.status(403).send("Unauthorized");
@@ -2177,6 +2206,7 @@ app.post('/disputes/:id/resolve', ensureAuthenticated, async (req, res) => {
       adminUser: req.user
     });
 
+    adminAudit(req, 'DISPUTE_RESOLVED', { disputeId: req.params.id, resolution });
     res.redirect('/admin/disputes');
   } catch (err) {
     res.status(400).send("Resolution error: " + err.message);
@@ -2184,7 +2214,7 @@ app.post('/disputes/:id/resolve', ensureAuthenticated, async (req, res) => {
 });
 
 // Admin: Approve, Auto-Verify via Binance API, or Reject a Pending Deposit
-app.post('/admin/deposits/:id/decision', ensureAuthenticated, async (req, res) => {
+app.post('/admin/deposits/:id/decision', ensureAuthenticated, requireFreshAdmin, async (req, res) => {
   if (req.user.role !== 'ADMIN' || isDemoUser(req.user)) {
     return res.status(403).send("Unauthorized: Real Administrator account required.");
   }
@@ -2254,6 +2284,7 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, async (req, res) =
       type: 'deposit_decision'
     });
 
+    adminAudit(req, 'DEPOSIT_' + finalDecision, { depositId: deposit.id, userId: deposit.userId, amount: deposit.amount, txId: deposit.txId });
     res.redirect('/admin/disputes');
   } catch (err) {
     await client.query('ROLLBACK');
@@ -2265,7 +2296,7 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, async (req, res) =
 });
 
 // Admin: Send via Binance API, Mark Approved, or Reject (and refund) a Pending Withdrawal
-app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, async (req, res) => {
+app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, requireFreshAdmin, async (req, res) => {
   if (req.user.role !== 'ADMIN' || isDemoUser(req.user)) {
     return res.status(403).send("Unauthorized: Real Administrator account required.");
   }
@@ -2330,6 +2361,7 @@ app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, async (req, res
       type: 'withdrawal_decision'
     });
 
+    adminAudit(req, 'WITHDRAWAL_' + finalDecision, { withdrawalId: withdrawal.id, userId: withdrawal.userId, amount: withdrawal.amount, to: withdrawal.binanceId });
     res.redirect('/admin/disputes');
   } catch (err) {
     await client.query('ROLLBACK');
