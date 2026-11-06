@@ -12,7 +12,7 @@ const multer = require('multer');
 const QRCode = require('qrcode');
 
 const { pool, initDatabase } = require('./db');
-const { setupAuth, ensureAuthenticated, normalizeUser, isDemoModeEnabled } = require('./auth');
+const { setupAuth, ensureAuthenticated, normalizeUser, isDemoModeEnabled, isDemoUser } = require('./auth');
 const escrow = require('./escrow');
 const emailService = require('./services/email');
 
@@ -283,7 +283,8 @@ const DEFAULT_SAMPLE_FILES = new Set([
 
 async function canAccessUploadedFile(user, filename) {
   if (!user || !filename) return false;
-  if (user.role === 'ADMIN') return true;
+  if (user.role === 'ADMIN' && !isDemoUser(user)) return true;
+  if (user.role === 'ADMIN' && isDemoUser(user) && DEFAULT_SAMPLE_FILES.has(filename)) return true;
   const filePathUrl = `/uploads/${filename}`;
 
   // 1. Is user the author of a service containing this file?
@@ -408,15 +409,34 @@ function sanitizePublicService(srv) {
 // ==========================================
 async function canAccessOrder(user, orderId) {
   if (!user || !orderId) return false;
-  if (user.role === 'ADMIN') return true;
-  const res = await pool.query('SELECT "buyerId", "sellerId" FROM orders WHERE id = $1', [orderId]);
+  if (user.role === 'ADMIN' && !isDemoUser(user)) return true;
+  const res = await pool.query(`
+    SELECT o."buyerId", o."sellerId", b.email as "buyerEmail", s.email as "sellerEmail"
+    FROM orders o
+    JOIN users b ON o."buyerId" = b.id
+    JOIN users s ON o."sellerId" = s.id
+    WHERE o.id = $1
+  `, [orderId]);
   if (res.rows.length === 0) return false;
-  return res.rows[0].buyerId === user.id || res.rows[0].sellerId === user.id;
+  const row = res.rows[0];
+  if (user.role === 'ADMIN' && isDemoUser(user)) {
+    return isDemoUser(row.buyerEmail) && isDemoUser(row.sellerEmail);
+  }
+  return row.buyerId === user.id || row.sellerId === user.id;
 }
 
 async function canAccessConversation(user, conversationId) {
   if (!user || !conversationId) return false;
-  if (user.role === 'ADMIN') return true;
+  if (user.role === 'ADMIN' && !isDemoUser(user)) return true;
+  if (user.role === 'ADMIN' && isDemoUser(user)) {
+    const nonDemoCheck = await pool.query(`
+      SELECT 1 FROM conversation_participants cp
+      JOIN users u ON cp."userId" = u.id
+      WHERE cp."conversationId" = $1 AND u.email NOT LIKE '%.local'
+      LIMIT 1
+    `, [conversationId]);
+    return nonDemoCheck.rows.length === 0;
+  }
   const res = await pool.query(
     'SELECT 1 FROM conversation_participants WHERE "conversationId" = $1 AND "userId" = $2 LIMIT 1',
     [conversationId, user.id]
@@ -893,11 +913,6 @@ app.post('/orders/create', ensureAuthenticated, async (req, res) => {
   try {
     const { serviceId, requirements } = req.body;
 
-    // Prevent demo accounts from purchasing real users' methods if demo mode is off
-    if (req.user.email && req.user.email.endsWith('.local') && !isDemoModeEnabled()) {
-      throw new Error("Demo accounts cannot execute transactions in production.");
-    }
-
     const order = await escrow.createOrderWithEscrow(pool, {
       buyerId: req.user.id,
       serviceId,
@@ -916,14 +931,14 @@ app.post('/orders/create', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// Order detail & tracking (strictly restricted to Buyer, Seller, or Admin)
+// Order detail & tracking (strictly restricted to Buyer, Seller, or matching-sandbox Admin)
 app.get('/orders/:id', ensureAuthenticated, async (req, res) => {
   try {
     const ordRes = await pool.query(`
       SELECT o.*, 
              s.title as "serviceTitle",
-             b.name as "buyerName",
-             sl.name as "sellerName"
+             b.name as "buyerName", b.email as "buyerEmail",
+             sl.name as "sellerName", sl.email as "sellerEmail"
       FROM orders o
       JOIN services s ON o."serviceId" = s.id
       JOIN users b ON o."buyerId" = b.id
@@ -934,9 +949,16 @@ app.get('/orders/:id', ensureAuthenticated, async (req, res) => {
     if (ordRes.rows.length === 0) return res.status(404).send("Order not found");
     const order = formatRows(ordRes.rows)[0];
 
-    if (req.user.role !== 'ADMIN' && req.user.id !== order.buyerId && req.user.id !== order.sellerId) {
-      return res.status(403).send("Access denied to this order");
+    const isParticipant = req.user.id === order.buyerId || req.user.id === order.sellerId;
+    const isAuthorizedAdmin = req.user.role === 'ADMIN' && (
+      !isDemoUser(req.user) || (isDemoUser(order.buyerEmail) && isDemoUser(order.sellerEmail))
+    );
+
+    if (!isParticipant && !isAuthorizedAdmin) {
+      return res.status(403).send("Access denied to this order (Sandbox isolation)");
     }
+    delete order.buyerEmail;
+    delete order.sellerEmail;
 
     const dispRes = await pool.query('SELECT * FROM disputes WHERE "orderId" = $1', [order.id]);
     const dispute = dispRes.rows[0] ? formatRows(dispRes.rows)[0] : null;
@@ -1068,36 +1090,45 @@ app.get('/messages', ensureAuthenticated, (req, res) => {
   res.redirect('/chat');
 });
 
-// Main Chat Page (never leaks private user emails)
+// Main Chat Page (strictly isolates Demo test accounts from Real accounts)
 app.get('/chat', ensureAuthenticated, async (req, res) => {
   try {
     const currentUserId = req.user.id;
+    const currentIsDemo = isDemoUser(req.user);
     let targetUserId = req.query.recipientId || null;
     let serviceId = req.query.serviceId || null;
     let requestedConvId = req.query.conversationId || null;
 
     if (req.query.support === '1' || req.query.support === 'true') {
-      const adminRes = await pool.query("SELECT id, name FROM users WHERE role = 'ADMIN' LIMIT 1");
+      const adminRes = await pool.query(
+        currentIsDemo
+          ? "SELECT id, name FROM users WHERE role = 'ADMIN' AND email LIKE '%.local' LIMIT 1"
+          : "SELECT id, name FROM users WHERE role = 'ADMIN' AND email NOT LIKE '%.local' LIMIT 1"
+      );
       if (adminRes.rows.length > 0 && req.user.role !== 'ADMIN') {
         targetUserId = adminRes.rows[0].id;
       }
     }
 
     if (targetUserId && targetUserId !== currentUserId) {
-      const existRes = await pool.query(`
-        SELECT c.id 
-        FROM conversations c
-        JOIN conversation_participants p1 ON c.id = p1."conversationId" AND p1."userId" = $1
-        JOIN conversation_participants p2 ON c.id = p2."conversationId" AND p2."userId" = $2
-        LIMIT 1
-      `, [currentUserId, targetUserId]);
+      const recipientUserRes = await pool.query('SELECT id, role, name, email FROM users WHERE id = $1', [targetUserId]);
+      if (recipientUserRes.rows.length > 0) {
+        const recipientUser = recipientUserRes.rows[0];
+        if (isDemoUser(recipientUser) !== currentIsDemo) {
+          return res.status(403).send("Sandbox isolation: Demo test accounts can only message other demo test accounts.");
+        }
 
-      if (existRes.rows.length > 0) {
-        return res.redirect(`/chat?conversationId=${existRes.rows[0].id}`);
-      } else {
-        const recipientUserRes = await pool.query('SELECT role, name FROM users WHERE id = $1', [targetUserId]);
-        if (recipientUserRes.rows.length > 0) {
-          const recipientUser = recipientUserRes.rows[0];
+        const existRes = await pool.query(`
+          SELECT c.id 
+          FROM conversations c
+          JOIN conversation_participants p1 ON c.id = p1."conversationId" AND p1."userId" = $1
+          JOIN conversation_participants p2 ON c.id = p2."conversationId" AND p2."userId" = $2
+          LIMIT 1
+        `, [currentUserId, targetUserId]);
+
+        if (existRes.rows.length > 0) {
+          return res.redirect(`/chat?conversationId=${existRes.rows[0].id}`);
+        } else {
           const convType = recipientUser.role === 'ADMIN' || req.user.role === 'ADMIN' ? 'SUPPORT' : 'DIRECT';
 
           let subject = req.query.subject ? String(req.query.subject).slice(0, 200) : null;
@@ -1143,8 +1174,9 @@ app.get('/chat', ensureAuthenticated, async (req, res) => {
       JOIN conversation_participants other_p ON c.id = other_p."conversationId" AND other_p."userId" != $1
       JOIN users u ON other_p."userId" = u.id
       LEFT JOIN services s ON c."serviceId" = s.id
+      WHERE (u.email LIKE '%.local') = $2
       ORDER BY c."lastMessageAt" DESC
-    `, [currentUserId]);
+    `, [currentUserId, currentIsDemo]);
 
     const conversations = formatRows(convsRes.rows);
 
@@ -1161,15 +1193,21 @@ app.get('/chat', ensureAuthenticated, async (req, res) => {
                ) as "participantsSummary"
         FROM conversations c
         LEFT JOIN services s ON c."serviceId" = s.id
+        WHERE NOT EXISTS (
+          SELECT 1 FROM conversation_participants cp2
+          JOIN users u2 ON cp2."userId" = u2.id
+          WHERE cp2."conversationId" = c.id
+            AND (u2.email LIKE '%.local') != $1
+        )
         ORDER BY c."lastMessageAt" DESC
-      `);
+      `, [currentIsDemo]);
       platformConversations = formatRows(allConvsRes.rows);
     }
 
     let activeConversation = null;
     if (requestedConvId) {
       activeConversation = conversations.find(c => c.id === requestedConvId);
-      if (!activeConversation && req.user.role === 'ADMIN') {
+      if (!activeConversation && req.user.role === 'ADMIN' && (await canAccessConversation(req.user, requestedConvId))) {
         const adminConvRes = await pool.query(`
           SELECT c.*, s.title as "serviceTitle", s.price as "servicePrice", s.id as "serviceId"
           FROM conversations c
@@ -1236,8 +1274,9 @@ app.get('/chat', ensureAuthenticated, async (req, res) => {
              (SELECT count(*) FROM services s WHERE s."sellerId" = u.id) as "servicesCount"
       FROM users u
       WHERE u.id != $1
+        AND (u.email LIKE '%.local') = $2
       ORDER BY (u.role = 'ADMIN') DESC, (u.role = 'USER') DESC, u.name ASC
-    `, [currentUserId]);
+    `, [currentUserId, currentIsDemo]);
 
     res.render('chat', {
       conversations,
@@ -1395,6 +1434,14 @@ app.post('/api/chat/start', ensureAuthenticated, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid recipient' });
     }
 
+    const recipientRes = await pool.query('SELECT role, email FROM users WHERE id = $1', [recipientId]);
+    if (recipientRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Recipient not found' });
+    }
+    if (isDemoUser(recipientRes.rows[0]) !== isDemoUser(req.user)) {
+      return res.status(403).json({ success: false, error: 'Sandbox isolation: Demo accounts can only chat with other demo accounts.' });
+    }
+
     const existRes = await pool.query(`
       SELECT c.id 
       FROM conversations c
@@ -1407,10 +1454,6 @@ app.post('/api/chat/start', ensureAuthenticated, async (req, res) => {
     if (existRes.rows.length > 0) {
       convId = existRes.rows[0].id;
     } else {
-      const recipientRes = await pool.query('SELECT role FROM users WHERE id = $1', [recipientId]);
-      if (recipientRes.rows.length === 0) {
-        return res.status(404).json({ success: false, error: 'Recipient not found' });
-      }
       const convType = recipientRes.rows[0].role === 'ADMIN' || req.user.role === 'ADMIN' ? 'SUPPORT' : 'DIRECT';
 
       convId = 'conv_' + crypto.randomBytes(8).toString('hex');
@@ -1591,13 +1634,16 @@ app.get('/history', ensureAuthenticated, async (req, res) => {
 
     let adminDisputes = [];
     if (user.role === 'ADMIN') {
+      const adminIsDemo = isDemoUser(user);
       const dispRes = await pool.query(`
         SELECT d.*, o.amount, o."serviceId", s.title as "serviceTitle"
         FROM disputes d
         JOIN orders o ON d."orderId" = o.id
         JOIN services s ON o."serviceId" = s.id
+        JOIN users b ON o."buyerId" = b.id
+        WHERE (NOT $1) OR (b.email LIKE '%.local')
         ORDER BY d."createdAt" DESC
-      `);
+      `, [adminIsDemo]);
       adminDisputes = formatRows(dispRes.rows);
     }
 
@@ -1758,6 +1804,8 @@ app.get('/admin/disputes', ensureAuthenticated, async (req, res) => {
       return res.status(403).send("Access restricted to administrators.");
     }
 
+    const adminIsDemo = isDemoUser(req.user);
+
     const dispRes = await pool.query(`
       SELECT d.*, o.amount, o."serviceId", o."buyerId", o."sellerId", s.title as "serviceTitle",
              b.name as "buyerName", sl.name as "sellerName"
@@ -1766,24 +1814,27 @@ app.get('/admin/disputes', ensureAuthenticated, async (req, res) => {
       JOIN services s ON o."serviceId" = s.id
       JOIN users b ON o."buyerId" = b.id
       JOIN users sl ON o."sellerId" = sl.id
+      WHERE (NOT $1) OR (b.email LIKE '%.local' AND sl.email LIKE '%.local')
       ORDER BY d."createdAt" DESC
-    `);
+    `, [adminIsDemo]);
 
     const depRes = await pool.query(`
       SELECT d.*, u.name as "userName", u.email as "userEmail"
       FROM deposits d
       JOIN users u ON d."userId" = u.id
+      WHERE (NOT $1) OR (u.email LIKE '%.local')
       ORDER BY (d.status = 'PENDING') DESC, d."createdAt" DESC
       LIMIT 50
-    `);
+    `, [adminIsDemo]);
 
     const withRes = await pool.query(`
       SELECT w.*, u.name as "userName", u.email as "userEmail"
       FROM withdrawals w
       JOIN users u ON w."userId" = u.id
+      WHERE (NOT $1) OR (u.email LIKE '%.local')
       ORDER BY (w.status = 'PENDING') DESC, w."createdAt" DESC
       LIMIT 50
-    `);
+    `, [adminIsDemo]);
 
     res.render('disputes', {
       disputes: formatRows(dispRes.rows),
@@ -1806,7 +1857,8 @@ app.post('/disputes/:id/resolve', ensureAuthenticated, async (req, res) => {
     await escrow.resolveDispute(pool, {
       disputeId: req.params.id,
       resolution,
-      resolutionNote: String(resolutionNote || '').slice(0, 1000)
+      resolutionNote: String(resolutionNote || '').slice(0, 1000),
+      adminUser: req.user
     });
 
     res.redirect('/admin/disputes');
@@ -1831,9 +1883,15 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, async (req, res) =
       return res.redirect('/admin/disputes');
     }
 
+    const uRes = await client.query('SELECT id, email FROM users WHERE id = $1 FOR UPDATE', [deposit.userId]);
+    const targetUser = uRes.rows[0];
+    if (isDemoUser(req.user) && !isDemoUser(targetUser)) {
+      await client.query('ROLLBACK');
+      return res.status(403).send("Sandbox isolation: Demo Admin cannot approve or reject real users' deposits.");
+    }
+
     if (action === 'APPROVE') {
       const amount = Math.round(parseFloat(deposit.amount) * 100) / 100;
-      await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [deposit.userId]);
       await client.query('UPDATE users SET "walletBalance" = "walletBalance" + $1 WHERE id = $2', [amount, deposit.userId]);
       await client.query("UPDATE deposits SET status = 'COMPLETED' WHERE id = $1", [deposit.id]);
     } else if (action === 'REJECT') {
@@ -1867,11 +1925,17 @@ app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, async (req, res
       return res.redirect('/admin/disputes');
     }
 
+    const uRes = await client.query('SELECT id, email FROM users WHERE id = $1 FOR UPDATE', [withdrawal.userId]);
+    const targetUser = uRes.rows[0];
+    if (isDemoUser(req.user) && !isDemoUser(targetUser)) {
+      await client.query('ROLLBACK');
+      return res.status(403).send("Sandbox isolation: Demo Admin cannot process real users' withdrawals.");
+    }
+
     if (action === 'APPROVE') {
       await client.query("UPDATE withdrawals SET status = 'COMPLETED', \"processedAt\" = CURRENT_TIMESTAMP WHERE id = $1", [withdrawal.id]);
     } else if (action === 'REJECT') {
       const amount = Math.round(parseFloat(withdrawal.amount) * 100) / 100;
-      await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [withdrawal.userId]);
       await client.query('UPDATE users SET "walletBalance" = "walletBalance" + $1 WHERE id = $2', [amount, withdrawal.userId]);
       await client.query("UPDATE withdrawals SET status = 'REJECTED', \"processedAt\" = CURRENT_TIMESTAMP WHERE id = $1", [withdrawal.id]);
     }

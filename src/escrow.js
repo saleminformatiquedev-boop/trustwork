@@ -31,6 +31,13 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
 
     const sellerRes = await client.query('SELECT * FROM users WHERE id = $1', [srv.sellerId]);
     sellerUser = sellerRes.rows[0];
+    if (!sellerUser) throw new Error("Seller not found");
+
+    const buyerIsDemo = String(buyerUser.email || '').toLowerCase().endsWith('.local');
+    const sellerIsDemo = String(sellerUser.email || '').toLowerCase().endsWith('.local');
+    if (buyerIsDemo !== sellerIsDemo) {
+      throw new Error("Sandbox isolation: Demo test accounts can only transact with other demo test accounts.");
+    }
 
     const price = Math.round(parseFloat(srv.price) * 100) / 100;
     const balance = Math.round(parseFloat(buyerUser.walletBalance) * 100) / 100;
@@ -349,7 +356,7 @@ async function openDispute(pool, { orderId, userId, reason, details }) {
 /**
  * Arbitrate dispute (Refund buyer or Pay seller)
  */
-async function resolveDispute(pool, { disputeId, resolution, resolutionNote }) {
+async function resolveDispute(pool, { disputeId, resolution, resolutionNote, adminUser }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -364,6 +371,16 @@ async function resolveDispute(pool, { disputeId, resolution, resolutionNote }) {
     if (!order) throw new Error("Associated order not found");
     if (order.status === 'COMPLETED' || order.status === 'REFUNDED') {
       throw new Error("Order has already been finalized");
+    }
+
+    if (adminUser && String(adminUser.email || '').toLowerCase().endsWith('.local')) {
+      const bRes = await client.query('SELECT email FROM users WHERE id = $1', [order.buyerId]);
+      const sRes = await client.query('SELECT email FROM users WHERE id = $1', [order.sellerId]);
+      const buyerIsDemo = bRes.rows[0] && String(bRes.rows[0].email || '').toLowerCase().endsWith('.local');
+      const sellerIsDemo = sRes.rows[0] && String(sRes.rows[0].email || '').toLowerCase().endsWith('.local');
+      if (!buyerIsDemo || !sellerIsDemo) {
+        throw new Error("Sandbox isolation: Demo Admin can only arbitrate disputes between demo test accounts.");
+      }
     }
 
     const amount = Math.round(parseFloat(order.amount) * 100) / 100;

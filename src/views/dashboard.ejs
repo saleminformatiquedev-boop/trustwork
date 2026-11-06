@@ -19,9 +19,10 @@
 
     <% if (typeof demoModeEnabled !== 'undefined' && demoModeEnabled) { %>
       <div class="flex items-center gap-1.5 text-xs">
-        <span class="text-slate-400 mr-1 hidden sm:inline">Demo role:</span>
+        <span class="text-slate-400 mr-1 hidden sm:inline">Demo sandbox:</span>
         <a href="/auth/demo-login/buyer" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition">Buyer</a>
         <a href="/auth/demo-login/seller" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition">Seller</a>
+        <a href="/auth/demo-login/admin" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition">Admin</a>
       </div>
     <% } %>
   </div>

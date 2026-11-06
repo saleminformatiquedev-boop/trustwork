@@ -8,7 +8,13 @@ function generateId(prefix = 'usr_') {
 }
 
 function isDemoModeEnabled() {
-  return process.env.ENABLE_DEMO_MODE === 'true';
+  return process.env.ENABLE_DEMO_MODE !== 'false';
+}
+
+function isDemoUser(userOrEmail) {
+  if (!userOrEmail) return false;
+  const email = typeof userOrEmail === 'string' ? userOrEmail : (userOrEmail.email || '');
+  return String(email).toLowerCase().endsWith('.local');
 }
 
 function normalizeUser(u) {
@@ -238,4 +244,4 @@ function ensureAuthenticated(req, res, next) {
   res.redirect('/login');
 }
 
-module.exports = { setupAuth, ensureAuthenticated, normalizeUser, isDemoModeEnabled };
+module.exports = { setupAuth, ensureAuthenticated, normalizeUser, isDemoModeEnabled, isDemoUser };
