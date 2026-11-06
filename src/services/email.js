@@ -11,7 +11,7 @@ const SMTP_SECURE = process.env.SMTP_SECURE !== undefined
   : (SMTP_PORT === 465);
 
 const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || process.env.SMTP_USER || '';
-const BASE_URL = process.env.BASE_URL || 'https://51.20.182.245.sslip.io';
+const BASE_URL = process.env.BASE_URL || 'https://trustwork.duckdns.org';
 
 let transporter = null;
 
