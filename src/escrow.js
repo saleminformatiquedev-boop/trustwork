@@ -2,6 +2,8 @@
 const crypto = require('crypto');
 const emailService = require('./services/email');
 
+const PLATFORM_FEE_RATE = 0.15; // 15% Admin commission on all transactions
+
 function generateId(prefix = 'ord_') {
   return prefix + crypto.randomBytes(6).toString('hex');
 }
@@ -66,10 +68,12 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
     const deliveredAt = isInstantDelivery ? new Date() : null;
 
     const attachmentsJson = srv.attachments ? JSON.stringify(srv.attachments) : '[]';
+    const platformFee = Math.round(price * PLATFORM_FEE_RATE * 100) / 100;
+    const sellerNetAmount = Math.round((price - platformFee) * 100) / 100;
 
     const orderRes = await client.query(`
-      INSERT INTO orders (id, "serviceId", "buyerId", "sellerId", amount, status, requirements, "fileUrl", "fileName", "deliveryNote", "deliveredAt", "formats", "videoUrl", "attachments")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)
+      INSERT INTO orders (id, "serviceId", "buyerId", "sellerId", amount, "platformFee", "sellerNetAmount", status, requirements, "fileUrl", "fileName", "deliveryNote", "deliveredAt", "formats", "videoUrl", "attachments")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb)
       RETURNING *
     `, [
       orderId,
@@ -77,6 +81,8 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
       buyerUser.id,
       srv.sellerId,
       price,
+      platformFee,
+      sellerNetAmount,
       initialStatus,
       requirements || "Method pack purchase",
       srv.fileUrl || null,
@@ -214,38 +220,63 @@ async function completeOrderAndReleaseFunds(pool, { orderId, buyerId }) {
       throw new Error("Invalid order amount");
     }
 
-    // Lock buyer and seller in deterministic order to prevent deadlocks
-    const [firstId, secondId] = [order.buyerId, order.sellerId].sort();
-    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [firstId]);
-    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [secondId]);
+    const platformFee = Math.round(amount * PLATFORM_FEE_RATE * 100) / 100;
+    const sellerNetAmount = Math.round((amount - platformFee) * 100) / 100;
+
+    // Determine matching Admin wallet (Demo Admin for demo transactions, Real Admin for real transactions)
+    const bEmailRes = await client.query('SELECT email FROM users WHERE id = $1', [order.buyerId]);
+    const isDemoTx = bEmailRes.rows[0] && String(bEmailRes.rows[0].email || '').toLowerCase().endsWith('.local');
+    const adminRes = await client.query(
+      isDemoTx
+        ? "SELECT id FROM users WHERE role = 'ADMIN' AND email LIKE '%.local' ORDER BY \"createdAt\" ASC LIMIT 1"
+        : "SELECT id FROM users WHERE role = 'ADMIN' AND email NOT LIKE '%.local' ORDER BY \"createdAt\" ASC LIMIT 1"
+    );
+    const adminId = adminRes.rows[0] ? adminRes.rows[0].id : null;
+
+    // Lock all involved user accounts in deterministic order to prevent deadlocks
+    const lockIds = Array.from(new Set([order.buyerId, order.sellerId, ...(adminId ? [adminId] : [])])).sort();
+    for (const uid of lockIds) {
+      await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [uid]);
+    }
 
     const bCheck = await client.query('SELECT "escrowBalance" FROM users WHERE id = $1', [order.buyerId]);
     if (!bCheck.rows[0] || parseFloat(bCheck.rows[0].escrowBalance) < amount) {
       throw new Error("Insufficient escrow balance to complete this transaction");
     }
 
-    // 1. Deduct from buyer escrow
+    // 1. Deduct 100% from buyer escrow
     await client.query(`
       UPDATE users 
       SET "escrowBalance" = "escrowBalance" - $1 
       WHERE id = $2
     `, [amount, order.buyerId]);
 
-    // 2. Credit author wallet
+    // 2. Credit 85% net payout to author wallet
     await client.query(`
       UPDATE users 
       SET "walletBalance" = "walletBalance" + $1 
       WHERE id = $2
-    `, [amount, order.sellerId]);
+    `, [sellerNetAmount, order.sellerId]);
 
-    // 3. Mark COMPLETED
+    // 3. Credit 15% platform commission to Admin wallet
+    if (adminId && platformFee > 0) {
+      await client.query(`
+        UPDATE users 
+        SET "walletBalance" = "walletBalance" + $1 
+        WHERE id = $2
+      `, [platformFee, adminId]);
+    }
+
+    // 4. Mark COMPLETED with exact fee breakdown
     const updatedRes = await client.query(`
       UPDATE orders 
       SET status = 'COMPLETED', 
+          "platformFee" = $1,
+          "sellerNetAmount" = $2,
           "completedAt" = CURRENT_TIMESTAMP 
-      WHERE id = $1
+      WHERE id = $3
       RETURNING *
-    `, [orderId]);
+    `, [platformFee, sellerNetAmount, orderId]);
     updatedOrder = updatedRes.rows[0];
 
     const msgId = generateId('msg_');
@@ -256,7 +287,7 @@ async function completeOrderAndReleaseFunds(pool, { orderId, buyerId }) {
       msgId,
       orderId,
       buyerId,
-      `✅ Order approved by buyer! The escrow funds (${amount.toFixed(2)} USDT) have been successfully transferred to the author.`
+      `✅ Order approved by buyer! ${sellerNetAmount.toFixed(2)} USDT (85% net payout) has been transferred to the author, and ${platformFee.toFixed(2)} USDT (15% platform commission) has been credited to Admin.`
     ]);
 
     const bRes = await client.query('SELECT * FROM users WHERE id = $1', [order.buyerId]);
@@ -431,20 +462,49 @@ async function resolveDispute(pool, { disputeId, resolution, resolutionNote, adm
         `⚖️ ARBITRATION COMPLETED: Investigation resolved in favor of the buyer.\nDecision: ${resolutionNote}\nThe full amount of ${amount.toFixed(2)} USDT has been refunded to the buyer's wallet.`
       ]);
     } else if (resolution === "PAY_SELLER") {
-      // 2. Pay author
+      const platformFee = Math.round(amount * PLATFORM_FEE_RATE * 100) / 100;
+      const sellerNetAmount = Math.round((amount - platformFee) * 100) / 100;
+
+      const bEmailRes = await client.query('SELECT email FROM users WHERE id = $1', [order.buyerId]);
+      const isDemoTx = bEmailRes.rows[0] && String(bEmailRes.rows[0].email || '').toLowerCase().endsWith('.local');
+      const adminRes = await client.query(
+        isDemoTx
+          ? "SELECT id FROM users WHERE role = 'ADMIN' AND email LIKE '%.local' ORDER BY \"createdAt\" ASC LIMIT 1"
+          : "SELECT id FROM users WHERE role = 'ADMIN' AND email NOT LIKE '%.local' ORDER BY \"createdAt\" ASC LIMIT 1"
+      );
+      const targetAdminId = adminRes.rows[0] ? adminRes.rows[0].id : null;
+
+      // 1. Deduct 100% from buyer escrow
       await client.query(`
         UPDATE users 
         SET "escrowBalance" = "escrowBalance" - $1 
         WHERE id = $2
       `, [amount, order.buyerId]);
 
+      // 2. Pay 85% net to author
       await client.query(`
         UPDATE users 
         SET "walletBalance" = "walletBalance" + $1 
         WHERE id = $2
-      `, [amount, order.sellerId]);
+      `, [sellerNetAmount, order.sellerId]);
 
-      await client.query("UPDATE orders SET status = 'COMPLETED', \"completedAt\" = CURRENT_TIMESTAMP WHERE id = $1", [order.id]);
+      // 3. Pay 15% commission to Admin
+      if (targetAdminId && platformFee > 0) {
+        await client.query(`
+          UPDATE users 
+          SET "walletBalance" = "walletBalance" + $1 
+          WHERE id = $2
+        `, [platformFee, targetAdminId]);
+      }
+
+      await client.query(`
+        UPDATE orders 
+        SET status = 'COMPLETED', 
+            "platformFee" = $1,
+            "sellerNetAmount" = $2,
+            "completedAt" = CURRENT_TIMESTAMP 
+        WHERE id = $3
+      `, [platformFee, sellerNetAmount, order.id]);
 
       await client.query(`
         UPDATE disputes 
@@ -462,7 +522,7 @@ async function resolveDispute(pool, { disputeId, resolution, resolutionNote, adm
         msgId,
         order.id,
         order.sellerId,
-        `⚖️ ARBITRATION COMPLETED: Investigation resolved in favor of the author.\nDecision: ${resolutionNote}\nThe funds (${amount.toFixed(2)} USDT) have been released to the author.`
+        `⚖️ ARBITRATION COMPLETED: Investigation resolved in favor of the author.\nDecision: ${resolutionNote}\n${sellerNetAmount.toFixed(2)} USDT (85% net) has been released to the author, and ${platformFee.toFixed(2)} USDT (15% platform fee) has been credited to Admin.`
       ]);
     }
 

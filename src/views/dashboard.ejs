@@ -49,18 +49,30 @@
       </div>
     </div>
 
-    <!-- In Escrow -->
-    <div class="bg-white p-6 rounded-2xl border border-slate-200/90 flex flex-col justify-between">
-      <div>
-        <span class="text-xs text-slate-400 font-medium">In Escrow (Active Orders)</span>
-        <div class="text-3xl font-extrabold text-slate-900 mt-1">
-          <span id="dash-escrow-balance"><%= user.escrowBalance.toFixed(2) %></span> <span class="text-sm font-semibold text-slate-400">USDT</span>
-        </div>
+      <!-- In Escrow / Admin Commission -->
+      <div class="bg-white p-6 rounded-2xl border border-slate-200/90 flex flex-col justify-between">
+        <% if (user.role === 'ADMIN') { %>
+          <div>
+            <span class="text-xs text-emerald-700 font-semibold">Admin Commission Earned (15%)</span>
+            <div class="text-3xl font-extrabold text-emerald-600 mt-1">
+              <span><%= (typeof totalAdminCommission !== 'undefined' ? totalAdminCommission : 0).toFixed(2) %></span> <span class="text-sm font-semibold text-slate-400">USDT</span>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 mt-4 flex items-center gap-1.5">
+            <i class="fa-solid fa-percent text-emerald-600"></i> 15% automatically collected on every completed order
+          </p>
+        <% } else { %>
+          <div>
+            <span class="text-xs text-slate-400 font-medium">In Escrow (Active Orders)</span>
+            <div class="text-3xl font-extrabold text-slate-900 mt-1">
+              <span id="dash-escrow-balance"><%= user.escrowBalance.toFixed(2) %></span> <span class="text-sm font-semibold text-slate-400">USDT</span>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 mt-4 flex items-center gap-1.5">
+            <i class="fa-solid fa-lock text-emerald-600"></i> Released upon buyer approval (85% net to author, 15% fee)
+          </p>
+        <% } %>
       </div>
-      <p class="text-xs text-slate-400 mt-4 flex items-center gap-1.5">
-        <i class="fa-solid fa-lock text-emerald-600"></i> Released upon buyer approval
-      </p>
-    </div>
 
     <!-- Binance Pay ID -->
     <div class="bg-white p-6 rounded-2xl border border-slate-200/90 flex flex-col justify-between">
@@ -127,9 +139,12 @@
               <h4 class="text-sm font-bold text-slate-900 truncate"><%= ord.serviceTitle %></h4>
             </div>
             <div class="flex items-center gap-4 flex-shrink-0">
-              <span class="text-xs font-bold text-emerald-600">+<%= ord.amount.toFixed(2) %> USDT</span>
+              <div class="text-right">
+                <span class="text-xs font-bold text-emerald-600 block">+<%= (ord.sellerNetAmount || (ord.amount * 0.85)).toFixed(2) %> USDT net</span>
+                <span class="text-[10px] text-slate-400">Gross: <%= ord.amount.toFixed(2) %> (15% fee)</span>
+              </div>
               <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : (ord.status === 'DISPUTED' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700') %>">
-                <%= ord.status === 'COMPLETED' ? 'Paid' : (ord.status === 'DELIVERED' ? 'Delivered' : (ord.status === 'DISPUTED' ? 'Disputed' : 'In Escrow')) %>
+                <%= ord.status === 'COMPLETED' ? 'Paid (85%)' : (ord.status === 'DELIVERED' ? 'Delivered' : (ord.status === 'DISPUTED' ? 'Disputed' : 'In Escrow')) %>
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-300"></i>
             </div>

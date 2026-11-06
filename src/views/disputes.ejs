@@ -5,8 +5,31 @@
   <div>
     <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900">Admin Financial & Arbitration Center</h1>
     <p class="text-xs sm:text-sm text-slate-500 mt-1">
-      Verify Binance Pay deposits, process USDT withdrawals, and arbitrate escrow disputes.
+      15% platform commission on all completed transactions, Binance Pay verification, and escrow arbitration.
     </p>
+  </div>
+
+  <!-- Admin 15% Commission Overview -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="bg-slate-900 text-white p-5 rounded-2xl">
+      <span class="text-xs text-slate-400">Admin Commission Rate</span>
+      <div class="text-2xl font-extrabold mt-1 text-emerald-400">15%</div>
+      <span class="text-[11px] text-slate-400">Automatic split (85% Seller / 15% Admin)</span>
+    </div>
+    <div class="bg-white p-5 rounded-2xl border border-slate-200/90">
+      <span class="text-xs text-slate-400">Total Admin Commission Earned (15%)</span>
+      <div class="text-2xl font-extrabold text-emerald-600 mt-1">
+        +<%= (typeof totalCommissionEarned !== 'undefined' ? totalCommissionEarned : 0).toFixed(2) %> <span class="text-xs font-semibold text-slate-400">USDT</span>
+      </div>
+      <span class="text-[11px] text-slate-400">Credited directly to Admin wallet</span>
+    </div>
+    <div class="bg-white p-5 rounded-2xl border border-slate-200/90">
+      <span class="text-xs text-slate-400">Completed Sales Volume</span>
+      <div class="text-2xl font-extrabold text-slate-900 mt-1">
+        <%= (typeof totalCompletedVolume !== 'undefined' ? totalCompletedVolume : 0).toFixed(2) %> <span class="text-xs font-semibold text-slate-400">USDT</span>
+      </div>
+      <span class="text-[11px] text-slate-400"><%= typeof commissionOrders !== 'undefined' ? commissionOrders.length : 0 %> completed order(s)</span>
+    </div>
   </div>
 
   <!-- 1. Pending Binance Pay Deposits -->

@@ -377,13 +377,25 @@ app.get('/uploads/:filename', ensureAuthenticated, async (req, res) => {
 
 // Helper for row formatting
 function formatRows(rows) {
-  return rows.map(r => ({
-    ...r,
-    price: r.price !== undefined ? parseFloat(r.price) : undefined,
-    amount: r.amount !== undefined ? parseFloat(r.amount) : undefined,
-    walletBalance: r.walletBalance !== undefined ? parseFloat(r.walletBalance) : undefined,
-    escrowBalance: r.escrowBalance !== undefined ? parseFloat(r.escrowBalance) : undefined
-  }));
+  return rows.map(r => {
+    const amt = r.amount !== undefined ? parseFloat(r.amount) : undefined;
+    const fee = r.platformFee !== undefined && parseFloat(r.platformFee) > 0
+      ? parseFloat(r.platformFee)
+      : (amt !== undefined ? Math.round(amt * 0.15 * 100) / 100 : undefined);
+    const net = r.sellerNetAmount !== undefined && parseFloat(r.sellerNetAmount) > 0
+      ? parseFloat(r.sellerNetAmount)
+      : (amt !== undefined && fee !== undefined ? Math.round((amt - fee) * 100) / 100 : undefined);
+
+    return {
+      ...r,
+      price: r.price !== undefined ? parseFloat(r.price) : undefined,
+      amount: amt,
+      platformFee: fee,
+      sellerNetAmount: net,
+      walletBalance: r.walletBalance !== undefined ? parseFloat(r.walletBalance) : undefined,
+      escrowBalance: r.escrowBalance !== undefined ? parseFloat(r.escrowBalance) : undefined
+    };
+  });
 }
 
 /**
@@ -1530,12 +1542,32 @@ app.get('/dashboard', ensureAuthenticated, async (req, res) => {
       SELECT * FROM deposits WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 20
     `, [user.id]);
 
+    let adminCommissionOrders = [];
+    let totalAdminCommission = 0;
+    if (user.role === 'ADMIN') {
+      const adminIsDemo = isDemoUser(user);
+      const commRes = await pool.query(`
+        SELECT o.*, s.title as "serviceTitle", b.name as "buyerName", sl.name as "sellerName"
+        FROM orders o
+        JOIN services s ON o."serviceId" = s.id
+        JOIN users b ON o."buyerId" = b.id
+        JOIN users sl ON o."sellerId" = sl.id
+        WHERE o.status = 'COMPLETED'
+          AND ((NOT $1 AND b.email NOT LIKE '%.local') OR ($1 AND b.email LIKE '%.local'))
+        ORDER BY o."completedAt" DESC NULLS LAST, o."createdAt" DESC
+      `, [adminIsDemo]);
+      adminCommissionOrders = formatRows(commRes.rows);
+      totalAdminCommission = adminCommissionOrders.reduce((acc, o) => acc + (o.platformFee || 0), 0);
+    }
+
     res.render('dashboard', {
       user,
       buyerOrders: formatRows(buyerRes.rows),
       sellerOrders: formatRows(sellerRes.rows),
       withdrawals: formatRows(withRes.rows),
       deposits: formatRows(depRes.rows),
+      adminCommissionOrders,
+      totalAdminCommission,
       platformBinancePayId: PLATFORM_BINANCE_PAY_ID
     });
   } catch (err) {
@@ -1836,10 +1868,29 @@ app.get('/admin/disputes', ensureAuthenticated, async (req, res) => {
       LIMIT 50
     `, [adminIsDemo]);
 
+    const commRes = await pool.query(`
+      SELECT o.*, s.title as "serviceTitle", b.name as "buyerName", sl.name as "sellerName"
+      FROM orders o
+      JOIN services s ON o."serviceId" = s.id
+      JOIN users b ON o."buyerId" = b.id
+      JOIN users sl ON o."sellerId" = sl.id
+      WHERE o.status = 'COMPLETED'
+        AND ((NOT $1 AND b.email NOT LIKE '%.local') OR ($1 AND b.email LIKE '%.local'))
+      ORDER BY o."completedAt" DESC NULLS LAST, o."createdAt" DESC
+      LIMIT 50
+    `, [adminIsDemo]);
+
+    const commissionOrders = formatRows(commRes.rows);
+    const totalCommissionEarned = commissionOrders.reduce((acc, o) => acc + (o.platformFee || 0), 0);
+    const totalCompletedVolume = commissionOrders.reduce((acc, o) => acc + (o.amount || 0), 0);
+
     res.render('disputes', {
       disputes: formatRows(dispRes.rows),
       deposits: formatRows(depRes.rows),
-      withdrawals: formatRows(withRes.rows)
+      withdrawals: formatRows(withRes.rows),
+      commissionOrders,
+      totalCommissionEarned,
+      totalCompletedVolume
     });
   } catch (err) {
     console.error("Admin center error:", err.message);

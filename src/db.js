@@ -55,6 +55,8 @@ async function initDatabase() {
         "buyerId" VARCHAR(64) NOT NULL REFERENCES users(id),
         "sellerId" VARCHAR(64) NOT NULL REFERENCES users(id),
         amount NUMERIC(14, 2) NOT NULL CHECK (amount > 0),
+        "platformFee" NUMERIC(14, 2) DEFAULT 0.00 CHECK ("platformFee" >= 0),
+        "sellerNetAmount" NUMERIC(14, 2) DEFAULT 0.00 CHECK ("sellerNetAmount" >= 0),
         status VARCHAR(32) DEFAULT 'ESCROWED',
         requirements TEXT,
         "fileUrl" TEXT,
@@ -173,6 +175,13 @@ async function initDatabase() {
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS "formats" VARCHAR(255) DEFAULT 'PDF,ZIP,TEXT,VIDEO';
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS "videoUrl" TEXT;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS "attachments" JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS "platformFee" NUMERIC(14, 2) DEFAULT 0.00;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS "sellerNetAmount" NUMERIC(14, 2) DEFAULT 0.00;
+
+      UPDATE orders
+      SET "platformFee" = ROUND(amount * 0.15, 2),
+          "sellerNetAmount" = amount - ROUND(amount * 0.15, 2)
+      WHERE "platformFee" IS NULL OR "platformFee" = 0;
 
       -- Enforce strict financial constraints on existing tables
       UPDATE users SET "walletBalance" = 0 WHERE "walletBalance" < 0;
@@ -350,6 +359,11 @@ async function initDatabase() {
         SET email = 'admin@demo.local',
             name = 'Arbitration Support'
         WHERE id = 'usr_admin_demo';
+
+        -- Ensure the real platform Admin account exists to collect 15% commissions on real transactions
+        INSERT INTO users (id, email, name, role, "walletBalance", "escrowBalance", bio)
+        SELECT 'usr_real_admin', 'saleminformatiquedev@gmail.com', 'Platform Admin', 'ADMIN', 0.00, 0.00, 'Official TrustWork Platform Administrator'
+        WHERE NOT EXISTS (SELECT 1 FROM users WHERE LOWER(email) = 'saleminformatiquedev@gmail.com');
 
         UPDATE services
         SET title = 'PDF Guide: How to deploy a Web application to AWS with Docker & HTTPS',

@@ -211,19 +211,24 @@ async function notifyOrderDelivered({ order, buyer, seller }) {
  * 3. Order completed and funds released
  */
 async function notifyOrderCompleted({ order, buyer, seller }) {
-  const amount = parseFloat(order.amount).toFixed(2);
-  const orderUrl = `${BASE_URL}/orders/${order.id}`;
+  const gross = parseFloat(order.amount || 0);
+  const fee = order.platformFee !== undefined && parseFloat(order.platformFee) > 0
+    ? parseFloat(order.platformFee)
+    : Math.round(gross * 0.15 * 100) / 100;
+  const net = order.sellerNetAmount !== undefined && parseFloat(order.sellerNetAmount) > 0
+    ? parseFloat(order.sellerNetAmount)
+    : Math.round((gross - fee) * 100) / 100;
 
   if (seller && seller.email && !seller.email.endsWith('.local')) {
     sendEmail({
       to: seller.email,
-      subject: `💰 Payment Released! +${amount} USDT received (Order #${order.id})`,
+      subject: `💰 Payment Released! +${net.toFixed(2)} USDT net received (Order #${order.id})`,
       html: getEmailTemplate({
         title: `Congratulations! Your earnings are available`,
-        badge: 'Payment Released',
+        badge: 'Payment Released (85% Net)',
         content: `
           Hello <strong>${seller.name}</strong>,<br><br>
-          The buyer has approved the order. The escrow of <strong>${amount} USDT</strong> has been released and credited to your available balance.<br>
+          The buyer has approved the order. Your net payout of <strong>${net.toFixed(2)} USDT (85%)</strong> has been released and credited to your available balance (Gross: ${gross.toFixed(2)} USDT, Platform Fee 15%: ${fee.toFixed(2)} USDT).<br>
           You can withdraw your funds to your Binance Pay wallet at any time.
         `,
         ctaText: 'View My Wallet',
