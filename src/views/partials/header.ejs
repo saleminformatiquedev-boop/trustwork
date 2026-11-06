@@ -29,6 +29,18 @@
       to { transform: translateY(0); opacity: 1; }
     }
     .toast-anim { animation: fadeSlide 0.22s ease-out; }
+    @keyframes twUnreadPulse {
+      0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.65); transform: scale(1); }
+      50%  { transform: scale(1.12); }
+      70%  { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); transform: scale(1); }
+    }
+    .tw-unread {
+      background: #ef4444; color: #fff; font-weight: 800; line-height: 1;
+      border-radius: 9999px; text-align: center; border: 2px solid #fff;
+      animation: twUnreadPulse 1.6s ease-in-out infinite;
+    }
+    .tw-unread.hidden { display: none; }
     button, a { -webkit-tap-highlight-color: transparent; }
   </style>
 </head>
@@ -63,8 +75,8 @@
           </a>
           <a href="/chat" class="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/80 transition flex items-center gap-1.5">
             <span>Messages</span>
-            <span id="header-unread-badge" class="<%= (typeof unreadChatCount !== 'undefined' && unreadChatCount > 0) ? '' : 'hidden' %> px-1.5 py-0.5 bg-emerald-600 text-white text-[10px] font-bold rounded-full leading-none">
-              <%= typeof unreadChatCount !== 'undefined' ? unreadChatCount : 0 %>
+            <span id="header-unread-badge" class="tw-unread <%= (typeof unreadChatCount !== 'undefined' && unreadChatCount > 0) ? '' : 'hidden' %> px-1.5 py-1 text-[10px] min-w-[20px]">
+              <%= typeof unreadChatCount !== 'undefined' ? (unreadChatCount > 9 ? '9+' : unreadChatCount) : 0 %>
             </span>
           </a>
           <a href="/chat?support=1" class="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/80 transition text-slate-500">
@@ -126,11 +138,12 @@
       <span>Publish</span>
     </a>
     <% if (user) { %>
-      <a href="/chat" class="flex flex-col items-center justify-center text-[11px] font-medium text-slate-600 hover:text-slate-900 flex-1 py-1 relative">
+      <% const hasUnreadNav = (typeof unreadChatCount !== 'undefined' && unreadChatCount > 0); %>
+      <a id="bottom-messages-link" href="/chat" class="flex flex-col items-center justify-center text-[11px] <%= hasUnreadNav ? 'font-bold text-slate-900' : 'font-medium text-slate-600' %> hover:text-slate-900 flex-1 py-1 relative">
         <div class="relative">
-          <i class="fa-regular fa-comment text-sm mb-0.5"></i>
-          <span id="bottom-unread-badge" class="<%= (typeof unreadChatCount !== 'undefined' && unreadChatCount > 0) ? '' : 'hidden' %> absolute -top-1 -right-2.5 px-1 bg-emerald-600 text-white text-[9px] font-bold rounded-full min-w-[14px] text-center">
-            <%= typeof unreadChatCount !== 'undefined' ? unreadChatCount : 0 %>
+          <i id="bottom-messages-icon" class="<%= hasUnreadNav ? 'fa-solid text-red-500' : 'fa-regular' %> fa-comment text-base mb-0.5"></i>
+          <span id="bottom-unread-badge" class="tw-unread <%= (typeof unreadChatCount !== 'undefined' && unreadChatCount > 0) ? '' : 'hidden' %> absolute -top-2 -right-4 px-1 py-[3px] text-[10px] min-w-[18px]">
+            <%= typeof unreadChatCount !== 'undefined' ? (unreadChatCount > 9 ? '9+' : unreadChatCount) : 0 %>
           </span>
         </div>
         <span>Messages</span>
@@ -274,22 +287,58 @@
     });
 
     <% if (user) { %>
+      // Unread-messages badge: red pulsing pastille + "(N)" in the browser tab title
+      window.setUnreadBadge = function (n) {
+        n = parseInt(n, 10) || 0;
+        const label = n > 9 ? '9+' : String(n);
+        ['header-unread-badge', 'bottom-unread-badge'].forEach(id => {
+          const b = document.getElementById(id);
+          if (!b) return;
+          b.textContent = label;
+          b.classList.toggle('hidden', n <= 0);
+        });
+        // Footer (mobile) Messages button: solid red bubble + bold label while there are unread messages
+        const navIcon = document.getElementById('bottom-messages-icon');
+        const navLink = document.getElementById('bottom-messages-link');
+        if (navIcon) {
+          navIcon.classList.toggle('fa-solid', n > 0);
+          navIcon.classList.toggle('fa-regular', n <= 0);
+          navIcon.classList.toggle('text-red-500', n > 0);
+        }
+        if (navLink) {
+          navLink.classList.toggle('font-bold', n > 0);
+          navLink.classList.toggle('text-slate-900', n > 0);
+          navLink.classList.toggle('font-medium', n <= 0);
+          navLink.classList.toggle('text-slate-600', n <= 0);
+        }
+        const base = document.title.replace(/^\(\d+\+?\)\s*/, '');
+        document.title = n > 0 ? `(${label}) ${base}` : base;
+      };
+      window.refreshUnreadBadge = async function () {
+        try {
+          const r = await fetch('/api/chat/unread-count', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+          if (!r.ok) return;
+          const d = await r.json();
+          if (d && d.success) window.setUnreadBadge(d.count);
+        } catch (e) {}
+      };
+      window.setUnreadBadge(<%= parseInt(typeof unreadChatCount !== 'undefined' ? unreadChatCount : 0, 10) || 0 %>);
+      setInterval(() => { if (document.visibilityState === 'visible') window.refreshUnreadBadge(); }, 15000);
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') window.refreshUnreadBadge(); });
+      window.addEventListener('pageshow', () => window.refreshUnreadBadge());
+
       if (typeof io !== 'undefined') {
         const globalUserSocket = io();
         globalUserSocket.emit('join_user');
 
         globalUserSocket.on('chat_notification', (notif) => {
-          const badges = [
-            document.getElementById('header-unread-badge'),
-            document.getElementById('bottom-unread-badge')
-          ];
-          badges.forEach(b => {
-            if (b) {
-              b.textContent = notif.unreadTotal || 1;
-              b.classList.remove('hidden');
-            }
-          });
           const isViewingThisConversation = (window.location.pathname === '/chat' && window.location.search.includes(notif.conversationId) && document.visibilityState === 'visible');
+          if (isViewingThisConversation) {
+            // Already reading this conversation: it is marked read, just resync the counter shortly
+            setTimeout(window.refreshUnreadBadge, 1500);
+          } else {
+            window.setUnreadBadge(notif.unreadTotal || 1);
+          }
           if (!isViewingThisConversation) {
             window.triggerBrowserNotification({
               title: `💬 New message from ${notif.senderName}`,
