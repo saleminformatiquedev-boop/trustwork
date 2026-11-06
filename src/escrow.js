@@ -199,7 +199,7 @@ async function deliverOrder(pool, { orderId, sellerId, deliveryNote }) {
 /**
  * Buyer (within 2 days) or Admin approves delivery -> Release escrow funds to author
  */
-async function completeOrderAndReleaseFunds(pool, { orderId, buyerId, isAdmin = false }) {
+async function completeOrderAndReleaseFunds(pool, { orderId, buyerId, isAdmin = false, adminUser = null }) {
   const client = await pool.connect();
   let updatedOrder = null;
   let buyerUser = null;
@@ -232,7 +232,15 @@ async function completeOrderAndReleaseFunds(pool, { orderId, buyerId, isAdmin = 
 
     // Determine matching Admin wallet (Demo Admin for demo transactions, Real Admin for real transactions)
     const bEmailRes = await client.query('SELECT email FROM users WHERE id = $1', [order.buyerId]);
-    const isDemoTx = bEmailRes.rows[0] && String(bEmailRes.rows[0].email || '').toLowerCase().endsWith('.local');
+    const sEmailRes = await client.query('SELECT email FROM users WHERE id = $1', [order.sellerId]);
+    const buyerIsDemo = bEmailRes.rows[0] && String(bEmailRes.rows[0].email || '').toLowerCase().endsWith('.local');
+    const sellerIsDemo = sEmailRes.rows[0] && String(sEmailRes.rows[0].email || '').toLowerCase().endsWith('.local');
+    const isDemoTx = buyerIsDemo && sellerIsDemo;
+
+    if (isAdmin && adminUser && String(adminUser.email || '').toLowerCase().endsWith('.local') && !isDemoTx) {
+      throw new Error("Sandbox isolation: Demo Admin cannot approve or release real users' orders.");
+    }
+
     const adminRes = await client.query(
       isDemoTx
         ? "SELECT id FROM users WHERE role = 'ADMIN' AND email LIKE '%.local' ORDER BY \"createdAt\" ASC LIMIT 1"
@@ -340,8 +348,8 @@ async function openDispute(pool, { orderId, userId, reason, details }) {
     if (ord.buyerId !== userId && ord.sellerId !== userId) {
       throw new Error("Only transaction participants can open an investigation");
     }
-    if (ord.status === "COMPLETED" || ord.status === "REFUNDED") {
-      throw new Error("Cannot open a dispute on an already completed or refunded order");
+    if (ord.status === "COMPLETED" || ord.status === "REFUNDED" || ord.status === "DISPUTED") {
+      throw new Error("Cannot open a dispute on an already completed, refunded, or disputed order");
     }
 
     await client.query("UPDATE orders SET status = 'DISPUTED' WHERE id = $1", [orderId]);
@@ -430,9 +438,19 @@ async function resolveDispute(pool, { disputeId, resolution, resolutionNote, adm
       throw new Error("Invalid arbitration resolution");
     }
 
-    const [firstId, secondId] = [order.buyerId, order.sellerId].sort();
-    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [firstId]);
-    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [secondId]);
+    const bEmailRes = await client.query('SELECT email FROM users WHERE id = $1', [order.buyerId]);
+    const isDemoTx = bEmailRes.rows[0] && String(bEmailRes.rows[0].email || '').toLowerCase().endsWith('.local');
+    const adminRes = await client.query(
+      isDemoTx
+        ? "SELECT id FROM users WHERE role = 'ADMIN' AND email LIKE '%.local' ORDER BY \"createdAt\" ASC LIMIT 1"
+        : "SELECT id FROM users WHERE role = 'ADMIN' AND email NOT LIKE '%.local' ORDER BY \"createdAt\" ASC LIMIT 1"
+    );
+    const targetAdminId = adminRes.rows[0] ? adminRes.rows[0].id : null;
+
+    const lockIds = Array.from(new Set([order.buyerId, order.sellerId, ...(targetAdminId ? [targetAdminId] : [])])).sort();
+    for (const uid of lockIds) {
+      await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [uid]);
+    }
 
     const bCheck = await client.query('SELECT "escrowBalance" FROM users WHERE id = $1', [order.buyerId]);
     if (!bCheck.rows[0] || parseFloat(bCheck.rows[0].escrowBalance) < amount) {
@@ -471,15 +489,6 @@ async function resolveDispute(pool, { disputeId, resolution, resolutionNote, adm
     } else if (resolution === "PAY_SELLER") {
       const platformFee = Math.round(amount * PLATFORM_FEE_RATE * 100) / 100;
       const sellerNetAmount = Math.round((amount - platformFee) * 100) / 100;
-
-      const bEmailRes = await client.query('SELECT email FROM users WHERE id = $1', [order.buyerId]);
-      const isDemoTx = bEmailRes.rows[0] && String(bEmailRes.rows[0].email || '').toLowerCase().endsWith('.local');
-      const adminRes = await client.query(
-        isDemoTx
-          ? "SELECT id FROM users WHERE role = 'ADMIN' AND email LIKE '%.local' ORDER BY \"createdAt\" ASC LIMIT 1"
-          : "SELECT id FROM users WHERE role = 'ADMIN' AND email NOT LIKE '%.local' ORDER BY \"createdAt\" ASC LIMIT 1"
-      );
-      const targetAdminId = adminRes.rows[0] ? adminRes.rows[0].id : null;
 
       // 1. Deduct 100% from buyer escrow
       await client.query(`

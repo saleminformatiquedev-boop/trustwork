@@ -15,6 +15,7 @@ const { pool, initDatabase } = require('./db');
 const { setupAuth, ensureAuthenticated, normalizeUser, isDemoModeEnabled, isDemoUser } = require('./auth');
 const escrow = require('./escrow');
 const emailService = require('./services/email');
+const binanceService = require('./services/binance');
 
 const app = express();
 const server = http.createServer(app);
@@ -26,7 +27,7 @@ app.disable('x-powered-by');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '127.0.0.1';
-const PLATFORM_BINANCE_PAY_ID = process.env.PLATFORM_BINANCE_PAY_ID || process.env.BINANCE_PAY_ID || 'BINANCE-PAY-789456';
+const PLATFORM_BINANCE_PAY_ID = binanceService.PLATFORM_BINANCE_PAY_ID;
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(48).toString('hex');
 
 // Strict Security Headers Middleware
@@ -85,12 +86,18 @@ const ALLOWED_EXTENSIONS = new Set([
   '.mp4', '.mov', '.webm', '.doc', '.docx'
 ]);
 
+function getUploadOwnerTag(userId) {
+  if (!userId) return 'anon';
+  return crypto.createHmac('sha256', SESSION_SECRET).update('upload:' + String(userId)).digest('hex').slice(0, 12);
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
     const rawExt = path.extname(file.originalname || '').toLowerCase().replace(/[^a-z0-9.]/g, '');
     const safeExt = ALLOWED_EXTENSIONS.has(rawExt) ? rawExt : '.bin';
-    const uniqueName = Date.now() + '-' + crypto.randomBytes(8).toString('hex') + safeExt;
+    const ownerTag = req.user && req.user.id ? `u${getUploadOwnerTag(req.user.id)}-` : '';
+    const uniqueName = Date.now() + '-' + ownerTag + crypto.randomBytes(8).toString('hex') + safeExt;
     cb(null, uniqueName);
   }
 });
@@ -176,16 +183,27 @@ app.use(sessionMiddleware);
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Synchronizer CSRF Token Generation & Verification Middleware
+// Parse cookies helper for stateless HttpOnly CSRF seed when unauthenticated
+function parseCookie(req, name) {
+  const raw = req.headers.cookie || '';
+  const match = raw.split(';').map(c => c.trim()).find(c => c.startsWith(name + '='));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
+}
+
+// Synchronizer + HMAC-Bound Cookie CSRF Protection (Prevents MemoryStore DoS on unauthenticated requests)
 app.use((req, res, next) => {
-  if (req.session) {
-    if (!req.session.csrfToken) {
-      req.session.csrfToken = crypto.randomBytes(32).toString('hex');
-    }
-    res.locals.csrfToken = req.session.csrfToken;
-  } else {
-    res.locals.csrfToken = '';
+  let csrfSeed = parseCookie(req, 'trustwork.csrf');
+  if (!csrfSeed || !/^[a-f0-9]{32,64}$/.test(csrfSeed)) {
+    csrfSeed = crypto.randomBytes(24).toString('hex');
+    const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+    res.setHeader(
+      'Set-Cookie',
+      `trustwork.csrf=${csrfSeed}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`
+    );
   }
+
+  const expectedToken = crypto.createHmac('sha256', SESSION_SECRET).update('csrf:' + csrfSeed).digest('hex');
+  res.locals.csrfToken = expectedToken;
 
   if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
     // 1. Verify Origin / Referer host matches target Host when present
@@ -211,7 +229,6 @@ app.use((req, res, next) => {
     }
 
     // 2. Verify cryptographic CSRF token
-    const expectedToken = req.session ? req.session.csrfToken : null;
     const providedToken =
       req.headers['x-csrf-token'] ||
       (req.body && req.body._csrf) ||
@@ -282,9 +299,14 @@ const DEFAULT_SAMPLE_FILES = new Set([
 ]);
 
 async function canAccessUploadedFile(user, filename) {
-  if (!user || !filename) return false;
+  if (!user || !filename || !/^[a-zA-Z0-9._-]+$/.test(filename)) return false;
   if (user.role === 'ADMIN' && !isDemoUser(user)) return true;
   if (user.role === 'ADMIN' && isDemoUser(user) && DEFAULT_SAMPLE_FILES.has(filename)) return true;
+
+  // Owner HMAC tag check (the user who uploaded this file via /api/upload)
+  const ownerMarker = `-u${getUploadOwnerTag(user.id)}-`;
+  if (filename.includes(ownerMarker)) return true;
+
   const filePathUrl = `/uploads/${filename}`;
 
   // 1. Is user the author of a service containing this file?
@@ -293,7 +315,7 @@ async function canAccessUploadedFile(user, filename) {
      WHERE "sellerId" = $1 
        AND ("fileUrl" = $2 OR "attachments"::text LIKE $3)
      LIMIT 1`,
-    [user.id, filePathUrl, `%${filename}%`]
+    [user.id, filePathUrl, `%/uploads/${filename}%`]
   );
   if (sellerCheck.rows.length > 0) return true;
 
@@ -316,7 +338,7 @@ async function canAccessUploadedFile(user, filename) {
        AND o.status IN ('ESCROWED', 'DELIVERED', 'COMPLETED', 'DISPUTED')
        AND (o."fileUrl" = $2 OR s."fileUrl" = $2 OR o."attachments"::text LIKE $3 OR s."attachments"::text LIKE $3)
      LIMIT 1`,
-    [user.id, filePathUrl, `%${filename}%`]
+    [user.id, filePathUrl, `%/uploads/${filename}%`]
   );
   if (buyerOrderCheck.rows.length > 0) return true;
 
@@ -481,8 +503,12 @@ io.on('connection', (socket) => {
 
       const senderId = socket.user.id;
       const senderName = socket.user.name || 'User';
-      const safeFileUrl = fileUrl && /^\/uploads\/[a-zA-Z0-9._-]+$/.test(String(fileUrl)) ? String(fileUrl) : null;
+      let safeFileUrl = fileUrl && /^\/uploads\/[a-zA-Z0-9._-]+$/.test(String(fileUrl)) ? String(fileUrl) : null;
+      if (safeFileUrl && !(await canAccessUploadedFile(socket.user, path.basename(safeFileUrl)))) {
+        safeFileUrl = null;
+      }
       const trimmedContent = content ? String(content).trim().slice(0, 4000) : '';
+      if (!trimmedContent && !safeFileUrl) return;
 
       const newId = 'msg_' + crypto.randomBytes(8).toString('hex');
       const insertRes = await pool.query(`
@@ -546,9 +572,13 @@ io.on('connection', (socket) => {
       const senderName = socket.user.name || 'User';
       const senderAvatar = socket.user.avatar || null;
       const senderRole = socket.user.role || 'USER';
-      const safeFileUrl = fileUrl && /^\/uploads\/[a-zA-Z0-9._-]+$/.test(String(fileUrl)) ? String(fileUrl) : null;
+      let safeFileUrl = fileUrl && /^\/uploads\/[a-zA-Z0-9._-]+$/.test(String(fileUrl)) ? String(fileUrl) : null;
+      if (safeFileUrl && !(await canAccessUploadedFile(socket.user, path.basename(safeFileUrl)))) {
+        safeFileUrl = null;
+      }
 
       const trimmedContent = content ? String(content).trim().slice(0, 4000) : '';
+      if (!trimmedContent && !safeFileUrl) return;
       const newMsgId = 'dmsg_' + crypto.randomBytes(8).toString('hex');
 
       const insertRes = await pool.query(`
@@ -786,6 +816,12 @@ app.post('/api/upload', ensureAuthenticated, upload.single('file'), (req, res) =
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No file provided' });
     }
+    if (isDemoUser(req.user)) {
+      if (fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+      }
+      return res.status(403).json({ success: false, error: 'Demo accounts cannot upload files to the server. Please sign in with a real Google account.' });
+    }
     const ext = path.extname(req.file.filename).toLowerCase();
     verifyUploadedFileSafety(req.file.path, ext);
 
@@ -804,6 +840,16 @@ app.post('/api/upload', ensureAuthenticated, upload.single('file'), (req, res) =
 // Publish new multi-format method (PDF, ZIP, Text, Video)
 app.post('/services/new', ensureAuthenticated, upload.any(), async (req, res) => {
   try {
+    if (isDemoUser(req.user)) {
+      if (req.files && req.files.length > 0) {
+        for (const f of req.files) {
+          if (fs.existsSync(f.path)) {
+            try { fs.unlinkSync(f.path); } catch (_) {}
+          }
+        }
+      }
+      return res.status(403).send("Demo test accounts cannot publish new methods to the public catalog. Please sign in with your Google account.");
+    }
     const { title, description, category, price, pageCount, difficulty, videoUrl, formats } = req.body;
 
     const cleanTitle = String(title || '').trim();
@@ -1040,7 +1086,8 @@ app.post('/orders/:id/complete', ensureAuthenticated, async (req, res) => {
     const updated = await escrow.completeOrderAndReleaseFunds(pool, {
       orderId: req.params.id,
       buyerId: req.user.id,
-      isAdmin: req.user.role === 'ADMIN'
+      isAdmin: req.user.role === 'ADMIN',
+      adminUser: req.user
     });
 
     const netAmt = parseFloat(updated.sellerNetAmount || (updated.amount * 0.85)).toFixed(2);
@@ -1061,7 +1108,13 @@ app.post('/orders/:id/complete', ensureAuthenticated, async (req, res) => {
 app.post('/orders/:id/review', ensureAuthenticated, async (req, res) => {
   try {
     const { rating, comment } = req.body;
-    const ordRes = await pool.query('SELECT * FROM orders WHERE id = $1', [req.params.id]);
+    const ordRes = await pool.query(`
+      SELECT o.*, b.email as "buyerEmail", s.email as "sellerEmail"
+      FROM orders o
+      JOIN users b ON o."buyerId" = b.id
+      JOIN users s ON o."sellerId" = s.id
+      WHERE o.id = $1
+    `, [req.params.id]);
     const order = ordRes.rows[0];
 
     if (!order) {
@@ -1072,6 +1125,10 @@ app.post('/orders/:id/review', ensureAuthenticated, async (req, res) => {
     const isExpired = Date.now() > baseMs + (2 * 24 * 60 * 60 * 1000);
     const isAdmin = req.user.role === 'ADMIN';
     const isBuyer = order.buyerId === req.user.id;
+
+    if (isAdmin && isDemoUser(req.user) && (!isDemoUser(order.buyerEmail) || !isDemoUser(order.sellerEmail))) {
+      return res.status(403).send("Sandbox isolation: Demo Admin cannot review real users' orders.");
+    }
 
     if (!isAdmin) {
       if (!isBuyer) {
@@ -1616,7 +1673,9 @@ app.get('/dashboard', ensureAuthenticated, async (req, res) => {
       deposits: formatRows(depRes.rows),
       adminCommissionOrders,
       totalAdminCommission,
-      platformBinancePayId: PLATFORM_BINANCE_PAY_ID
+      platformBinancePayId: PLATFORM_BINANCE_PAY_ID,
+      trc20Address: binanceService.DEFAULT_USDT_TRC20,
+      bep20Address: binanceService.DEFAULT_USDT_BEP20
     });
   } catch (err) {
     console.error("Dashboard error:", err.message);
@@ -1624,9 +1683,9 @@ app.get('/dashboard', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// Request withdrawal to Binance Pay (ACID locked, properly rolled back on error)
+// Request withdrawal via Binance API (On-Chain TRC20/BEP20 or Binance Pay ID)
 app.post('/api/wallet/withdraw', ensureAuthenticated, async (req, res) => {
-  if (req.user.email && req.user.email.endsWith('.local')) {
+  if (isDemoUser(req.user)) {
     return res.status(403).json({ success: false, error: 'Demo accounts cannot withdraw real USDT.' });
   }
 
@@ -1638,15 +1697,20 @@ app.post('/api/wallet/withdraw', ensureAuthenticated, async (req, res) => {
   }
 
   const client = await pool.connect();
+  let withId = null;
+  let destination = null;
+  let userObj = null;
+
   try {
     await client.query('BEGIN');
 
     const uRes = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.user.id]);
     const user = uRes.rows[0];
+    userObj = user;
 
     if (!user || !user.binanceId) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ success: false, error: 'Please save your Binance Pay ID before requesting a withdrawal.' });
+      return res.status(400).json({ success: false, error: 'Please save your USDT Address (TRC20 / BEP20) or Binance Pay ID before requesting a withdrawal.' });
     }
 
     if (parseFloat(user.walletBalance) < amount) {
@@ -1656,34 +1720,65 @@ app.post('/api/wallet/withdraw', ensureAuthenticated, async (req, res) => {
 
     await client.query('UPDATE users SET "walletBalance" = "walletBalance" - $1 WHERE id = $2', [amount, user.id]);
 
-    const withId = 'wth_' + crypto.randomBytes(8).toString('hex');
+    withId = 'wth_' + crypto.randomBytes(8).toString('hex');
+    destination = user.binanceId;
     await client.query(`
       INSERT INTO withdrawals (id, "userId", amount, "binanceId", status)
       VALUES ($1, $2, $3, $4, 'PENDING')
-    `, [withId, user.id, amount, user.binanceId]);
+    `, [withId, user.id, amount, destination]);
 
     await client.query('COMMIT');
-
-    (async () => {
-      try {
-        emailService.notifyWithdrawalRequested({
-          user,
-          amount,
-          binanceId: user.binanceId
-        });
-      } catch (e) {
-        console.warn("Error email withdrawal notification:", e.message);
-      }
-    })();
-
-    res.json({ success: true, message: `Withdrawal request of ${amount.toFixed(2)} USDT submitted for processing.` });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error("Withdrawal error:", err.message);
-    res.status(500).json({ success: false, error: 'Unable to process withdrawal request.' });
+    return res.status(500).json({ success: false, error: 'Unable to process withdrawal request.' });
   } finally {
     client.release();
   }
+
+  // Attempt automatic on-chain payout via Binance API if destination is a TRC20 or BEP20 address
+  let autoSent = false;
+  try {
+    const apiResult = await binanceService.executeUsdtWithdrawal({
+      destination,
+      amount,
+      withdrawalId: withId
+    });
+    if (apiResult && apiResult.success) {
+      autoSent = true;
+      await pool.query(
+        "UPDATE withdrawals SET status = 'COMPLETED', \"processedAt\" = CURRENT_TIMESTAMP WHERE id = $1",
+        [withId]
+      );
+      io.to(`user_${req.user.id}`).emit('user_notification', {
+        title: '💸 USDT Withdrawal Sent!',
+        body: `Your withdrawal of ${amount.toFixed(2)} USDT (${apiResult.network}) has been sent automatically via Binance.`,
+        url: '/dashboard',
+        type: 'withdrawal_decision'
+      });
+    }
+  } catch (apiErr) {
+    console.warn("Automatic Binance API withdrawal deferred to Admin:", apiErr.message);
+  }
+
+  (async () => {
+    try {
+      emailService.notifyWithdrawalRequested({
+        user: userObj,
+        amount,
+        binanceId: destination
+      });
+    } catch (e) {
+      console.warn("Error email withdrawal notification:", e.message);
+    }
+  })();
+
+  return res.json({
+    success: true,
+    message: autoSent
+      ? `✅ Withdrawal of ${amount.toFixed(2)} USDT has been sent automatically to ${destination} via Binance API!`
+      : `Withdrawal request of ${amount.toFixed(2)} USDT to ${destination} submitted and queued for processing.`
+  });
 });
 
 // History Page
@@ -1787,48 +1882,92 @@ app.get('/api/wallet/deposit-qr', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// REST AJAX: Record Binance Pay Top-Up Request (Strictly PENDING until Admin Verification!)
+// REST AJAX: Record & Automatically Verify Binance Pay / On-Chain Deposit via Binance API
 app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) => {
+  if (isDemoUser(req.user)) {
+    return res.status(403).json({ success: false, error: 'Demo test accounts cannot submit real Binance deposits.' });
+  }
+
+  const rawAmount = parseFloat(req.body.amount);
+  const amount = Math.round(rawAmount * 100) / 100;
+  const txId = String(req.body.txId || '').trim();
+  const binancePayId = PLATFORM_BINANCE_PAY_ID;
+
+  if (!Number.isFinite(amount) || amount < 1.00 || amount > 50000.00) {
+    return res.status(400).json({ success: false, error: 'Invalid top-up amount (between 1 and 50,000 USDT).' });
+  }
+
+  if (!txId || !/^[a-zA-Z0-9_-]{8,120}$/.test(txId)) {
+    return res.status(400).json({ success: false, error: 'Please enter a valid Binance Pay Order ID or Blockchain TxID (8 to 120 characters).' });
+  }
+
+  // 1. Check live Binance API (Binance Pay History + On-Chain USDT Deposit History)
+  const verification = await binanceService.verifyIncomingDeposit({
+    txId,
+    expectedAmount: amount
+  });
+
+  // If Binance API found a matching TxID that is invalid (e.g. outgoing payment, wrong currency, or lower amount), block immediately
+  if (
+    !verification.verified &&
+    verification.reason &&
+    (verification.reason.includes('outgoing payment') ||
+     verification.reason.includes('instead of USDT') ||
+     verification.reason.includes('is less than declared amount'))
+  ) {
+    return res.status(400).json({ success: false, error: verification.reason });
+  }
+
+  const canonicalTxId = verification.canonicalTxId || txId;
+  const creditAmount = verification.verified ? verification.actualAmount : amount;
+  const targetStatus = verification.verified ? 'COMPLETED' : 'PENDING';
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    const rawAmount = parseFloat(req.body.amount);
-    const amount = Math.round(rawAmount * 100) / 100;
-    const txId = String(req.body.txId || '').trim();
-    const binancePayId = PLATFORM_BINANCE_PAY_ID;
-
-    if (!Number.isFinite(amount) || amount < 1.00 || amount > 50000.00) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ success: false, error: 'Invalid top-up amount (between 1 and 50,000 USDT).' });
-    }
-
-    if (!txId || !/^[a-zA-Z0-9_-]{8,100}$/.test(txId)) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ success: false, error: 'Please enter a valid Binance Pay Order/Transaction ID (8 to 100 alphanumeric characters).' });
-    }
-
-    const existingTx = await client.query('SELECT id FROM deposits WHERE "txId" = $1', [txId]);
+    // Lock user and check for duplicate txId (case-insensitive)
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [req.user.id]);
+    const existingTx = await client.query(
+      'SELECT id FROM deposits WHERE LOWER("txId") = LOWER($1) OR LOWER("txId") = LOWER($2)',
+      [txId, canonicalTxId]
+    );
     if (existingTx.rows.length > 0) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ success: false, error: 'This Transaction ID (TxID) has already been submitted.' });
+      return res.status(400).json({ success: false, error: 'This Transaction ID (TxID) has already been used.' });
     }
 
     const depId = 'dep_' + crypto.randomBytes(8).toString('hex');
     const depRes = await client.query(`
       INSERT INTO deposits (id, "userId", amount, "binancePayId", "txId", status)
-      VALUES ($1, $2, $3, $4, $5, 'PENDING')
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
-    `, [depId, req.user.id, amount, binancePayId, txId]);
+    `, [depId, req.user.id, creditAmount, binancePayId, canonicalTxId, targetStatus]);
+
+    if (verification.verified) {
+      await client.query(
+        'UPDATE users SET "walletBalance" = "walletBalance" + $1 WHERE id = $2',
+        [creditAmount, req.user.id]
+      );
+    }
 
     await client.query('COMMIT');
+
+    if (verification.verified) {
+      io.to(`user_${req.user.id}`).emit('user_notification', {
+        title: '💰 Deposit Verified by Binance API!',
+        body: `+${creditAmount.toFixed(2)} USDT has been automatically credited to your wallet.`,
+        url: '/dashboard',
+        type: 'deposit_decision'
+      });
+    }
 
     (async () => {
       try {
         emailService.notifyDepositReceived({
           user: req.user,
-          amount,
-          txId,
+          amount: creditAmount,
+          txId: canonicalTxId,
           binancePayId
         });
       } catch (e) {
@@ -1836,29 +1975,35 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
       }
     })();
 
-    res.json({
+    return res.json({
       success: true,
-      message: `Deposit of ${amount.toFixed(2)} USDT (TxID: ${txId}) submitted for verification. Your balance will be credited as soon as an administrator confirms receipt.`,
+      autoCredited: verification.verified,
+      message: verification.verified
+        ? `✅ Verified by Binance API! +${creditAmount.toFixed(2)} USDT has been credited to your balance immediately.`
+        : `Deposit (${amount.toFixed(2)} USDT, TxID: ${txId}) recorded as PENDING. ${verification.reason}`,
       deposit: depRes.rows[0]
     });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error("Deposit submission error:", err.message);
-    res.status(500).json({ success: false, error: 'Unable to submit deposit request.' });
+    return res.status(500).json({ success: false, error: 'Unable to submit deposit request.' });
   } finally {
     client.release();
   }
 });
 
-// REST AJAX: Update Binance Pay ID & Bio
+// REST AJAX: Update Binance Pay ID / USDT Address & Bio
 app.post('/api/wallet/update-binance', ensureAuthenticated, async (req, res) => {
   try {
+    if (isDemoUser(req.user)) {
+      return res.status(403).json({ success: false, error: 'Shared demo accounts cannot modify profile or payout settings.' });
+    }
     const binanceId = req.body.binanceId ? String(req.body.binanceId).trim().slice(0, 100) : null;
     const bio = req.body.bio ? String(req.body.bio).trim().slice(0, 1000) : null;
     const skills = req.body.skills ? String(req.body.skills).trim().slice(0, 500) : null;
 
     if (binanceId && !/^[a-zA-Z0-9_@.-]{4,100}$/.test(binanceId)) {
-      return res.status(400).json({ success: false, error: 'Invalid Binance Pay ID format.' });
+      return res.status(400).json({ success: false, error: 'Invalid USDT Address or Binance Pay ID format.' });
     }
 
     await pool.query(`
@@ -1966,12 +2111,16 @@ app.post('/disputes/:id/resolve', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// Admin: Approve or Reject a Pending Deposit
+// Admin: Approve, Auto-Verify via Binance API, or Reject a Pending Deposit
 app.post('/admin/deposits/:id/decision', ensureAuthenticated, async (req, res) => {
   if (req.user.role !== 'ADMIN') {
     return res.status(403).send("Unauthorized");
   }
   const { action } = req.body;
+  if (!['APPROVE', 'REJECT', 'VERIFY_API'].includes(action)) {
+    return res.status(400).send("Invalid decision action.");
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -1989,19 +2138,32 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, async (req, res) =
       return res.status(403).send("Sandbox isolation: Demo Admin cannot approve or reject real users' deposits.");
     }
 
-    if (action === 'APPROVE') {
+    let finalDecision = action;
+    if (action === 'VERIFY_API') {
+      const check = await binanceService.verifyIncomingDeposit({
+        txId: deposit.txId,
+        expectedAmount: deposit.amount
+      });
+      if (!check.verified) {
+        await client.query('ROLLBACK');
+        return res.status(400).send("Binance API Verification Failed: " + (check.reason || "Transaction not found."));
+      }
+      finalDecision = 'APPROVE';
+    }
+
+    if (finalDecision === 'APPROVE') {
       const amount = Math.round(parseFloat(deposit.amount) * 100) / 100;
       await client.query('UPDATE users SET "walletBalance" = "walletBalance" + $1 WHERE id = $2', [amount, deposit.userId]);
       await client.query("UPDATE deposits SET status = 'COMPLETED' WHERE id = $1", [deposit.id]);
-    } else if (action === 'REJECT') {
+    } else if (finalDecision === 'REJECT') {
       await client.query("UPDATE deposits SET status = 'REJECTED' WHERE id = $1", [deposit.id]);
     }
 
     await client.query('COMMIT');
 
     io.to(`user_${deposit.userId}`).emit('user_notification', {
-      title: action === 'APPROVE' ? '💰 Deposit Confirmed!' : '⚠️ Deposit Rejected',
-      body: action === 'APPROVE'
+      title: finalDecision === 'APPROVE' ? '💰 Deposit Confirmed!' : '⚠️ Deposit Rejected',
+      body: finalDecision === 'APPROVE'
         ? `+${parseFloat(deposit.amount).toFixed(2)} USDT has been credited to your available balance.`
         : `Your deposit request (${parseFloat(deposit.amount).toFixed(2)} USDT) was rejected.`,
       url: '/dashboard',
@@ -2018,12 +2180,16 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, async (req, res) =
   }
 });
 
-// Admin: Approve or Reject (and refund) a Pending Withdrawal
+// Admin: Send via Binance API, Mark Approved, or Reject (and refund) a Pending Withdrawal
 app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, async (req, res) => {
   if (req.user.role !== 'ADMIN') {
     return res.status(403).send("Unauthorized");
   }
   const { action } = req.body;
+  if (!['APPROVE', 'REJECT', 'SEND_API'].includes(action)) {
+    return res.status(400).send("Invalid decision action.");
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -2041,9 +2207,23 @@ app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, async (req, res
       return res.status(403).send("Sandbox isolation: Demo Admin cannot process real users' withdrawals.");
     }
 
-    if (action === 'APPROVE') {
+    let finalDecision = action;
+    if (action === 'SEND_API') {
+      const apiOut = await binanceService.executeUsdtWithdrawal({
+        destination: withdrawal.binanceId,
+        amount: withdrawal.amount,
+        withdrawalId: withdrawal.id
+      });
+      if (!apiOut.success) {
+        await client.query('ROLLBACK');
+        return res.status(400).send("Binance API Withdrawal Error: " + apiOut.error);
+      }
+      finalDecision = 'APPROVE';
+    }
+
+    if (finalDecision === 'APPROVE') {
       await client.query("UPDATE withdrawals SET status = 'COMPLETED', \"processedAt\" = CURRENT_TIMESTAMP WHERE id = $1", [withdrawal.id]);
-    } else if (action === 'REJECT') {
+    } else if (finalDecision === 'REJECT') {
       const amount = Math.round(parseFloat(withdrawal.amount) * 100) / 100;
       await client.query('UPDATE users SET "walletBalance" = "walletBalance" + $1 WHERE id = $2', [amount, withdrawal.userId]);
       await client.query("UPDATE withdrawals SET status = 'REJECTED', \"processedAt\" = CURRENT_TIMESTAMP WHERE id = $1", [withdrawal.id]);
@@ -2052,8 +2232,8 @@ app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, async (req, res
     await client.query('COMMIT');
 
     io.to(`user_${withdrawal.userId}`).emit('user_notification', {
-      title: action === 'APPROVE' ? '💸 Withdrawal Sent!' : '↩️ Withdrawal Refunded',
-      body: action === 'APPROVE'
+      title: finalDecision === 'APPROVE' ? '💸 Withdrawal Sent!' : '↩️ Withdrawal Refunded',
+      body: finalDecision === 'APPROVE'
         ? `Your withdrawal of ${parseFloat(withdrawal.amount).toFixed(2)} USDT has been processed.`
         : `Your withdrawal of ${parseFloat(withdrawal.amount).toFixed(2)} USDT was cancelled and refunded to your wallet.`,
       url: '/dashboard',

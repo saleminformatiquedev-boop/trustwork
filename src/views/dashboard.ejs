@@ -74,14 +74,14 @@
         <% } %>
       </div>
 
-    <!-- Binance Pay ID -->
+    <!-- Binance Pay ID / USDT Payout Address -->
     <div class="bg-white p-6 rounded-2xl border border-slate-200/90 flex flex-col justify-between">
       <div>
-        <span class="text-xs text-slate-400 font-medium block mb-1">Binance Pay ID (for payouts)</span>
+        <span class="text-xs text-slate-400 font-medium block mb-1">USDT Address (TRC20 / BEP20) or Binance ID</span>
         <form id="binance-form" class="mt-2 space-y-2">
-          <input type="text" id="binanceId-input" name="binanceId" value="<%= user.binanceId || '' %>" placeholder="Your Binance Pay ID" class="w-full text-xs px-3 py-2.5 bg-[#FAFAFA] border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-slate-900 focus:outline-none">
+          <input type="text" id="binanceId-input" name="binanceId" value="<%= user.binanceId || '' %>" placeholder="TRC20 (T...), BEP20 (0x...), or Binance ID" class="w-full text-xs px-3 py-2.5 bg-[#FAFAFA] border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-slate-900 focus:outline-none">
           <button type="submit" id="binance-save-btn" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-xl transition">
-            Save Binance ID
+            Save Payout Address / ID
           </button>
         </form>
       </div>
@@ -233,22 +233,33 @@
       </a>
 
       <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-200/80">
-        <span class="text-slate-400">Binance Pay ID:</span>
+        <span class="text-slate-400">Admin Binance Pay ID:</span>
         <div class="flex items-center gap-1.5">
-          <code id="deposit-binance-id-text" class="font-mono font-bold text-slate-800"><%= typeof platformBinancePayId !== 'undefined' ? platformBinancePayId : 'BINANCE-PAY-789456' %></code>
+          <code id="deposit-binance-id-text" class="font-mono font-bold text-slate-900"><%= typeof platformBinancePayId !== 'undefined' ? platformBinancePayId : '1229901779' %></code>
           <button type="button" id="copy-binance-id-btn" class="text-[11px] font-semibold text-emerald-600 hover:underline">Copy</button>
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-200/80 text-left space-y-1.5 text-[11px]">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-slate-400 shrink-0">USDT (TRC20):</span>
+          <code class="font-mono text-slate-700 truncate select-all"><%= typeof trc20Address !== 'undefined' ? trc20Address : 'TNw9pxbxwf6qtvymRSnr2quaWxVCi5fwqu' %></code>
+        </div>
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-slate-400 shrink-0">USDT (BEP20):</span>
+          <code class="font-mono text-slate-700 truncate select-all"><%= typeof bep20Address !== 'undefined' ? bep20Address : '0x284b2c731c9a9449f88f42bc707c05511bb9b222' %></code>
         </div>
       </div>
     </div>
 
     <form id="deposit-confirm-form" class="space-y-3">
       <div>
-        <label class="text-xs font-medium text-slate-600 block mb-1">Binance Order ID / TxID:</label>
-        <input type="text" id="deposit-txid-input" required placeholder="e.g. 298492019482" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-mono focus:border-slate-900 focus:outline-none">
+        <label class="text-xs font-medium text-slate-600 block mb-1">Binance Pay Order ID or Blockchain TxID (Auto-Verified via API):</label>
+        <input type="text" id="deposit-txid-input" required placeholder="e.g. 463780934864084992" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-mono focus:border-slate-900 focus:outline-none">
       </div>
       <div class="flex gap-2">
         <button type="button" id="cancel-deposit-btn" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition">Cancel</button>
-        <button type="submit" id="submit-deposit-btn" class="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition">Verify & Credit</button>
+        <button type="submit" id="submit-deposit-btn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl transition">Verify via Binance API</button>
       </div>
     </form>
 
