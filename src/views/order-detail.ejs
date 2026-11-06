@@ -1,4 +1,9 @@
 <%- include('partials/header', { title: 'Order #' + order.id }) %>
+<%
+  const validationBaseMs = new Date(order.deliveredAt || order.createdAt).getTime();
+  const validationDeadlineMs = validationBaseMs + (2 * 24 * 60 * 60 * 1000);
+  const isValidationExpired = Date.now() > validationDeadlineMs;
+%>
 
 <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-6" id="order-page-root" data-order-id="<%= order.id %>">
 
@@ -31,6 +36,28 @@
           <i class="fa-solid fa-lock text-[10px]"></i> <%= order.amount.toFixed(2) %> USDT locked in escrow
         </span>
       <% } %>
+    </div>
+  </div>
+
+  <!-- 2-Day Validation Rule Banner -->
+  <div class="p-4 sm:p-5 rounded-2xl <%= isValidationExpired ? 'bg-slate-900 text-white' : 'bg-amber-50 border border-amber-200/90 text-amber-950' %> flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div class="flex items-start gap-3">
+      <div class="w-9 h-9 rounded-xl <%= isValidationExpired ? 'bg-white/10 text-amber-400' : 'bg-amber-100 text-amber-700' %> flex items-center justify-center shrink-0">
+        <i class="fa-regular fa-clock text-sm"></i>
+      </div>
+      <div class="text-xs leading-relaxed">
+        <strong class="block text-sm font-bold">
+          Only 2 days to validate if the method is good or not
+        </strong>
+        <span class="<%= isValidationExpired ? 'text-slate-300' : 'text-amber-800' %>">
+          After 2 days (48 hours), the review and validation decision will be for the <strong>Admin</strong>.
+        </span>
+      </div>
+    </div>
+    <div class="shrink-0">
+      <span id="validation-countdown" data-deadline="<%= validationDeadlineMs %>" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold <%= isValidationExpired ? 'bg-amber-500 text-slate-950' : 'bg-white text-amber-900 border border-amber-200' %>">
+        <%= isValidationExpired ? 'Admin Review Active (2 Days Passed)' : '2-Day Validation Window Active' %>
+      </span>
     </div>
   </div>
 
@@ -122,32 +149,71 @@
       
       <% if (user && user.id === order.buyerId && (order.status === 'DELIVERED' || order.status === 'ESCROWED')) { %>
         <div class="bg-white p-5 rounded-2xl border border-slate-200/90 space-y-3">
-          <h3 class="font-bold text-slate-900 text-sm">Everything working as expected?</h3>
-          <p class="text-xs text-slate-500 leading-relaxed">
-            Once you have verified the files, release the <strong><%= order.amount.toFixed(2) %> USDT</strong> escrow payment to the author.
+          <% if (!isValidationExpired) { %>
+            <h3 class="font-bold text-slate-900 text-sm">Validate Method (2-Day Window)</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Only <strong>2 days (48h)</strong> to validate if the method is good or not. After 2 days, the review will be for the <strong>Admin</strong>.
+            </p>
+            <form action="/orders/<%= order.id %>/complete" method="POST">
+              <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition">
+                Approve Method & Release Funds
+              </button>
+            </form>
+          <% } else { %>
+            <h3 class="font-bold text-slate-900 text-sm">2-Day Window Expired</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              The 2-day validation period has ended. The review and validation decision is now handled by the <strong>Admin</strong>.
+            </p>
+          <% } %>
+        </div>
+      <% } %>
+
+      <% if (user && user.role === 'ADMIN' && (order.status === 'DELIVERED' || order.status === 'ESCROWED')) { %>
+        <div class="bg-slate-900 text-white p-5 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-sm">Admin Validation & Review</h3>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">Admin Authority</span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Validate the method and release 85% to the author + 15% commission to Admin.
           </p>
           <form action="/orders/<%= order.id %>/complete" method="POST">
-            <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition">
-              Approve & Release Funds
+            <button type="submit" class="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold rounded-xl transition">
+              Admin Approve & Release Funds
             </button>
           </form>
         </div>
       <% } %>
 
-      <% if (order.status === 'COMPLETED' && user && user.id === order.buyerId && !review) { %>
+      <% if (!review && user && ((user.id === order.buyerId && !isValidationExpired && order.status === 'COMPLETED') || user.role === 'ADMIN')) { %>
         <div class="bg-white p-5 rounded-2xl border border-slate-200/90 space-y-3 text-xs">
-          <h3 class="font-bold text-slate-900 text-sm">Leave a Review</h3>
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-slate-900 text-sm"><%= user.role === 'ADMIN' ? 'Admin Review (Method Evaluation)' : 'Leave a Review (2-Day Window)' %></h3>
+          </div>
+          <p class="text-[11px] text-slate-400">
+            Only 2 days to validate if the method is good or not. After 2 days, the review is for the Admin.
+          </p>
           <form action="/orders/<%= order.id %>/review" method="POST" class="space-y-2.5">
             <select name="rating" class="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium" required>
-              <option value="5">5/5 — Excellent</option>
-              <option value="4">4/5 — Very Good</option>
-              <option value="3">3/5 — Good</option>
-              <option value="2">2/5 — Fair</option>
-              <option value="1">1/5 — Poor</option>
+              <option value="5">5/5 — Method Validated & Working</option>
+              <option value="4">4/5 — Very Good Method</option>
+              <option value="3">3/5 — Acceptable</option>
+              <option value="2">2/5 — Incomplete Method</option>
+              <option value="1">1/5 — Method Not Working</option>
             </select>
-            <textarea name="comment" rows="2" required placeholder="Your feedback..." class="w-full p-2.5 border border-slate-200 rounded-xl"></textarea>
+            <textarea name="comment" rows="2" required placeholder="Write your review on whether the method works..." class="w-full p-2.5 border border-slate-200 rounded-xl"></textarea>
             <button type="submit" class="w-full py-2 bg-slate-900 text-white font-semibold rounded-xl">Submit Review</button>
           </form>
+        </div>
+      <% } %>
+
+      <% if (review) { %>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/90 space-y-2 text-xs">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-slate-900 text-sm">Verified Method Review</h3>
+            <span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold"><%= review.rating %>/5 ★</span>
+          </div>
+          <p class="text-slate-600 leading-relaxed"><%= review.comment %></p>
         </div>
       <% } %>
 
@@ -317,6 +383,29 @@
     socket.emit('send_message', { orderId, content });
     chatInput.value = '';
   });
+
+  // Live 2-Day Validation Countdown Timer
+  (function() {
+    const countdownEl = document.getElementById('validation-countdown');
+    if (!countdownEl) return;
+    const deadline = parseInt(countdownEl.getAttribute('data-deadline'), 10);
+    if (!deadline) return;
+
+    function updateTimer() {
+      const diff = deadline - Date.now();
+      if (diff <= 0) {
+        countdownEl.textContent = 'Admin Review Active (2 Days Passed)';
+        return;
+      }
+      const totalHours = Math.floor(diff / (1000 * 60 * 60));
+      const days = Math.floor(totalHours / 24);
+      const hours = totalHours % 24;
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      countdownEl.textContent = `${days}d ${hours}h ${mins}m left to validate`;
+    }
+    updateTimer();
+    setInterval(updateTimer, 30000);
+  })();
 </script>
 
 <%- include('partials/footer') %>

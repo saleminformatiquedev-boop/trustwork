@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const emailService = require('./services/email');
 
 const PLATFORM_FEE_RATE = 0.15; // 15% Admin commission on all transactions
+const VALIDATION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000; // 2 days (48 hours) to validate method
 
 function generateId(prefix = 'ord_') {
   return prefix + crypto.randomBytes(6).toString('hex');
@@ -105,8 +106,8 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
       orderId,
       buyerUser.id,
       isInstantDelivery 
-        ? `🎉 Order confirmed! Your method pack "${srv.title}" (PDF, ZIP, Scripts & Video) is ready for instant download. Your ${price.toFixed(2)} USDT are protected in escrow until your validation.`
-        : `Order confirmed! An amount of ${price.toFixed(2)} USDT has been charged and secured in escrow.`,
+        ? `🎉 Order confirmed! Your method pack "${srv.title}" (PDF, ZIP, Scripts & Video) is ready for instant download. Your ${price.toFixed(2)} USDT are protected in escrow.\n⏱️ Only 2 days (48h) to validate if the method is good or not. After 2 days, the review will be for the Admin.`
+        : `Order confirmed! An amount of ${price.toFixed(2)} USDT has been charged and secured in escrow.\n⏱️ Only 2 days (48h) after delivery to validate if the method is good or not. After 2 days, the review will be for the Admin.`,
       srv.fileUrl || null,
       srv.fileName || null
     ]);
@@ -196,9 +197,9 @@ async function deliverOrder(pool, { orderId, sellerId, deliveryNote }) {
 }
 
 /**
- * Buyer approves delivery -> Release escrow funds to author
+ * Buyer (within 2 days) or Admin approves delivery -> Release escrow funds to author
  */
-async function completeOrderAndReleaseFunds(pool, { orderId, buyerId }) {
+async function completeOrderAndReleaseFunds(pool, { orderId, buyerId, isAdmin = false }) {
   const client = await pool.connect();
   let updatedOrder = null;
   let buyerUser = null;
@@ -210,7 +211,13 @@ async function completeOrderAndReleaseFunds(pool, { orderId, buyerId }) {
     const ordRes = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
     const order = ordRes.rows[0];
     if (!order) throw new Error("Order not found");
-    if (order.buyerId !== buyerId) throw new Error("Only the buyer can approve delivery");
+    if (!isAdmin) {
+      if (order.buyerId !== buyerId) throw new Error("Only the buyer or Admin can approve delivery");
+      const baseTime = new Date(order.deliveredAt || order.createdAt).getTime();
+      if (Date.now() - baseTime > VALIDATION_WINDOW_MS) {
+        throw new Error("Only 2 days to validate if the method is good or not. After 2 days, the review is for the Admin.");
+      }
+    }
     if (order.status !== "DELIVERED" && order.status !== "ESCROWED") {
       throw new Error(`Cannot complete an order with status ${order.status}`);
     }

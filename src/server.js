@@ -1034,12 +1034,13 @@ app.post('/orders/:id/deliver', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// Buyer approves and releases funds
+// Buyer (within 2 days) or Admin approves and releases funds
 app.post('/orders/:id/complete', ensureAuthenticated, async (req, res) => {
   try {
     const updated = await escrow.completeOrderAndReleaseFunds(pool, {
       orderId: req.params.id,
-      buyerId: req.user.id
+      buyerId: req.user.id,
+      isAdmin: req.user.role === 'ADMIN'
     });
 
     const netAmt = parseFloat(updated.sellerNetAmount || (updated.amount * 0.85)).toFixed(2);
@@ -1056,18 +1057,32 @@ app.post('/orders/:id/complete', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// Leave review on completed order
+// Leave review on order (Buyer within 2 days, or Admin after 2 days)
 app.post('/orders/:id/review', ensureAuthenticated, async (req, res) => {
   try {
     const { rating, comment } = req.body;
     const ordRes = await pool.query('SELECT * FROM orders WHERE id = $1', [req.params.id]);
     const order = ordRes.rows[0];
 
-    if (!order || order.buyerId !== req.user.id) {
-      return res.status(403).send("Only the buyer can leave a review.");
+    if (!order) {
+      return res.status(404).send("Order not found.");
     }
-    if (order.status !== 'COMPLETED') {
-      return res.status(400).send("Reviews can only be left on completed orders.");
+
+    const baseMs = new Date(order.deliveredAt || order.createdAt).getTime();
+    const isExpired = Date.now() > baseMs + (2 * 24 * 60 * 60 * 1000);
+    const isAdmin = req.user.role === 'ADMIN';
+    const isBuyer = order.buyerId === req.user.id;
+
+    if (!isAdmin) {
+      if (!isBuyer) {
+        return res.status(403).send("Only the buyer (within 2 days) or the Admin can leave a review.");
+      }
+      if (isExpired) {
+        return res.status(403).send("Only 2 days are allowed to validate the method. After 2 days, the review is for the Admin.");
+      }
+      if (order.status !== 'COMPLETED') {
+        return res.status(400).send("Please approve the order before submitting your review.");
+      }
     }
 
     const safeRating = Math.min(Math.max(parseInt(rating, 10) || 5, 1), 5);
