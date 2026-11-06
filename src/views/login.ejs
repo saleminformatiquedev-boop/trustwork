@@ -176,7 +176,7 @@
   async function findBlockedHosts() {
     const targets = {
       'apis.google.com': 'https://apis.google.com/js/api.js',
-      'salemsaccounts.firebaseapp.com': 'https://salemsaccounts.firebaseapp.com/__/auth/iframe',
+      [firebaseConfig.authDomain]: 'https://' + firebaseConfig.authDomain + '/__/auth/iframe',
       'identitytoolkit.googleapis.com': 'https://identitytoolkit.googleapis.com/',
       'accounts.google.com': 'https://accounts.google.com/gsi/client'
     };

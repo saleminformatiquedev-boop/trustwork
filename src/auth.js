@@ -185,9 +185,9 @@ function setupAuth(app, pool) {
     res.locals.demoModeEnabled = isDemoModeEnabled();
     res.locals.firebaseConfig = {
       apiKey: process.env.FIREBASE_API_KEY || "",
-      authDomain: process.env.FIREBASE_AUTH_DOMAIN || "salemsaccounts.firebaseapp.com",
-      projectId: process.env.FIREBASE_PROJECT_ID || "salemsaccounts",
-      appId: process.env.FIREBASE_APP_ID || "1:285875034313:web:a2cbb4b4a44906c43f5518"
+      authDomain: process.env.FIREBASE_AUTH_DOMAIN || "trustwork-7126c.firebaseapp.com",
+      projectId: process.env.FIREBASE_PROJECT_ID || "trustwork-7126c",
+      appId: process.env.FIREBASE_APP_ID || "1:491947716495:web:eea9fe4b920390f5c365fa"
     };
     next();
   });
