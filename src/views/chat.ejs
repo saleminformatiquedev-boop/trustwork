@@ -1,17 +1,19 @@
 <%- include('partials/header', { title: 'Messages' }) %>
 
-<div class="max-w-5xl mx-auto px-2 sm:px-6 py-4 sm:py-6 flex-grow flex flex-col h-[calc(100vh-4.5rem)] md:h-[calc(100vh-5rem)]">
+<% const mobileListActive = (typeof showMobileList !== 'undefined' && showMobileList) || !activeConversation; %>
 
-  <div class="bg-white rounded-2xl border border-slate-200/90 flex-grow flex overflow-hidden">
+<div class="max-w-5xl mx-auto px-2 sm:px-6 py-2 sm:py-6 w-full flex flex-col h-[calc(100dvh-8.25rem)] md:h-[calc(100dvh-5.5rem)]">
+
+  <div class="bg-white rounded-2xl border border-slate-200/90 flex-grow flex overflow-hidden h-full">
     
-    <!-- Left Sidebar: Conversations -->
-    <div id="chat-sidebar" class="<%= activeConversation ? 'hidden md:flex' : 'flex' %> flex-col w-full md:w-80 border-r border-slate-200/80 flex-shrink-0 bg-[#FAFAFA]">
+    <!-- Left Sidebar: Conversations List -->
+    <div id="chat-sidebar" class="<%= mobileListActive ? 'flex' : 'hidden md:flex' %> flex-col w-full md:w-80 border-r border-slate-200/80 flex-shrink-0 bg-[#FAFAFA] h-full">
       
-      <div class="p-4 border-b border-slate-200/80 bg-white space-y-3">
+      <div class="p-4 border-b border-slate-200/80 bg-white space-y-3 flex-shrink-0">
         <div class="flex items-center justify-between">
-          <h2 class="font-bold text-slate-900 text-sm">Messages</h2>
-          <button id="open-new-chat-modal" type="button" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition">
-            + New
+          <h2 class="font-bold text-slate-900 text-sm">Messages (<%= conversations ? conversations.length : 0 %>)</h2>
+          <button id="open-new-chat-modal" type="button" class="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition">
+            + New Chat
           </button>
         </div>
 
@@ -33,7 +35,7 @@
       <div id="conversations-list" class="flex-grow overflow-y-auto divide-y divide-slate-100">
         <% if (conversations && conversations.length > 0) { %>
           <% conversations.forEach(conv => { %>
-            <% const isActive = activeConversation && activeConversation.id === conv.id; %>
+            <% const isActive = !mobileListActive && activeConversation && activeConversation.id === conv.id; %>
             <a href="/chat?conversationId=<%= conv.id %>" 
                class="conv-item block p-3.5 hover:bg-white transition <%= isActive ? 'bg-white border-l-2 border-slate-900' : '' %>"
                data-conv-id="<%= conv.id %>"
@@ -44,7 +46,7 @@
               <div class="flex items-start gap-3 min-w-0">
                 <img src="<%= conv.partnerAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + (conv.partnerName || 'User') %>" 
                      alt="<%= conv.partnerName %>" 
-                     class="w-9 h-9 rounded-full border border-slate-200 object-cover flex-shrink-0">
+                     class="w-10 h-10 rounded-full border border-slate-200 object-cover flex-shrink-0">
 
                 <div class="flex-grow min-w-0">
                   <div class="flex items-center justify-between gap-1 mb-0.5">
@@ -65,6 +67,8 @@
                       <span class="px-1.5 py-0.5 bg-emerald-600 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center flex-shrink-0">
                         <%= conv.unreadCount %>
                       </span>
+                    <% } else { %>
+                      <i class="fa-solid fa-chevron-right text-[10px] text-slate-300 md:hidden"></i>
                     <% } %>
                   </div>
                 </div>
@@ -75,46 +79,62 @@
         <% } else { %>
           <div class="p-8 text-center text-slate-400 space-y-2">
             <p class="text-xs">No conversations yet.</p>
+            <button type="button" onclick="document.getElementById('open-new-chat-modal').click()" class="px-3 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-lg">
+              Start a Chat
+            </button>
           </div>
+        <% } %>
+
+        <% if (user && user.role === 'ADMIN' && typeof platformConversations !== 'undefined' && platformConversations.length > 0) { %>
+          <div class="px-4 py-2 bg-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            All Platform Chats (Admin)
+          </div>
+          <% platformConversations.forEach(pConv => { %>
+            <a href="/chat?conversationId=<%= pConv.id %>" class="block p-3.5 hover:bg-white transition text-xs">
+              <div class="font-semibold text-slate-900 truncate"><%= pConv.participantsSummary || pConv.subject %></div>
+              <div class="text-slate-400 text-[11px] truncate"><%= pConv.lastMessageText %></div>
+            </a>
+          <% }) %>
         <% } %>
       </div>
 
     </div>
 
     <!-- Right Column: Active Conversation -->
-    <div id="chat-main" class="<%= activeConversation ? 'flex' : 'hidden md:flex' %> flex-col flex-grow bg-white h-full overflow-hidden">
+    <div id="chat-main" class="<%= mobileListActive ? 'hidden md:flex' : 'flex' %> flex-col flex-grow bg-white h-full overflow-hidden">
       
       <% if (activeConversation && activePartner) { %>
         
-        <div class="px-4 py-3.5 border-b border-slate-200/80 flex items-center justify-between gap-3 bg-white flex-shrink-0">
-          <div class="flex items-center gap-3 min-w-0">
-            <a href="/chat" class="md:hidden w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-              <i class="fa-solid fa-arrow-left text-xs"></i>
-            </a>
+        <div class="px-3 sm:px-4 py-3 border-b border-slate-200/80 flex items-center justify-between gap-2 bg-white flex-shrink-0">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <button type="button" id="mobile-back-to-list-btn" class="md:hidden inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold flex-shrink-0">
+              <i class="fa-solid fa-arrow-left text-[10px]"></i>
+              <span>Chats</span>
+            </button>
             <img src="<%= activePartner.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + activePartner.name %>" 
                  alt="<%= activePartner.name %>" 
-                 class="w-9 h-9 rounded-full border border-slate-200 object-cover flex-shrink-0">
+                 class="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-slate-200 object-cover flex-shrink-0">
             <div class="min-w-0">
               <h3 class="font-bold text-slate-900 text-xs sm:text-sm truncate"><%= activePartner.name %></h3>
-              <p class="text-[11px] text-emerald-600">Online</p>
+              <p class="text-[10px] sm:text-[11px] text-emerald-600">Online</p>
             </div>
           </div>
 
           <% if (activePartner.id) { %>
-            <a href="/profile/<%= activePartner.id %>" class="text-xs font-medium text-slate-500 hover:text-slate-900">
+            <a href="/profile/<%= activePartner.id %>" class="text-xs font-medium text-slate-500 hover:text-slate-900 flex-shrink-0">
               View Profile
             </a>
           <% } %>
         </div>
 
         <!-- Messages -->
-        <div id="chat-messages-container" class="flex-grow p-4 sm:p-6 overflow-y-auto space-y-3 bg-[#FAFAFA]/50">
+        <div id="chat-messages-container" class="flex-grow p-3.5 sm:p-5 overflow-y-auto space-y-3 bg-[#FAFAFA]/50 min-h-0">
           <% if (messages && messages.length > 0) { %>
             <% messages.forEach(msg => { %>
               <% const isMe = user && user.id === msg.senderId; %>
               <div class="message-row flex flex-col <%= isMe ? 'items-end' : 'items-start' %>">
                 <span class="text-[10px] text-slate-400 mb-0.5"><%= msg.senderName %></span>
-                <div class="max-w-[80%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed break-words <%= isMe ? 'bg-slate-900 text-white' : 'bg-white text-slate-800 border border-slate-200/90' %>">
+                <div class="max-w-[82%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed break-words <%= isMe ? 'bg-slate-900 text-white' : 'bg-white text-slate-800 border border-slate-200/90' %>">
                   <% if (msg.content) { %>
                     <p class="whitespace-pre-line"><%= msg.content %></p>
                   <% } %>
@@ -127,28 +147,28 @@
               </div>
             <% }) %>
           <% } else { %>
-            <div id="empty-chat-state" class="text-center py-16 text-slate-400 text-xs">
+            <div id="empty-chat-state" class="text-center py-12 text-slate-400 text-xs">
               Send a message below to start the conversation.
             </div>
           <% } %>
         </div>
 
-        <div id="file-preview-bar" class="hidden px-4 py-2 bg-slate-100 border-t border-slate-200 flex items-center justify-between text-xs text-slate-700">
+        <div id="file-preview-bar" class="hidden px-4 py-2 bg-slate-100 border-t border-slate-200 flex items-center justify-between text-xs text-slate-700 flex-shrink-0">
           <span id="preview-file-name" class="font-semibold truncate">file.pdf</span>
           <button type="button" id="cancel-file-btn" class="text-rose-600"><i class="fa-solid fa-xmark"></i></button>
         </div>
 
-        <div id="chat-upload-status" class="hidden px-4 py-1.5 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500">
+        <div id="chat-upload-status" class="hidden px-4 py-1.5 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 flex-shrink-0">
           Uploading file...
         </div>
 
-        <form id="direct-chat-form" class="p-3 border-t border-slate-200/80 bg-white flex items-center gap-2 flex-shrink-0">
+        <form id="direct-chat-form" class="p-2.5 sm:p-3 border-t border-slate-200/80 bg-white flex items-center gap-2 flex-shrink-0">
           <input type="file" id="direct-file-input" class="hidden" accept=".pdf,.zip,.rar,.tar,.gz,.png,.jpg,.jpeg,.webp,.txt,.doc,.docx">
           <button type="button" id="direct-attach-btn" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition flex-shrink-0">
             <i class="fa-solid fa-paperclip text-xs"></i>
           </button>
-          <input type="text" id="direct-message-input" autocomplete="off" placeholder="Write a message..." class="flex-grow text-xs sm:text-sm px-3.5 py-2.5 bg-[#FAFAFA] border border-slate-200 focus:bg-white focus:border-slate-900 rounded-xl focus:outline-none transition">
-          <button type="submit" id="direct-send-btn" class="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition flex-shrink-0">
+          <input type="text" id="direct-message-input" autocomplete="off" placeholder="Write a message..." class="flex-grow text-xs sm:text-sm px-3.5 py-2 bg-[#FAFAFA] border border-slate-200 focus:bg-white focus:border-slate-900 rounded-xl focus:outline-none transition min-w-0">
+          <button type="submit" id="direct-send-btn" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition flex-shrink-0">
             Send
           </button>
         </form>
@@ -214,6 +234,23 @@
 
   if (currentUserId) socket.emit('join_user');
 
+  const chatSidebar = document.getElementById('chat-sidebar');
+  const chatMain = document.getElementById('chat-main');
+  const mobileBackBtn = document.getElementById('mobile-back-to-list-btn');
+
+  // Instant mobile toggle back to conversation list
+  if (mobileBackBtn && chatSidebar && chatMain) {
+    mobileBackBtn.addEventListener('click', () => {
+      chatMain.classList.add('hidden');
+      chatMain.classList.remove('flex');
+      chatSidebar.classList.remove('hidden');
+      chatSidebar.classList.add('flex');
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({}, '', '/chat');
+      }
+    });
+  }
+
   const messagesContainer = document.getElementById('chat-messages-container');
   const chatForm = document.getElementById('direct-chat-form');
   const messageInput = document.getElementById('direct-message-input');
@@ -251,7 +288,7 @@
     const fileHtml = msg.fileUrl ? `<a href="${encodeURI(msg.fileUrl)}" download="${escapeHtml(msg.fileName || 'file')}" target="_blank" class="mt-1.5 inline-flex items-center gap-1.5 underline font-medium"><i class="fa-solid fa-paperclip"></i> ${escapeHtml(msg.fileName || 'Attachment')}</a>` : '';
     row.innerHTML = `
       <span class="text-[10px] text-slate-400 mb-0.5">${escapeHtml(msg.senderName || 'Member')}</span>
-      <div class="max-w-[80%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed break-words ${isMe ? 'bg-slate-900 text-white' : 'bg-white text-slate-800 border border-slate-200/90'}">
+      <div class="max-w-[82%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed break-words ${isMe ? 'bg-slate-900 text-white' : 'bg-white text-slate-800 border border-slate-200/90'}">
         ${msg.content ? `<p class="whitespace-pre-line">${escapeHtml(msg.content)}</p>` : ''}
         ${fileHtml}
       </div>

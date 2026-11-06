@@ -1296,7 +1296,8 @@ app.get('/chat', ensureAuthenticated, async (req, res) => {
       activeConversation,
       activePartner,
       messages,
-      contacts: contactsRes.rows
+      contacts: contactsRes.rows,
+      showMobileList: !requestedConvId
     });
   } catch (err) {
     console.error("Chat error:", err.message);
