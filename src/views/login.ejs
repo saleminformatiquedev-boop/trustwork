@@ -115,6 +115,7 @@
     if (!resp.ok || !data.success) {
       throw new Error(data.error || 'Sign-in failed. Please try again.');
     }
+    sessionStorage.removeItem('tw_redirect_tried');
     window.location.href = data.redirectUrl || '/dashboard';
   }
 
@@ -129,6 +130,26 @@
     }
   }
 
+  // Find out which Google service the device/network cannot reach (ad-blocker, Private DNS, VPN, captive Wi-Fi...)
+  async function findBlockedHosts() {
+    const targets = {
+      'apis.google.com': 'https://apis.google.com/js/api.js',
+      'salemsaccounts.firebaseapp.com': 'https://salemsaccounts.firebaseapp.com/__/auth/iframe',
+      'identitytoolkit.googleapis.com': 'https://identitytoolkit.googleapis.com/',
+      'accounts.google.com': 'https://accounts.google.com/gsi/client'
+    };
+    const blocked = [];
+    await Promise.all(Object.entries(targets).map(async ([host, url]) => {
+      try {
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), 8000);
+        await fetch(url, { mode: 'no-cors', cache: 'no-store', signal: ctl.signal });
+        clearTimeout(t);
+      } catch (_) { blocked.push(host); }
+    }));
+    return blocked;
+  }
+
   btn.addEventListener('click', async () => {
     errBox.classList.add('hidden');
     setBusy(true);
@@ -138,6 +159,20 @@
     } catch (e) {
       if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment')) {
         try { await signInWithRedirect(auth, provider); return; } catch (e2) { e = e2; }
+      }
+      if (e && e.code === 'auth/network-request-failed') {
+        const blocked = await findBlockedHosts();
+        if (blocked.length > 0) {
+          showError('Network error: your device or network is blocking ' + blocked.join(', ') +
+            '. Turn off any ad-blocker, Private DNS or VPN (or switch between Wi-Fi and mobile data), then try again.');
+          setBusy(false);
+          return;
+        }
+        // Everything is reachable: retry once using the full-page redirect flow instead of a popup
+        if (!sessionStorage.getItem('tw_redirect_tried')) {
+          sessionStorage.setItem('tw_redirect_tried', '1');
+          try { await signInWithRedirect(auth, provider); return; } catch (e2) { e = e2; }
+        }
       }
       const msg = friendlyError(e);
       if (msg) showError(msg);
