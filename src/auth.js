@@ -373,7 +373,11 @@ function ensureAuthenticated(req, res, next) {
     return res.status(401).json({ success: false, error: 'Authentication required' });
   }
   // Remember the page the visitor wanted so we send them back right after sign-in
-  if (req.method === 'GET') rememberReturnTo(req, res, req.originalUrl);
+  if (req.method === 'GET') {
+    rememberReturnTo(req, res, req.originalUrl);
+    const safe = safeReturnPath(req.originalUrl);
+    return res.redirect(safe ? '/login?next=' + encodeURIComponent(safe) : '/login');
+  }
   res.redirect('/login');
 }
 

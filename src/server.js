@@ -775,7 +775,7 @@ app.get('/services/:id', async (req, res) => {
     rememberReturnTo(req, res, req.originalUrl);
     return res.redirect('/login?msg=' + encodeURIComponent(
       'Create your free account or sign in to view this method — you will be taken straight back to it.'
-    ));
+    ) + '&next=' + encodeURIComponent(req.originalUrl));
   }
   try {
     const srvRes = await pool.query(`

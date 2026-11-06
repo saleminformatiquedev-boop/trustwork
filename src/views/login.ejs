@@ -19,6 +19,23 @@
       </div>
     <% } %>
 
+    <div id="inapp-warning" class="hidden mb-5 p-4 bg-amber-50 border border-amber-300 rounded-xl text-left">
+      <div class="flex items-start gap-2.5">
+        <i class="fa-solid fa-triangle-exclamation text-amber-600 mt-0.5"></i>
+        <div class="text-xs text-amber-900 leading-relaxed">
+          <strong class="block text-sm mb-1">Open this page in your browser</strong>
+          Google sign-in does not work inside the Facebook / Messenger / Instagram in-app browser.
+          Open TrustWork in <strong>Chrome</strong> or <strong>Safari</strong> to sign in.
+          <div class="flex flex-wrap gap-2 mt-3">
+            <a id="inapp-open-chrome" href="#" class="hidden px-3 py-2 bg-slate-900 text-white font-semibold rounded-lg">Open in Chrome</a>
+            <button type="button" id="inapp-copy-link" class="px-3 py-2 bg-white border border-amber-300 text-amber-900 font-semibold rounded-lg">Copy link</button>
+          </div>
+          <p id="inapp-ios-tip" class="hidden mt-2 text-[11px] text-amber-800">On iPhone: tap <strong>•••</strong> (or the compass icon) then <strong>Open in Safari</strong>.</p>
+          <p id="inapp-copied" class="hidden mt-2 text-[11px] font-semibold text-emerald-700">Link copied — paste it in Chrome or Safari.</p>
+        </div>
+      </div>
+    </div>
+
     <button type="button" id="google-signin-btn" class="disabled:opacity-60 disabled:cursor-wait w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm rounded-xl transition">
       <svg class="w-4 h-4 bg-white rounded-full p-0.5" viewBox="0 0 24 24">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -93,6 +110,31 @@
   const errBox = document.getElementById('login-error');
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
+  // Facebook / Messenger / Instagram / TikTok... in-app browsers: Google blocks OAuth there
+  const ua = navigator.userAgent || '';
+  const inAppBrowser = /FBAN|FBAV|FB_IAB|FBIOS|FB4A|Messenger|Instagram|Snapchat|TikTok|musical_ly|BytedanceWebview|MicroMessenger|Line\/|Twitter/i.test(ua);
+  if (inAppBrowser) {
+    document.getElementById('inapp-warning').classList.remove('hidden');
+    const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    const chromeLink = document.getElementById('inapp-open-chrome');
+    if (isAndroid) {
+      chromeLink.href = 'intent://' + location.host + location.pathname + location.search +
+        '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' +
+        encodeURIComponent(location.href) + ';end';
+      chromeLink.classList.remove('hidden');
+    }
+    if (isIOS) document.getElementById('inapp-ios-tip').classList.remove('hidden');
+    document.getElementById('inapp-copy-link').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(location.href); }
+      catch (_) {
+        const ta = document.createElement('textarea'); ta.value = location.href;
+        document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.remove();
+      }
+      document.getElementById('inapp-copied').classList.remove('hidden');
+    });
+  }
+
   function showError(msg) {
     errBox.textContent = msg;
     errBox.classList.remove('hidden');
@@ -152,6 +194,11 @@
 
   btn.addEventListener('click', async () => {
     errBox.classList.add('hidden');
+    if (inAppBrowser) {
+      showError('Google blocks sign-in inside this in-app browser. Please open this page in Chrome or Safari (see the box above).');
+      document.getElementById('inapp-warning').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     setBusy(true);
     try {
       const result = await signInWithPopup(auth, provider);
