@@ -14,7 +14,8 @@ const QRCode = require('qrcode');
 const { pool, initDatabase } = require('./db');
 const {
   setupAuth, ensureAuthenticated, normalizeUser, isDemoModeEnabled, isDemoUser,
-  enforceAdminSessionLimit, requireFreshAdmin, requireFreshIfAdmin
+  enforceAdminSessionLimit, requireFreshAdmin, requireFreshIfAdmin,
+  safeReturnPath, rememberReturnTo
 } = require('./auth');
 const escrow = require('./escrow');
 const emailService = require('./services/email');
@@ -754,6 +755,11 @@ app.get('/', async (req, res) => {
 
 // Login Page
 app.get('/login', (req, res) => {
+  const nextPath = safeReturnPath(req.query.next);
+  if (nextPath) {
+    if (req.isAuthenticated()) return res.redirect(nextPath);
+    rememberReturnTo(req, res, nextPath);
+  }
   res.render('login', { msg: req.query.msg || null });
 });
 
@@ -764,6 +770,13 @@ app.get('/services/new', ensureAuthenticated, (req, res) => {
 
 // Detail of a guide/service with reviews (strips private download links before purchase)
 app.get('/services/:id', async (req, res) => {
+  // Visitors must sign up / sign in first, then land straight back on this exact offer
+  if (!req.isAuthenticated()) {
+    rememberReturnTo(req, res, req.originalUrl);
+    return res.redirect('/login?msg=' + encodeURIComponent(
+      'Create your free account or sign in to view this method — you will be taken straight back to it.'
+    ));
+  }
   try {
     const srvRes = await pool.query(`
       SELECT s.*, u.name as "sellerName", u.avatar as "sellerAvatar", u.bio as "sellerBio", u.skills as "sellerSkills"

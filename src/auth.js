@@ -63,6 +63,45 @@ function getAdminEmail() {
   return (process.env.ADMIN_EMAIL || process.env.NOTIFICATION_EMAIL || 'saleminformatiquedev@gmail.com').trim().toLowerCase();
 }
 
+// ---- "Return to the page I came from" after sign-in (open-redirect safe) ----
+const RETURN_COOKIE = 'trustwork.next';
+
+// Only same-site relative paths are ever accepted (never //host, http://, backslashes or control chars)
+function safeReturnPath(p) {
+  if (typeof p !== 'string') return null;
+  const v = p.trim();
+  if (!v || v.length > 300) return null;
+  if (!v.startsWith('/') || v.startsWith('//') || v.startsWith('/\\')) return null;
+  if (/[\\\u0000-\u001f\u007f]/.test(v)) return null;
+  if (/^\/(login|logout|auth)(\/|\?|$)/i.test(v)) return null;
+  return v;
+}
+
+function readCookieValue(req, name) {
+  const raw = req.headers.cookie || '';
+  const match = raw.split(';').map(c => c.trim()).find(c => c.startsWith(name + '='));
+  if (!match) return null;
+  try { return decodeURIComponent(match.slice(name.length + 1)); } catch (_) { return null; }
+}
+
+function rememberReturnTo(req, res, target) {
+  const safe = safeReturnPath(target);
+  if (!safe) return;
+  res.cookie(RETURN_COOKIE, safe, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: Boolean(req.secure || req.headers['x-forwarded-proto'] === 'https'),
+    maxAge: 15 * 60 * 1000,
+    path: '/'
+  });
+}
+
+function consumeReturnTo(req, res) {
+  const safe = safeReturnPath(readCookieValue(req, RETURN_COOKIE));
+  res.clearCookie(RETURN_COOKIE, { path: '/' });
+  return safe;
+}
+
 // Admin hardening: absolute session lifetime + "fresh login" required for sensitive money actions
 const ADMIN_MAX_SESSION_MS = 4 * 60 * 60 * 1000; // real admin sessions last 4h max
 const ADMIN_FRESH_LOGIN_MS = 30 * 60 * 1000;     // sensitive admin actions need a Google sign-in within 30 min
@@ -247,7 +286,7 @@ function setupAuth(app, pool) {
         if (err) {
           return res.status(500).json({ success: false, error: "Session error." });
         }
-        return res.json({ success: true, redirectUrl: '/dashboard' });
+        return res.json({ success: true, redirectUrl: consumeReturnTo(req, res) || '/dashboard' });
       });
     } catch (err) {
       console.error("Firebase Google Auth error:", err);
@@ -270,7 +309,7 @@ function setupAuth(app, pool) {
       if (isRealAdmin(req.user)) {
         console.log('[ADMIN-AUDIT]', JSON.stringify({ ts: new Date().toISOString(), action: 'ADMIN_LOGIN', ip: req.ip, via: 'oauth' }));
       }
-      res.redirect('/dashboard');
+      res.redirect(consumeReturnTo(req, res) || '/dashboard');
     }
   );
 
@@ -319,7 +358,7 @@ function setupAuth(app, pool) {
 
       loginWithRegeneratedSession(req, normalizeUser(user), (err) => {
         if (err) return res.status(500).send("Session error");
-        res.redirect('/dashboard');
+        res.redirect(consumeReturnTo(req, res) || '/dashboard');
       });
     } catch (e) {
       console.error("Demo login error:", e);
@@ -333,6 +372,8 @@ function ensureAuthenticated(req, res, next) {
   if (req.path.startsWith('/api/')) {
     return res.status(401).json({ success: false, error: 'Authentication required' });
   }
+  // Remember the page the visitor wanted so we send them back right after sign-in
+  if (req.method === 'GET') rememberReturnTo(req, res, req.originalUrl);
   res.redirect('/login');
 }
 
@@ -344,5 +385,7 @@ module.exports = {
   isDemoUser,
   enforceAdminSessionLimit,
   requireFreshAdmin,
-  requireFreshIfAdmin
+  requireFreshIfAdmin,
+  safeReturnPath,
+  rememberReturnTo
 };
