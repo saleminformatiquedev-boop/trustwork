@@ -6,6 +6,9 @@ const BINANCE_API_BASE = 'https://api.binance.com';
 const PLATFORM_BINANCE_PAY_ID = process.env.PLATFORM_BINANCE_PAY_ID || process.env.BINANCE_PAY_ID || '1229901779';
 const DEFAULT_USDT_TRC20 = process.env.USDT_TRC20_ADDRESS || 'TNw9pxbxwf6qtvymRSnr2quaWxVCi5fwqu';
 const DEFAULT_USDT_BEP20 = process.env.USDT_BEP20_ADDRESS || '0x284b2c731c9a9449f88f42bc707c05511bb9b222';
+// Reject any historical Binance transaction created before the platform API integration
+const MIN_DEPOSIT_TIMESTAMP = 1793956460000;
+const MAX_DEPOSIT_AGE_MS = 48 * 60 * 60 * 1000; // 48 hours max age for automatic verification
 
 function getCredentials() {
   return {
@@ -94,14 +97,21 @@ async function verifyIncomingDeposit({ txId, expectedAmount }) {
     for (const item of payList) {
       const orderId = String(item.orderId || '').trim();
       const transactionId = String(item.transactionId || '').trim();
-      const note = String(item.note || '').trim();
+      const txTime = Number(item.transactionTime || 0);
 
+      // Strict exact match on private Binance Pay Order ID or Transaction ID only (never match user-controlled note)
       const idMatches =
-        orderId.toLowerCase() === cleanLower ||
-        transactionId.toLowerCase() === cleanLower ||
-        (cleanLower.length >= 10 && note.toLowerCase().includes(cleanLower));
+        (orderId && orderId.toLowerCase() === cleanLower) ||
+        (transactionId && transactionId.toLowerCase() === cleanLower);
 
       if (idMatches) {
+        if (txTime < MIN_DEPOSIT_TIMESTAMP || (Date.now() - txTime > MAX_DEPOSIT_AGE_MS)) {
+          return {
+            verified: false,
+            reason: 'This Binance Pay transaction is expired or predates platform integration.'
+          };
+        }
+
         const currency = String(item.currency || '').toUpperCase();
         const rawAmt = parseFloat(item.amount || 0);
 
@@ -121,15 +131,16 @@ async function verifyIncomingDeposit({ txId, expectedAmount }) {
         }
 
         const receivedAmount = Math.round(rawAmt * 100) / 100;
-        if (receivedAmount + 0.001 < minAmount) {
+        if (Math.abs(receivedAmount - minAmount) > 0.01) {
           return {
             verified: false,
-            reason: `Binance Pay transaction found, but received amount (${receivedAmount.toFixed(2)} USDT) is less than declared amount (${minAmount.toFixed(2)} USDT).`
+            reason: `Binance Pay amount (${receivedAmount.toFixed(2)} USDT) does not match the declared deposit amount (${minAmount.toFixed(2)} USDT).`
           };
         }
 
         return {
           verified: true,
+          autoCreditAllowed: true,
           method: 'BINANCE_PAY',
           canonicalTxId: orderId || transactionId,
           actualAmount: receivedAmount,
@@ -161,6 +172,14 @@ async function verifyIncomingDeposit({ txId, expectedAmount }) {
           depId.toLowerCase() === cleanLower;
 
         if (isMatch) {
+          const insertTime = Number(dep.insertTime || 0);
+          if (insertTime < MIN_DEPOSIT_TIMESTAMP || (Date.now() - insertTime > MAX_DEPOSIT_AGE_MS)) {
+            return {
+              verified: false,
+              reason: 'This on-chain deposit is expired or predates platform integration.'
+            };
+          }
+
           const coin = String(dep.coin || '').toUpperCase();
           if (coin !== 'USDT') {
             return { verified: false, reason: `Deposit found, but coin is ${coin} instead of USDT.` };
@@ -175,15 +194,18 @@ async function verifyIncomingDeposit({ txId, expectedAmount }) {
           }
 
           const receivedAmount = Math.round(parseFloat(dep.amount || 0) * 100) / 100;
-          if (receivedAmount + 0.001 < minAmount) {
+          if (Math.abs(receivedAmount - minAmount) > 0.01) {
             return {
               verified: false,
-              reason: `On-chain deposit found, but amount (${receivedAmount.toFixed(2)} USDT) is less than declared amount (${minAmount.toFixed(2)} USDT).`
+              reason: `On-chain deposit amount (${receivedAmount.toFixed(2)} USDT) does not match declared amount (${minAmount.toFixed(2)} USDT).`
             };
           }
 
+          // Note: Public blockchain txIds are visible on TronScan/BscScan, so autoCreditAllowed is false for user submissions
+          // (Admin can approve in 1 click via VERIFY_API, preventing blockchain explorer front-running!)
           return {
             verified: true,
+            autoCreditAllowed: false,
             method: `ON_CHAIN_${dep.network || 'USDT'}`,
             canonicalTxId: cleanChainTx || depId,
             actualAmount: receivedAmount

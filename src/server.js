@@ -1427,6 +1427,10 @@ app.post('/api/chat/messages', ensureAuthenticated, upload.single('file'), async
     let fileType = null;
 
     if (req.file) {
+      if (isDemoUser(req.user)) {
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+        return res.status(403).json({ success: false, error: 'Shared demo accounts cannot upload files to the server.' });
+      }
       const ext = path.extname(req.file.filename).toLowerCase();
       verifyUploadedFileSafety(req.file.path, ext);
 
@@ -1683,6 +1687,55 @@ app.get('/dashboard', ensureAuthenticated, async (req, res) => {
   }
 });
 
+// Real-Money Ledger Solvency Guard: Recomputes a real user's maximum legitimate balance from COMPLETED real-money transactions
+async function verifyRealUserSolvency(client, user) {
+  if (!user || isDemoUser(user)) return { solvent: false, maxAllowedBalance: 0 };
+
+  const depRes = await client.query(
+    `SELECT COALESCE(SUM(amount), 0) AS total FROM deposits WHERE "userId" = $1 AND status = 'COMPLETED'`,
+    [user.id]
+  );
+  const salesRes = await client.query(
+    `SELECT COALESCE(SUM(COALESCE(o."sellerNetAmount", ROUND(o.amount * 0.85, 2))), 0) AS total
+     FROM orders o
+     JOIN users b ON o."buyerId" = b.id
+     WHERE o."sellerId" = $1 AND o.status = 'COMPLETED' AND b.email NOT LIKE '%.local'`,
+    [user.id]
+  );
+  let adminComm = 0;
+  if (user.role === 'ADMIN') {
+    const commRes = await client.query(
+      `SELECT COALESCE(SUM(COALESCE(o."platformFee", ROUND(o.amount * 0.15, 2))), 0) AS total
+       FROM orders o
+       JOIN users b ON o."buyerId" = b.id
+       WHERE o.status = 'COMPLETED' AND b.email NOT LIKE '%.local'`
+    );
+    adminComm = parseFloat(commRes.rows[0].total) || 0;
+  }
+  const spentRes = await client.query(
+    `SELECT COALESCE(SUM(amount), 0) AS total FROM orders WHERE "buyerId" = $1 AND status != 'REFUNDED'`,
+    [user.id]
+  );
+  const withRes = await client.query(
+    `SELECT COALESCE(SUM(amount), 0) AS total FROM withdrawals WHERE "userId" = $1 AND status IN ('PENDING', 'COMPLETED')`,
+    [user.id]
+  );
+
+  const completedDeposits = parseFloat(depRes.rows[0].total) || 0;
+  const completedSalesNet = parseFloat(salesRes.rows[0].total) || 0;
+  const buyerSpent = parseFloat(spentRes.rows[0].total) || 0;
+  const priorWithdrawals = parseFloat(withRes.rows[0].total) || 0;
+
+  const maxAllowedBalance = Math.round((completedDeposits + completedSalesNet + adminComm - buyerSpent - priorWithdrawals) * 100) / 100;
+  const currentWallet = Math.round((parseFloat(user.walletBalance) || 0) * 100) / 100;
+
+  return {
+    solvent: currentWallet <= maxAllowedBalance + 0.05,
+    maxAllowedBalance,
+    currentWallet
+  };
+}
+
 // Request withdrawal via Binance API (On-Chain TRC20/BEP20 or Binance Pay ID)
 app.post('/api/wallet/withdraw', ensureAuthenticated, async (req, res) => {
   if (isDemoUser(req.user)) {
@@ -1716,6 +1769,15 @@ app.post('/api/wallet/withdraw', ensureAuthenticated, async (req, res) => {
     if (parseFloat(user.walletBalance) < amount) {
       await client.query('ROLLBACK');
       return res.status(400).json({ success: false, error: 'Insufficient available balance.' });
+    }
+
+    const solvency = await verifyRealUserSolvency(client, user);
+    if (!solvency.solvent || solvency.maxAllowedBalance + 0.05 < amount) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        success: false,
+        error: 'Security check: Withdrawal exceeds verified real-money deposit/escrow ledger balance.'
+      });
     }
 
     await client.query('UPDATE users SET "walletBalance" = "walletBalance" - $1 WHERE id = $2', [amount, user.id]);
@@ -1907,24 +1969,32 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
     expectedAmount: amount
   });
 
-  // If Binance API found a matching TxID that is invalid (e.g. outgoing payment, wrong currency, or lower amount), block immediately
+  // If Binance API found a matching TxID that is invalid (e.g. outgoing payment, wrong currency, mismatching amount, or expired), block immediately
   if (
     !verification.verified &&
     verification.reason &&
     (verification.reason.includes('outgoing payment') ||
      verification.reason.includes('instead of USDT') ||
-     verification.reason.includes('is less than declared amount'))
+     verification.reason.includes('does not match') ||
+     verification.reason.includes('expired or predates'))
   ) {
     return res.status(400).json({ success: false, error: verification.reason });
   }
 
   const canonicalTxId = verification.canonicalTxId || txId;
+  const shouldAutoCredit = Boolean(verification.verified && verification.autoCreditAllowed);
   const creditAmount = verification.verified ? verification.actualAmount : amount;
-  const targetStatus = verification.verified ? 'COMPLETED' : 'PENDING';
+  const targetStatus = shouldAutoCredit ? 'COMPLETED' : 'PENDING';
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Serialize concurrent submissions of the same txId across ALL users using PostgreSQL transaction-level advisory locks
+    const lockKeys = Array.from(new Set([txId.toLowerCase(), canonicalTxId.toLowerCase()])).sort();
+    for (const k of lockKeys) {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [k]);
+    }
 
     // Lock user and check for duplicate txId (case-insensitive)
     await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [req.user.id]);
@@ -1944,7 +2014,7 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
       RETURNING *
     `, [depId, req.user.id, creditAmount, binancePayId, canonicalTxId, targetStatus]);
 
-    if (verification.verified) {
+    if (shouldAutoCredit) {
       await client.query(
         'UPDATE users SET "walletBalance" = "walletBalance" + $1 WHERE id = $2',
         [creditAmount, req.user.id]
@@ -1953,7 +2023,7 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
 
     await client.query('COMMIT');
 
-    if (verification.verified) {
+    if (shouldAutoCredit) {
       io.to(`user_${req.user.id}`).emit('user_notification', {
         title: '💰 Deposit Verified by Binance API!',
         body: `+${creditAmount.toFixed(2)} USDT has been automatically credited to your wallet.`,
@@ -1977,10 +2047,12 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
 
     return res.json({
       success: true,
-      autoCredited: verification.verified,
-      message: verification.verified
+      autoCredited: shouldAutoCredit,
+      message: shouldAutoCredit
         ? `✅ Verified by Binance API! +${creditAmount.toFixed(2)} USDT has been credited to your balance immediately.`
-        : `Deposit (${amount.toFixed(2)} USDT, TxID: ${txId}) recorded as PENDING. ${verification.reason}`,
+        : verification.verified
+          ? `✅ On-chain deposit of ${creditAmount.toFixed(2)} USDT detected on Binance! Queued for 1-click Admin security confirmation.`
+          : `Deposit (${amount.toFixed(2)} USDT, TxID: ${txId}) recorded as PENDING. ${verification.reason}`,
       deposit: depRes.rows[0]
     });
   } catch (err) {
@@ -2113,8 +2185,8 @@ app.post('/disputes/:id/resolve', ensureAuthenticated, async (req, res) => {
 
 // Admin: Approve, Auto-Verify via Binance API, or Reject a Pending Deposit
 app.post('/admin/deposits/:id/decision', ensureAuthenticated, async (req, res) => {
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).send("Unauthorized");
+  if (req.user.role !== 'ADMIN' || isDemoUser(req.user)) {
+    return res.status(403).send("Unauthorized: Real Administrator account required.");
   }
   const { action } = req.body;
   if (!['APPROVE', 'REJECT', 'VERIFY_API'].includes(action)) {
@@ -2131,11 +2203,13 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, async (req, res) =
       return res.redirect('/admin/disputes');
     }
 
+    await client.query('SELECT pg_advisory_xact_lock(hashtext(LOWER($1)))', [deposit.txId]);
+
     const uRes = await client.query('SELECT id, email FROM users WHERE id = $1 FOR UPDATE', [deposit.userId]);
     const targetUser = uRes.rows[0];
-    if (isDemoUser(req.user) && !isDemoUser(targetUser)) {
+    if (!targetUser || isDemoUser(targetUser)) {
       await client.query('ROLLBACK');
-      return res.status(403).send("Sandbox isolation: Demo Admin cannot approve or reject real users' deposits.");
+      return res.status(403).send("Sandbox isolation: Demo accounts cannot receive real deposit credits.");
     }
 
     let finalDecision = action;
@@ -2152,6 +2226,16 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, async (req, res) =
     }
 
     if (finalDecision === 'APPROVE') {
+      // Ensure no other COMPLETED deposit already used this txId
+      const dupCheck = await client.query(
+        `SELECT id FROM deposits WHERE id != $1 AND LOWER("txId") = LOWER($2) AND status = 'COMPLETED'`,
+        [deposit.id, deposit.txId]
+      );
+      if (dupCheck.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).send("Duplicate TxID: Another deposit with this transaction ID was already completed.");
+      }
+
       const amount = Math.round(parseFloat(deposit.amount) * 100) / 100;
       await client.query('UPDATE users SET "walletBalance" = "walletBalance" + $1 WHERE id = $2', [amount, deposit.userId]);
       await client.query("UPDATE deposits SET status = 'COMPLETED' WHERE id = $1", [deposit.id]);
@@ -2182,8 +2266,8 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, async (req, res) =
 
 // Admin: Send via Binance API, Mark Approved, or Reject (and refund) a Pending Withdrawal
 app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, async (req, res) => {
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).send("Unauthorized");
+  if (req.user.role !== 'ADMIN' || isDemoUser(req.user)) {
+    return res.status(403).send("Unauthorized: Real Administrator account required.");
   }
   const { action } = req.body;
   if (!['APPROVE', 'REJECT', 'SEND_API'].includes(action)) {
@@ -2200,15 +2284,21 @@ app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, async (req, res
       return res.redirect('/admin/disputes');
     }
 
-    const uRes = await client.query('SELECT id, email FROM users WHERE id = $1 FOR UPDATE', [withdrawal.userId]);
+    const uRes = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [withdrawal.userId]);
     const targetUser = uRes.rows[0];
-    if (isDemoUser(req.user) && !isDemoUser(targetUser)) {
+    if (!targetUser || isDemoUser(targetUser)) {
       await client.query('ROLLBACK');
-      return res.status(403).send("Sandbox isolation: Demo Admin cannot process real users' withdrawals.");
+      return res.status(403).send("Sandbox isolation: Demo accounts cannot process real withdrawals.");
     }
 
     let finalDecision = action;
     if (action === 'SEND_API') {
+      const solvency = await verifyRealUserSolvency(client, targetUser);
+      if (!solvency.solvent) {
+        await client.query('ROLLBACK');
+        return res.status(403).send("Security Alert: User wallet balance exceeds verified real-money ledger solvency.");
+      }
+
       const apiOut = await binanceService.executeUsdtWithdrawal({
         destination: withdrawal.binanceId,
         amount: withdrawal.amount,
