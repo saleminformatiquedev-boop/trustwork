@@ -349,21 +349,60 @@ async function initDatabase() {
               WHEN "category" = 'Méthodologie de Développement' THEN 'Development Methodology'
               WHEN "category" = 'Sécurité & Blockchain' THEN 'Security & Blockchain'
               WHEN "category" = 'Architecture Logicielle' THEN 'Software Architecture'
+              WHEN "category" = 'Design & Graphisme' THEN 'Software Architecture'
+              WHEN "category" = 'Développement Web & Mobile' THEN 'Backend & API'
               ELSE "category"
             END;
+
+        UPDATE services
+        SET title = 'PDF Guide: How to deploy a Web application to AWS with Docker & HTTPS',
+            description = 'Step-by-step method to accomplish this task from A to Z: EC2 instance creation, Nginx configuration, automated Let''s Encrypt SSL, Docker Compose, monitoring, and failover management. With copy-paste ready shell scripts.',
+            category = 'Cloud & Deployment'
+        WHERE id = 'srv_logo_minimal';
+
+        UPDATE services
+        SET title = 'PDF Method: How to design a secure REST API with JWT & PostgreSQL',
+            description = 'Practical procedure sheet to build a robust API: strict input validation, password hashing with bcrypt, secure JWT token management, authorization middleware, and ACID transactions protected against double-spending.',
+            category = 'Backend & API'
+        WHERE id = 'srv_landing_page';
+
+        INSERT INTO services (id, "sellerId", title, description, category, price, "deliveryDays", "fileUrl", "fileName", "fileSize", "pageCount", "difficulty")
+        SELECT 'srv_guide_cicd_actions', 'usr_seller_demo',
+               'PDF Playbook: How to build a CI/CD Pipeline with GitHub Actions',
+               'Step-by-step playbook to automate your tests and deployments: YAML configuration, secure infrastructure secrets management, automated unit test runs, and zero-downtime deployment.',
+               'DevOps & CI/CD', 39.00, 1, '/uploads/guide-methode-developpement-ideale.pdf', 'playbook-cicd-github-actions.pdf', '3.1 MB', 55, 'Advanced'
+        WHERE EXISTS (SELECT 1 FROM users WHERE id = 'usr_seller_demo')
+          AND NOT EXISTS (SELECT 1 FROM services WHERE id = 'srv_guide_cicd_actions');
+
+        UPDATE conversations
+        SET subject = 'Questions about the method & files',
+            "lastMessageText" = 'Thank you for the clarification!'
+        WHERE id = 'conv_buyer_seller';
+
+        UPDATE direct_messages
+        SET content = 'Thank you for the clarification!'
+        WHERE content LIKE 'Merci pour les%';
+
+        UPDATE messages
+        SET content = 'Order confirmed! Your USDT payment is securely locked in escrow and your package files are ready for download.'
+        WHERE content LIKE 'Commande confirm%' OR content LIKE '%Commande valid%';
+
+        UPDATE orders
+        SET "deliveryNote" = 'Instant access: Your complete method package (PDF Guide, ZIP Source Code, Shell Scripts, and Video Walkthrough) is ready to download above.',
+            requirements = 'Instant purchase of method package'
+        WHERE "deliveryNote" LIKE '%Accès immédiat%' OR requirements LIKE 'Achat%';
       `);
     }
 
     // Initialize demo conversations if empty
     const convCountRes = await client.query('SELECT count(*) as total FROM conversations');
     if (parseInt(convCountRes.rows[0].total, 10) === 0) {
-      console.log("💬 Initialisation des conversations de démonstration...");
+      console.log("💬 Initializing demo conversations...");
 
       const buyerId = "usr_buyer_demo";
       const sellerId = "usr_seller_demo";
       const adminId = "usr_admin_demo";
 
-      // Récupérer un serviceId existant ou null
       const srvCheck = await client.query('SELECT id FROM services LIMIT 1');
       const sampleSrvId = srvCheck.rows.length > 0 ? srvCheck.rows[0].id : null;
 
@@ -375,8 +414,8 @@ async function initDatabase() {
       `, [
         conv1Id,
         sampleSrvId,
-        "Question sur la méthode et les fichiers",
-        "Avec plaisir ! Si vous avez la moindre question, écrivez-moi ici."
+        "Questions about the method & files",
+        "My pleasure! If you have any questions while running the playbook, feel free to ask here."
       ]);
 
       await client.query(`

@@ -79,7 +79,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname || '').toLowerCase();
     if (!ALLOWED_EXTENSIONS.has(ext)) {
-      return cb(new Error(`Format de fichier non autorisé (${ext}). Formats acceptés : PDF, ZIP, TXT, Images, Vidéos.`));
+      return cb(new Error(`Unsupported file format (${ext}). Allowed formats: PDF, ZIP, TXT, Images, Videos.`));
     }
     cb(null, true);
   }
@@ -633,7 +633,7 @@ app.post('/orders/create', ensureAuthenticated, async (req, res) => {
 
     res.redirect('/orders/' + order.id);
   } catch (err) {
-    const safeMsg = JSON.stringify("Erreur : " + (err.message || "Impossible de créer la commande"));
+    const safeMsg = JSON.stringify("Error: " + (err.message || "Unable to create order"));
     res.status(400).send(`
       <script>
         alert(${safeMsg});
@@ -991,7 +991,7 @@ app.post('/api/chat/messages', ensureAuthenticated, upload.single('file'), async
     }
 
     if (!(await canAccessConversation(req.user, conversationId))) {
-      return res.status(403).json({ success: false, error: 'Accès refusé à cette conversation' });
+      return res.status(403).json({ success: false, error: 'Access denied to this conversation' });
     }
 
     let fileUrl = null;
@@ -1385,18 +1385,18 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
 
     if (isNaN(amount) || !Number.isFinite(amount) || amount <= 0 || amount > 50000) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ success: false, error: 'Montant de recharge invalide (max 50 000 USDT).' });
+      return res.status(400).json({ success: false, error: 'Invalid top-up amount (max 50,000 USDT).' });
     }
 
     if (!txId || !/^[a-zA-Z0-9_-]{6,100}$/.test(txId)) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ success: false, error: 'Veuillez saisir un identifiant de transaction Binance (TxID) valide (6 à 100 caractères alphanumériques).' });
+      return res.status(400).json({ success: false, error: 'Please enter a valid Binance Transaction ID (TxID, 6 to 100 alphanumeric characters).' });
     }
 
     const existingTx = await client.query('SELECT id FROM deposits WHERE "txId" = $1', [txId]);
     if (existingTx.rows.length > 0) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ success: false, error: 'Cet identifiant de transaction (TxID) a déjà été enregistré.' });
+      return res.status(400).json({ success: false, error: 'This Transaction ID (TxID) has already been used.' });
     }
 
     const upd = await client.query(`
@@ -1432,7 +1432,7 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
 
     res.json({
       success: true,
-      message: `Votre recharge de ${amount.toFixed(2)} USDT via Binance Pay a été enregistrée avec succès !`,
+      message: `Your top-up of ${amount.toFixed(2)} USDT via Binance Pay has been credited!`,
       newWalletBalance,
       deposit: depRes.rows[0]
     });
@@ -1448,7 +1448,7 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
 app.post('/api/wallet/deposit-test', ensureAuthenticated, async (req, res) => {
   try {
     if (process.env.ENABLE_DEMO_MODE === 'false') {
-      return res.status(403).json({ success: false, error: 'Le mode recharge de démonstration est désactivé.' });
+      return res.status(403).json({ success: false, error: 'Demo top-up mode is disabled.' });
     }
 
     const upd = await pool.query(`
@@ -1531,9 +1531,9 @@ app.post('/disputes/:id/resolve', ensureAuthenticated, async (req, res) => {
 app.use((err, req, res, next) => {
   console.error("[Security/Server Error]:", err.message);
   if (req.path.startsWith('/api/')) {
-    return res.status(400).json({ success: false, error: err.message || 'Requête invalide.' });
+    return res.status(400).json({ success: false, error: err.message || 'Invalid request.' });
   }
-  res.status(400).send("Erreur lors du traitement de la requête : " + (err.message || "Requête invalide"));
+  res.status(400).send("Error processing request: " + (err.message || "Invalid request"));
 });
 
 // Initialize database and start server

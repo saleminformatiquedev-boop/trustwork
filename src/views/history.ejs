@@ -1,246 +1,91 @@
-<%- include('partials/header', { title: 'Transaction History' }) %>
+<%- include('partials/header', { title: 'Order History' }) %>
 
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-6">
 
-  <!-- History Page Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
-      <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 mb-1">
-        <a href="/dashboard" class="hover:text-emerald-600">Dashboard</a>
-        <span>/</span>
-        <span>Activity Log</span>
-      </div>
-      <h1 class="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2">
-        <i class="fa-solid fa-clock-rotate-left text-emerald-600"></i> Complete Activity History
-      </h1>
-      <p class="text-xs text-slate-500 mt-1">
-        Transparent tracking of every fund transfer, escrow validation, arbitration decision, and delivery.
-      </p>
+      <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900">Order History</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Track all your purchases and sales.</p>
     </div>
 
-    <!-- History Type Tabs -->
-    <div class="flex flex-wrap gap-1.5 bg-slate-100 p-1.5 rounded-xl self-start sm:self-auto text-xs font-semibold">
-      <button class="hist-tab-btn active px-3 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm transition" data-target="tab-all">
-        All (<%= buyerHistory.length + sellerHistory.length + (adminDisputes ? adminDisputes.length : 0) %>)
-      </button>
-      <button class="hist-tab-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition" data-target="tab-buyer">
-        Purchases (<%= buyerHistory.length %>)
-      </button>
-      <button class="hist-tab-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition" data-target="tab-seller">
-        Sales (<%= sellerHistory.length %>)
-      </button>
-      <% if (user.role === 'ADMIN') { %>
-        <button class="hist-tab-btn px-3 py-1.5 rounded-lg text-amber-700 hover:text-amber-800 transition" data-target="tab-admin">
-          Admin Disputes (<%= adminDisputes ? adminDisputes.length : 0 %>)
-        </button>
-      <% } %>
+    <div class="flex gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold self-start">
+      <button class="hist-tab-btn active px-3 py-1.5 rounded-lg bg-white text-slate-900 shadow-xs transition" data-target="tab-all">All</button>
+      <button class="hist-tab-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition" data-target="tab-buyer">Purchases (<%= buyerHistory.length %>)</button>
+      <button class="hist-tab-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition" data-target="tab-seller">Sales (<%= sellerHistory.length %>)</button>
     </div>
   </div>
 
-  <!-- Quick Stats -->
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-    <div class="bg-white p-4 rounded-xl border border-slate-200 text-center">
-      <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Total Spent</span>
-      <div class="text-lg sm:text-xl font-black text-slate-900">
-        <%= totalSpent.toFixed(2) %> <span class="text-xs text-slate-400">USDT</span>
-      </div>
+  <!-- Purchases -->
+  <div id="tab-buyer" class="hist-section bg-white rounded-2xl border border-slate-200/90 overflow-hidden">
+    <div class="px-5 py-3.5 border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
+      Purchases (<%= buyerHistory.length %>)
     </div>
-
-    <div class="bg-white p-4 rounded-xl border border-slate-200 text-center">
-      <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Total Earned</span>
-      <div class="text-lg sm:text-xl font-black text-emerald-600">
-        +<%= totalEarned.toFixed(2) %> <span class="text-xs text-emerald-500">USDT</span>
-      </div>
-    </div>
-
-    <div class="bg-white p-4 rounded-xl border border-slate-200 text-center">
-      <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Currently in Escrow</span>
-      <div class="text-lg sm:text-xl font-black text-amber-600">
-        <%= user.escrowBalance.toFixed(2) %> <span class="text-xs text-amber-500">USDT</span>
-      </div>
-    </div>
-
-    <div class="bg-white p-4 rounded-xl border border-slate-200 text-center">
-      <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Completed Orders</span>
-      <div class="text-lg sm:text-xl font-black text-blue-600">
-        <%= completedCount %>
-      </div>
-    </div>
-  </div>
-
-  <!-- Section 1: Buyer History -->
-  <div id="tab-buyer" class="hist-section bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-      <h2 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-        <i class="fa-solid fa-cart-shopping text-emerald-600"></i> Purchased Orders History
-      </h2>
-      <span class="text-xs text-slate-500"><%= buyerHistory.length %> transaction(s)</span>
-    </div>
-
     <div class="divide-y divide-slate-100">
       <% if (buyerHistory && buyerHistory.length > 0) { %>
         <% buyerHistory.forEach(ord => { %>
-          <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/80 transition">
-            <div class="space-y-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <span class="text-[10px] font-bold text-slate-400">#<%= ord.id %></span>
-                <span class="text-[10px] text-slate-400">• <%= new Date(ord.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></span>
-              </div>
-              <h4 class="text-xs sm:text-sm font-bold text-slate-900">
-                <a href="/orders/<%= ord.id %>" class="hover:text-emerald-600 transition"><%= ord.serviceTitle %></a>
-              </h4>
-              <p class="text-[11px] text-slate-500">
-                Author: <strong class="text-slate-700"><%= ord.sellerName %></strong>
-              </p>
+          <a href="/orders/<%= ord.id %>" class="p-5 flex items-center justify-between gap-4 hover:bg-slate-50 transition block">
+            <div class="min-w-0">
+              <div class="text-xs text-slate-400">Author: <%= ord.sellerName %></div>
+              <h4 class="text-sm font-bold text-slate-900 truncate mt-0.5"><%= ord.serviceTitle %></h4>
             </div>
-
-            <div class="flex items-center justify-between sm:justify-end gap-4 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-              <div class="text-left sm:text-right">
-                <div class="text-xs sm:text-sm font-black text-slate-900"><%= ord.amount.toFixed(2) %> USDT</div>
-                <span class="text-[10px] text-slate-400 block">Fixed price</span>
-              </div>
-
-              <div class="text-right">
-                <span class="inline-block text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : (ord.status === 'DELIVERED' ? 'bg-amber-100 text-amber-800' : (ord.status === 'DISPUTED' ? 'bg-rose-100 text-rose-800' : (ord.status === 'REFUNDED' ? 'bg-slate-200 text-slate-800' : 'bg-blue-100 text-blue-800'))) %>">
-                  <%= ord.status === 'ESCROWED' ? '🔒 Escrow' : (ord.status === 'DELIVERED' ? '📦 Delivered' : (ord.status === 'COMPLETED' ? '✅ Completed' : (ord.status === 'DISPUTED' ? '⚖️ Dispute' : '🛡️ Refunded'))) %>
-                </span>
-                <a href="/orders/<%= ord.id %>" class="block text-[10px] sm:text-[11px] text-emerald-600 hover:text-emerald-700 font-semibold mt-1">
-                  View details <i class="fa-solid fa-arrow-right text-[8px]"></i>
-                </a>
-              </div>
+            <div class="flex items-center gap-4 flex-shrink-0">
+              <span class="text-xs font-bold text-slate-900"><%= ord.amount.toFixed(2) %> USDT</span>
+              <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' %>">
+                <%= ord.status === 'COMPLETED' ? 'Completed' : 'Active' %>
+              </span>
             </div>
-          </div>
+          </a>
         <% }) %>
       <% } else { %>
-        <div class="text-center py-12 text-slate-400 text-xs">
-          No purchases made yet.
-        </div>
+        <div class="text-center py-10 text-slate-400 text-xs">No purchases yet.</div>
       <% } %>
     </div>
   </div>
 
-  <!-- Section 2: Seller History -->
-  <div id="tab-seller" class="hist-section bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-      <h2 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-        <i class="fa-solid fa-briefcase text-blue-600"></i> Sales History (Delivered Methods)
-      </h2>
-      <span class="text-xs text-slate-500"><%= sellerHistory.length %> task(s)</span>
+  <!-- Sales -->
+  <div id="tab-seller" class="hist-section bg-white rounded-2xl border border-slate-200/90 overflow-hidden">
+    <div class="px-5 py-3.5 border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
+      Sales (<%= sellerHistory.length %>)
     </div>
-
     <div class="divide-y divide-slate-100">
       <% if (sellerHistory && sellerHistory.length > 0) { %>
         <% sellerHistory.forEach(ord => { %>
-          <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/80 transition">
-            <div class="space-y-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <span class="text-[10px] font-bold text-slate-400">#<%= ord.id %></span>
-                <span class="text-[10px] text-slate-400">• <%= new Date(ord.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></span>
-              </div>
-              <h4 class="text-xs sm:text-sm font-bold text-slate-900">
-                <a href="/orders/<%= ord.id %>" class="hover:text-emerald-600 transition"><%= ord.serviceTitle %></a>
-              </h4>
-              <p class="text-[11px] text-slate-500">
-                Buyer: <strong class="text-slate-700"><%= ord.buyerName %></strong>
-              </p>
+          <a href="/orders/<%= ord.id %>" class="p-5 flex items-center justify-between gap-4 hover:bg-slate-50 transition block">
+            <div class="min-w-0">
+              <div class="text-xs text-slate-400">Buyer: <%= ord.buyerName %></div>
+              <h4 class="text-sm font-bold text-slate-900 truncate mt-0.5"><%= ord.serviceTitle %></h4>
             </div>
-
-            <div class="flex items-center justify-between sm:justify-end gap-4 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-              <div class="text-left sm:text-right">
-                <div class="text-xs sm:text-sm font-black text-emerald-600">+<%= ord.amount.toFixed(2) %> USDT</div>
-                <span class="text-[10px] text-slate-400 block">Payout</span>
-              </div>
-
-              <div class="text-right">
-                <span class="inline-block text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : (ord.status === 'DELIVERED' ? 'bg-amber-100 text-amber-800' : (ord.status === 'DISPUTED' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800')) %>">
-                  <%= ord.status === 'COMPLETED' ? '💰 Paid' : ord.status %>
-                </span>
-                <a href="/orders/<%= ord.id %>" class="block text-[10px] sm:text-[11px] text-blue-600 hover:text-blue-700 font-semibold mt-1">
-                  View <i class="fa-solid fa-arrow-right text-[8px]"></i>
-                </a>
-              </div>
+            <div class="flex items-center gap-4 flex-shrink-0">
+              <span class="text-xs font-bold text-emerald-600">+<%= ord.amount.toFixed(2) %> USDT</span>
+              <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' %>">
+                <%= ord.status === 'COMPLETED' ? 'Paid' : 'Active' %>
+              </span>
             </div>
-          </div>
+          </a>
         <% }) %>
       <% } else { %>
-        <div class="text-center py-12 text-slate-400 text-xs">
-          No sales recorded for your services yet.
-        </div>
+        <div class="text-center py-10 text-slate-400 text-xs">No sales yet.</div>
       <% } %>
     </div>
   </div>
 
-  <!-- Section 3: Admin Arbitration History -->
-  <% if (user.role === 'ADMIN' && adminDisputes) { %>
-    <div id="tab-admin" class="hist-section bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h2 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-          <i class="fa-solid fa-gavel text-amber-600"></i> Arbitration Decisions History (Admin)
-        </h2>
-        <span class="text-xs text-slate-500"><%= adminDisputes.length %> case(s)</span>
-      </div>
-
-      <div class="divide-y divide-slate-100">
-        <% if (adminDisputes && adminDisputes.length > 0) { %>
-          <% adminDisputes.forEach(disp => { %>
-            <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/80 transition">
-              <div class="space-y-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="text-[10px] font-bold text-slate-400">Case #<%= disp.id %></span>
-                  <span class="text-[10px] text-slate-400">• Order #<%= disp.orderId %></span>
-                </div>
-                <h4 class="text-xs sm:text-sm font-bold text-slate-900"><%= disp.serviceTitle %> (<%= disp.amount.toFixed(2) %> USDT)</h4>
-                <p class="text-[11px] text-slate-600"><strong>Reason:</strong> <%= disp.reason %></p>
-                <% if (disp.resolutionNote) { %>
-                  <p class="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg italic border border-slate-100">
-                    Decision: <%= disp.resolutionNote %>
-                  </p>
-                <% } %>
-              </div>
-
-              <div class="text-right flex-shrink-0">
-                <span class="inline-block text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full <%= disp.status === 'OPEN' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800' %>">
-                  <%= disp.status === 'OPEN' ? '⚠️ Pending' : '⚖️ Resolved' %>
-                </span>
-                <a href="/orders/<%= disp.orderId %>" class="block text-[10px] sm:text-[11px] text-amber-600 hover:text-amber-700 font-semibold mt-1">
-                  Review <i class="fa-solid fa-arrow-right text-[8px]"></i>
-                </a>
-              </div>
-            </div>
-          <% }) %>
-        <% } else { %>
-          <div class="text-center py-12 text-slate-400 text-xs">
-            No disputes or arbitration records found.
-          </div>
-        <% } %>
-      </div>
-    </div>
-  <% } %>
-
 </div>
 
-<!-- Filter Tabs Script -->
 <script>
   const tabBtns = document.querySelectorAll('.hist-tab-btn');
   const sections = document.querySelectorAll('.hist-section');
-
   tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       tabBtns.forEach(b => {
-        b.classList.remove('bg-white', 'text-slate-900', 'shadow-sm', 'active');
+        b.classList.remove('bg-white', 'text-slate-900', 'shadow-xs');
         b.classList.add('text-slate-600');
       });
-      btn.classList.add('bg-white', 'text-slate-900', 'shadow-sm', 'active');
+      btn.classList.add('bg-white', 'text-slate-900', 'shadow-xs');
       btn.classList.remove('text-slate-600');
-
       const target = btn.dataset.target;
-      if (target === 'tab-all') {
-        sections.forEach(s => s.style.display = 'block');
-      } else {
-        sections.forEach(s => {
-          s.style.display = s.id === target ? 'block' : 'none';
-        });
-      }
+      sections.forEach(s => {
+        s.style.display = (target === 'tab-all' || s.id === target) ? 'block' : 'none';
+      });
     });
   });
 </script>

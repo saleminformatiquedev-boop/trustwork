@@ -1,93 +1,55 @@
-<%- include('partials/header', { title: 'Dispute Arbitration' }) %>
+<%- include('partials/header', { title: 'Disputes & Arbitration' }) %>
 
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-6">
   
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
-    <div>
-      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-semibold mb-2">
-        <i class="fa-solid fa-gavel text-[10px]"></i> Arbitration & Moderation Area
-      </div>
-      <h1 class="text-xl sm:text-2xl font-black text-slate-900">Dispute & Investigation Center</h1>
-      <p class="text-xs text-slate-500 mt-1">
-        Resolve disagreements between buyers and authors by inspecting task instructions, deliverables, and chat logs.
-      </p>
-    </div>
-    <div class="text-xs bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 self-start sm:self-auto font-medium text-slate-600">
-      <i class="fa-solid fa-shield-halved text-emerald-600 mr-1"></i> 100% Protected Escrow Funds
-    </div>
+  <div>
+    <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900">Dispute Arbitration Center</h1>
+    <p class="text-xs sm:text-sm text-slate-500 mt-1">
+      Review claims and either refund the buyer or release escrow funds to the seller.
+    </p>
   </div>
 
   <% if (disputes && disputes.length > 0) { %>
     <div class="space-y-4">
       <% disputes.forEach(disp => { %>
-        <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-start justify-between gap-6 hover:shadow-md transition">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200/90 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           
-          <div class="space-y-3 flex-grow min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="text-xs font-bold text-slate-400">Case #<%= disp.id %></span>
-              <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full <%= disp.status === 'OPEN' ? 'bg-rose-100 text-rose-800 animate-pulse' : 'bg-emerald-100 text-emerald-800' %>">
-                <%= disp.status === 'OPEN' ? '⚠️ Investigation Open' : '✅ Closed' %>
+          <div class="space-y-2 flex-grow min-w-0">
+            <div class="flex items-center gap-2 text-xs">
+              <span class="font-bold text-slate-400">#<%= disp.id %></span>
+              <span class="font-semibold px-2.5 py-0.5 rounded-full <%= disp.status === 'OPEN' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700' %>">
+                <%= disp.status === 'OPEN' ? 'Open' : 'Resolved' %>
               </span>
-              <span class="text-xs font-bold text-slate-900 bg-slate-100 px-2.5 py-0.5 rounded-full">
-                <%= disp.amount.toFixed(2) %> USDT
-              </span>
+              <span class="font-bold text-slate-900"><%= disp.amount.toFixed(2) %> USDT</span>
             </div>
 
-            <h3 class="font-bold text-slate-900 text-sm sm:text-base">
-              <a href="/orders/<%= disp.orderId %>" class="hover:text-emerald-600 transition flex items-center gap-1.5">
-                <span><%= disp.serviceTitle %></span>
-                <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-slate-400"></i>
-              </a>
+            <h3 class="font-bold text-slate-900 text-base">
+              <a href="/orders/<%= disp.orderId %>" class="hover:underline"><%= disp.serviceTitle %></a>
             </h3>
 
-            <div class="text-xs text-slate-700 bg-rose-50/60 p-3 rounded-xl border border-rose-100 space-y-1">
-              <div class="font-bold text-rose-900">Reason for claim: <%= disp.reason %></div>
-              <div class="text-slate-600 leading-relaxed text-[11px] whitespace-pre-line"><%= disp.details %></div>
-            </div>
-
-            <% if (disp.resolutionNote) { %>
-              <div class="text-xs text-slate-600 bg-emerald-50 p-3 rounded-xl border border-emerald-100">
-                <strong class="text-emerald-900 block mb-0.5">Decision rendered:</strong>
-                <%= disp.resolutionNote %>
-              </div>
-            <% } %>
+            <p class="text-xs text-slate-600"><strong>Reason:</strong> <%= disp.reason %> — <%= disp.details %></p>
           </div>
 
-          <!-- Arbitration Actions -->
-          <div class="flex flex-col sm:flex-row lg:flex-col gap-2.5 flex-shrink-0 pt-4 lg:pt-0 border-t lg:border-t-0 border-slate-100 lg:w-56">
+          <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
             <% if (disp.status === 'OPEN') { %>
-              <form action="/disputes/<%= disp.id %>/resolve" method="POST" class="w-full">
+              <form action="/disputes/<%= disp.id %>/resolve" method="POST">
                 <input type="hidden" name="resolution" value="REFUND_BUYER">
-                <input type="hidden" name="resolutionNote" value="Arbitration: verified defect. Full refund issued to buyer.">
-                <button type="submit" class="w-full px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center justify-center gap-1.5">
-                  <i class="fa-solid fa-rotate-left"></i> Refund Buyer
+                <input type="hidden" name="resolutionNote" value="Full refund issued to buyer.">
+                <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl transition">
+                  Refund Buyer
                 </button>
               </form>
 
-              <form action="/disputes/<%= disp.id %>/resolve" method="POST" class="w-full">
+              <form action="/disputes/<%= disp.id %>/resolve" method="POST">
                 <input type="hidden" name="resolution" value="PAY_SELLER">
-                <input type="hidden" name="resolutionNote" value="Arbitration: deliverables verified and compliant. Releasing payment to seller.">
-                <button type="submit" class="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center justify-center gap-1.5">
-                  <i class="fa-solid fa-check"></i> Pay Author
+                <input type="hidden" name="resolutionNote" value="Payment released to seller.">
+                <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition">
+                  Pay Seller
                 </button>
               </form>
-            <% } else { %>
-              <span class="text-xs font-semibold text-slate-400 text-center py-2 bg-slate-50 rounded-xl border border-slate-100">
-                <i class="fa-solid fa-lock mr-1"></i> Case Arbitrated & Closed
-              </span>
             <% } %>
-
-            <div class="grid grid-cols-2 gap-2">
-              <a href="/chat?recipientId=<%= disp.buyerId %>" class="text-center text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 py-1.5 px-2 rounded-xl transition flex items-center justify-center gap-1 border border-blue-200">
-                <i class="fa-regular fa-comments"></i> Buyer
-              </a>
-              <a href="/chat?recipientId=<%= disp.sellerId %>" class="text-center text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 py-1.5 px-2 rounded-xl transition flex items-center justify-center gap-1 border border-emerald-200">
-                <i class="fa-regular fa-comments"></i> Seller
-              </a>
-            </div>
-
-            <a href="/orders/<%= disp.orderId %>" class="text-center text-xs text-slate-500 hover:text-slate-800 py-2 border border-slate-200 rounded-xl transition flex items-center justify-center gap-1">
-              <i class="fa-solid fa-box text-xs"></i> View order
+            <a href="/orders/<%= disp.orderId %>" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition">
+              View Order
             </a>
           </div>
 
@@ -95,14 +57,8 @@
       <% }) %>
     </div>
   <% } else { %>
-    <div class="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
-      <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3 text-xl">
-        <i class="fa-solid fa-shield-check"></i>
-      </div>
-      <h3 class="text-base font-bold text-slate-800">No active disputes</h3>
-      <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-        All orders are proceeding normally or have already been resolved.
-      </p>
+    <div class="text-center py-14 bg-white rounded-2xl border border-slate-200/90 text-xs text-slate-400">
+      No active disputes.
     </div>
   <% } %>
 

@@ -17,7 +17,7 @@ function normalizeUser(u) {
 }
 
 async function findOrCreateGoogleUser(pool, { googleId, email, displayName, avatar }) {
-  if (!email) throw new Error("Email non fourni par Google");
+  if (!email) throw new Error("Email not provided by Google");
 
   const existingRes = await pool.query(
     'SELECT * FROM users WHERE "googleId" = $1 OR email = $2',
@@ -45,7 +45,6 @@ async function findOrCreateGoogleUser(pool, { googleId, email, displayName, avat
 }
 
 function setupAuth(app, pool) {
-  // Expose Firebase web config to views (from existing project salemsaccounts)
   app.use((req, res, next) => {
     res.locals.firebaseConfig = {
       apiKey: process.env.FIREBASE_API_KEY || "",
@@ -69,7 +68,6 @@ function setupAuth(app, pool) {
     }
   });
 
-  // Google OAuth if configured in .env
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     passport.use(
       new GoogleStrategy(
@@ -85,7 +83,7 @@ function setupAuth(app, pool) {
             const user = await findOrCreateGoogleUser(pool, {
               googleId: profile.id,
               email,
-              displayName: profile.displayName || "Utilisateur Google",
+              displayName: profile.displayName || "Google User",
               avatar
             });
             return done(null, user);
@@ -97,16 +95,14 @@ function setupAuth(app, pool) {
     );
   }
 
-  // Firebase Google Auth Verification Endpoint (uses existing Firebase GoogleAuthProvider config)
   app.post('/auth/firebase-google', async (req, res) => {
     try {
       const { idToken } = req.body || {};
       const apiKey = process.env.FIREBASE_API_KEY;
       if (!idToken || !apiKey) {
-        return res.status(400).json({ success: false, error: "Token ou clé Firebase manquante." });
+        return res.status(400).json({ success: false, error: "Missing token or API key." });
       }
 
-      // Verify idToken directly against Google Identity Toolkit REST API
       const verifyResp = await fetch(
         `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`,
         {
@@ -117,13 +113,13 @@ function setupAuth(app, pool) {
       );
 
       if (!verifyResp.ok) {
-        return res.status(401).json({ success: false, error: "Jeton Google invalide ou expiré." });
+        return res.status(401).json({ success: false, error: "Invalid or expired Google token." });
       }
 
       const verifyData = await verifyResp.json();
       const fbUser = verifyData.users && verifyData.users[0];
       if (!fbUser || !fbUser.email) {
-        return res.status(401).json({ success: false, error: "Impossible de récupérer l'email Google." });
+        return res.status(401).json({ success: false, error: "Unable to retrieve Google email." });
       }
 
       const user = await findOrCreateGoogleUser(pool, {
@@ -135,27 +131,26 @@ function setupAuth(app, pool) {
 
       req.login(user, (err) => {
         if (err) {
-          return res.status(500).json({ success: false, error: "Erreur d'ouverture de session." });
+          return res.status(500).json({ success: false, error: "Session error." });
         }
         return res.json({ success: true, redirectUrl: '/dashboard' });
       });
     } catch (err) {
       console.error("Firebase Google Auth error:", err);
-      return res.status(500).json({ success: false, error: "Erreur serveur lors de la connexion Google." });
+      return res.status(500).json({ success: false, error: "Server error during Google sign-in." });
     }
   });
 
-  // Classic Passport Google OAuth Routes
   app.get('/auth/google', (req, res, next) => {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-      return res.redirect('/login?msg=Veuillez+utiliser+le+bouton+Google+ou+le+mode+démo+ci-dessous');
+      return res.redirect('/login?msg=Please+use+demo+access+below+or+configure+Google+OAuth+keys');
     }
     passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
   });
 
   app.get(
     '/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: '/login?msg=Échec+de+la+connexion+Google' }),
+    passport.authenticate('google', { failureRedirect: '/login?msg=Google+sign-in+failed' }),
     (req, res) => {
       res.redirect('/dashboard');
     }
@@ -175,23 +170,21 @@ function setupAuth(app, pool) {
     });
   });
 
-  // Instant demo switch (can be disabled in production via ENABLE_DEMO_MODE=false)
   app.get('/auth/demo-login/:role', async (req, res) => {
     try {
       if (process.env.ENABLE_DEMO_MODE === 'false') {
-        return res.status(403).send("Le mode démo est désactivé sur cet environnement.");
+        return res.status(403).send("Demo mode is disabled in this environment.");
       }
 
       const role = (req.params.role || '').toLowerCase();
       if (!['buyer', 'seller', 'admin'].includes(role)) {
-        return res.status(400).send("Rôle de démonstration invalide.");
+        return res.status(400).send("Invalid demo role.");
       }
 
       let email = "buyer@demo.local";
       if (role === "seller") email = "seller@demo.local";
       if (role === "admin") email = "admin@demo.local";
 
-      // Also check fallback to old french emails if database was already seeded
       let userRes = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
       if (userRes.rows.length === 0) {
         if (role === "buyer") email = "acheteur@demo.local";
@@ -201,15 +194,15 @@ function setupAuth(app, pool) {
       }
 
       const user = userRes.rows[0];
-      if (!user) return res.status(404).send("Compte démo introuvable.");
+      if (!user) return res.status(404).send("Demo account not found.");
 
       req.login(normalizeUser(user), (err) => {
-        if (err) return res.status(500).send("Erreur de session");
+        if (err) return res.status(500).send("Session error");
         res.redirect('/dashboard');
       });
     } catch (e) {
       console.error("Demo login error:", e);
-      res.status(500).send("Erreur d'authentification.");
+      res.status(500).send("Authentication error.");
     }
   });
 }

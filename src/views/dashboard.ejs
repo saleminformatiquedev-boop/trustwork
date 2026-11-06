@@ -1,95 +1,73 @@
 <%- include('partials/header', { title: 'Dashboard' }) %>
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
 
-  <!-- User Header & Quick Test Switch -->
-  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
-    <div class="flex items-center gap-3.5 sm:gap-4">
-      <img src="<%= user.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.name %>" class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border border-slate-200 flex-shrink-0 object-cover">
+  <!-- User Profile & Quick Demo Switch -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90">
+    <div class="flex items-center gap-3.5 min-w-0">
+      <img src="<%= user.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.name %>" class="w-12 h-12 rounded-full border border-slate-200 object-cover flex-shrink-0">
       <div class="min-w-0">
         <div class="flex items-center gap-2">
-          <h1 class="text-lg sm:text-xl font-bold text-slate-900 truncate"><%= user.name %></h1>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 <%= user.role === 'ADMIN' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700' %>">
+          <h1 class="text-lg font-bold text-slate-900 truncate"><%= user.name %></h1>
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md <%= user.role === 'ADMIN' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600' %>">
             <%= user.role %>
           </span>
         </div>
-        <p class="text-xs text-slate-500 truncate"><%= user.email %></p>
+        <p class="text-xs text-slate-400 truncate"><%= user.email %></p>
       </div>
     </div>
 
-    <!-- Quick test role selector -->
-    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 text-xs bg-slate-50 p-2 rounded-xl border border-slate-200">
-      <span class="text-slate-500 font-semibold pl-1 text-[11px] sm:text-xs">Switch test role:</span>
-      <div class="grid grid-cols-3 sm:flex gap-1.5">
-        <a href="/auth/demo-login/buyer" class="text-center px-2.5 py-1 bg-white border border-slate-200 hover:border-blue-400 text-blue-700 font-medium rounded-lg text-[11px] transition">Buyer</a>
-        <a href="/auth/demo-login/seller" class="text-center px-2.5 py-1 bg-white border border-slate-200 hover:border-purple-400 text-purple-700 font-medium rounded-lg text-[11px] transition">Seller</a>
-        <a href="/auth/demo-login/admin" class="text-center px-2.5 py-1 bg-white border border-slate-200 hover:border-amber-400 text-amber-700 font-medium rounded-lg text-[11px] transition">Admin</a>
-      </div>
+    <div class="flex items-center gap-1.5 text-xs">
+      <span class="text-slate-400 mr-1 hidden sm:inline">Demo role:</span>
+      <a href="/auth/demo-login/buyer" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition">Buyer</a>
+      <a href="/auth/demo-login/seller" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition">Seller</a>
+      <a href="/auth/demo-login/admin" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition">Admin</a>
     </div>
   </div>
 
-  <!-- Wallet & Escrow Cards -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+  <!-- Wallet & Escrow Summary -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
     
     <!-- Available Balance -->
-    <div class="bg-gradient-to-br from-emerald-600 to-emerald-700 text-white p-5 sm:p-6 rounded-2xl shadow-md flex flex-col justify-between">
+    <div class="bg-slate-900 text-white p-6 rounded-2xl flex flex-col justify-between">
       <div>
-        <div class="flex items-center justify-between text-emerald-100 text-xs font-semibold mb-2">
-          <span>Available Balance (USDT)</span>
-          <i class="fa-solid fa-wallet text-base"></i>
+        <span class="text-xs text-slate-400 font-medium">Available Balance</span>
+        <div class="text-3xl font-extrabold mt-1">
+          <span id="dash-wallet-balance"><%= user.walletBalance.toFixed(2) %></span> <span class="text-sm font-semibold text-slate-400">USDT</span>
         </div>
-        <div class="text-2xl sm:text-3xl font-black">
-          <span id="dash-wallet-balance"><%= user.walletBalance.toFixed(2) %></span> <span class="text-base sm:text-lg font-bold">USDT</span>
-        </div>
-        <p class="text-[11px] text-emerald-100 mt-2">Ready to purchase guides or withdraw to Binance.</p>
       </div>
 
-      <div class="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-emerald-500/50 flex flex-wrap gap-2">
-        <button id="open-deposit-modal-btn" class="flex-1 min-w-[140px] px-3.5 py-2.5 bg-[#F0B90B] hover:bg-[#FCD535] text-slate-950 text-xs font-black rounded-xl transition flex items-center justify-center gap-2 shadow-md">
-          <i class="fa-brands fa-bitcoin text-base text-slate-950"></i> Top Up (Binance Pay)
+      <div class="mt-6 flex gap-2">
+        <button id="open-deposit-modal-btn" class="flex-1 py-2.5 px-3 bg-[#F0B90B] hover:bg-[#FCD535] text-slate-950 text-xs font-bold rounded-xl transition">
+          + Top Up
         </button>
-        <button id="open-withdraw-btn" class="flex-1 min-w-[120px] px-3 py-2.5 bg-emerald-800/90 hover:bg-emerald-900 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-emerald-400/40 shadow-sm">
-          <i class="fa-solid fa-arrow-up-from-bracket text-[10px]"></i> Withdraw USDT
+        <button id="open-withdraw-btn" class="flex-1 py-2.5 px-3 bg-white/10 hover:bg-white/15 text-white text-xs font-semibold rounded-xl transition">
+          Withdraw
         </button>
       </div>
     </div>
 
-    <!-- Escrow Balance -->
-    <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+    <!-- In Escrow -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200/90 flex flex-col justify-between">
       <div>
-        <div class="flex items-center justify-between text-slate-500 text-xs font-semibold mb-2">
-          <span>In Escrow (Locked Funds)</span>
-          <i class="fa-solid fa-lock text-amber-500 text-base"></i>
+        <span class="text-xs text-slate-400 font-medium">In Escrow (Active Orders)</span>
+        <div class="text-3xl font-extrabold text-slate-900 mt-1">
+          <span id="dash-escrow-balance"><%= user.escrowBalance.toFixed(2) %></span> <span class="text-sm font-semibold text-slate-400">USDT</span>
         </div>
-        <div class="text-2xl sm:text-3xl font-black text-slate-900">
-          <span id="dash-escrow-balance"><%= user.escrowBalance.toFixed(2) %></span> <span class="text-base sm:text-lg font-bold text-slate-400">USDT</span>
-        </div>
-        <p class="text-[11px] text-slate-500 mt-2">
-          Funds locked in orders pending delivery or buyer approval.
-        </p>
       </div>
-
-      <div class="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-slate-100 text-[11px] sm:text-xs text-slate-400 flex items-center gap-1.5">
-        <i class="fa-solid fa-shield-halved text-emerald-600"></i> Guaranteed protection
-      </div>
+      <p class="text-xs text-slate-400 mt-4 flex items-center gap-1.5">
+        <i class="fa-solid fa-lock text-emerald-600"></i> Released upon buyer approval
+      </p>
     </div>
 
-    <!-- Binance Pay Integration -->
-    <div class="sm:col-span-2 lg:col-span-1 bg-slate-900 text-white p-5 sm:p-6 rounded-2xl shadow-sm flex flex-col justify-between">
+    <!-- Binance Pay ID -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200/90 flex flex-col justify-between">
       <div>
-        <div class="flex items-center justify-between text-amber-400 text-xs font-bold mb-2">
-          <span class="flex items-center gap-1.5">
-            <i class="fa-brands fa-bitcoin text-sm"></i> Binance Pay
-          </span>
-          <span class="bg-amber-400/20 text-amber-300 text-[10px] px-2 py-0.5 rounded-full">Active</span>
-        </div>
-        <p class="text-xs text-slate-300 leading-relaxed mb-3">
-          Configure your Binance Pay ID to receive payouts directly to your wallet.
-        </p>
-        <form id="binance-form" class="space-y-2">
-          <input type="text" id="binanceId-input" name="binanceId" value="<%= user.binanceId || '' %>" placeholder="Your Binance Pay ID (e.g. 123456789)" class="w-full text-xs px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-400">
-          <button type="submit" id="binance-save-btn" class="w-full py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg transition">
-            Save Binance Pay ID
+        <span class="text-xs text-slate-400 font-medium block mb-1">Binance Pay ID (for payouts)</span>
+        <form id="binance-form" class="mt-2 space-y-2">
+          <input type="text" id="binanceId-input" name="binanceId" value="<%= user.binanceId || '' %>" placeholder="Your Binance Pay ID" class="w-full text-xs px-3 py-2.5 bg-[#FAFAFA] border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-slate-900 focus:outline-none">
+          <button type="submit" id="binance-save-btn" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-xl transition">
+            Save Binance ID
           </button>
         </form>
       </div>
@@ -97,182 +75,101 @@
 
   </div>
 
-  <!-- Direct Messaging Shortcut -->
-  <div class="bg-gradient-to-r from-emerald-50 via-teal-50 to-white p-4 sm:p-5 rounded-2xl border border-emerald-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-    <div class="flex items-center gap-3.5">
-      <span class="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center text-xl shadow-sm flex-shrink-0">
-        <i class="fa-regular fa-comments"></i>
-      </span>
-      <div>
-        <div class="flex items-center gap-2">
-          <h3 class="font-bold text-slate-900 text-sm sm:text-base">Secure Direct Messaging</h3>
-          <% if (typeof unreadChatCount !== 'undefined' && unreadChatCount > 0) { %>
-            <span class="px-2 py-0.5 bg-emerald-600 text-white text-[10px] font-black rounded-full shadow-xs animate-pulse">
-              <%= unreadChatCount %> new
-            </span>
-          <% } %>
+  <!-- Tabbed Lists (Purchases / Sales / Wallet History) -->
+  <div class="bg-white rounded-2xl border border-slate-200/90 overflow-hidden">
+    
+    <div class="px-5 pt-4 border-b border-slate-100 flex items-center gap-6 text-xs sm:text-sm font-semibold overflow-x-auto">
+      <button type="button" class="dash-tab border-b-2 border-slate-900 text-slate-900 pb-3 transition whitespace-nowrap" data-tab="tab-purchases">
+        My Purchases (<%= buyerOrders.length %>)
+      </button>
+      <button type="button" class="dash-tab border-b-2 border-transparent text-slate-400 hover:text-slate-700 pb-3 transition whitespace-nowrap" data-tab="tab-sales">
+        My Sales (<%= sellerOrders.length %>)
+      </button>
+      <button type="button" class="dash-tab border-b-2 border-transparent text-slate-400 hover:text-slate-700 pb-3 transition whitespace-nowrap" data-tab="tab-wallet">
+        Deposits & Withdrawals (<%= (typeof deposits !== 'undefined' ? deposits.length : 0) + (typeof withdrawals !== 'undefined' ? withdrawals.length : 0) %>)
+      </button>
+    </div>
+
+    <!-- Tab 1: My Purchases -->
+    <div id="tab-purchases" class="dash-panel divide-y divide-slate-100">
+      <% if (buyerOrders && buyerOrders.length > 0) { %>
+        <% buyerOrders.forEach(ord => { %>
+          <a href="/orders/<%= ord.id %>" class="p-5 flex items-center justify-between gap-4 hover:bg-slate-50/80 transition block">
+            <div class="min-w-0">
+              <div class="text-xs text-slate-400 mb-0.5">Author: <%= ord.sellerName %></div>
+              <h4 class="text-sm font-bold text-slate-900 truncate"><%= ord.serviceTitle %></h4>
+            </div>
+            <div class="flex items-center gap-4 flex-shrink-0">
+              <span class="text-xs font-bold text-slate-900"><%= ord.amount.toFixed(2) %> USDT</span>
+              <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : (ord.status === 'DISPUTED' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700') %>">
+                <%= ord.status === 'COMPLETED' ? 'Completed' : (ord.status === 'DELIVERED' ? 'Ready to review' : (ord.status === 'DISPUTED' ? 'Disputed' : 'In Escrow')) %>
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-300"></i>
+            </div>
+          </a>
+        <% }) %>
+      <% } else { %>
+        <div class="text-center py-12 text-slate-400 text-xs">
+          No purchased methods yet. <a href="/" class="text-slate-900 font-semibold underline ml-1">Browse catalog</a>
         </div>
-        <p class="text-xs text-slate-500 mt-0.5">
-          Communicate in real-time with authors, buyers, and dispute support.
-        </p>
-      </div>
-    </div>
-    <div class="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
-      <a href="/chat" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5">
-        <i class="fa-solid fa-paper-plane text-[10px]"></i>
-        <span>Open Chat</span>
-      </a>
-      <a href="/chat?support=1" class="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition flex items-center gap-1.5">
-        <i class="fa-solid fa-headset text-amber-500"></i>
-        <span>Support</span>
-      </a>
-    </div>
-  </div>
-
-  <!-- Orders & Sales Grids -->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-    
-    <!-- My Orders (As Buyer) -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h2 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-          <i class="fa-solid fa-file-pdf text-rose-500"></i> My Purchased PDF Guides
-        </h2>
-        <span class="text-xs text-slate-500"><%= buyerOrders.length %> guide(s)</span>
-      </div>
-
-      <div class="divide-y divide-slate-100">
-        <% if (buyerOrders && buyerOrders.length > 0) { %>
-          <% buyerOrders.forEach(ord => { %>
-            <a href="/orders/<%= ord.id %>" class="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-slate-50 transition block">
-              <div class="space-y-1 min-w-0">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 block truncate">#<%= ord.id %> • Author: <%= ord.sellerName %></span>
-                <h4 class="text-xs sm:text-sm font-bold text-slate-800 truncate"><%= ord.serviceTitle %></h4>
-                <div class="text-[11px] sm:text-xs text-slate-500 flex items-center gap-2">
-                  <span><%= ord.amount.toFixed(2) %> USDT</span>
-                  <span class="text-emerald-600 font-semibold flex items-center gap-1"><i class="fa-solid fa-download text-[10px]"></i> PDF Available</span>
-                </div>
-              </div>
-              <div class="text-right flex-shrink-0">
-                <span class="inline-block text-[10px] sm:text-xs font-bold px-2.5 py-0.5 sm:py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : (ord.status === 'DELIVERED' ? 'bg-amber-100 text-amber-800' : (ord.status === 'DISPUTED' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800')) %>">
-                  <%= ord.status %>
-                </span>
-                <span class="block text-[10px] sm:text-[11px] text-slate-400 mt-1">View <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
-              </div>
-            </a>
-          <% }) %>
-        <% } else { %>
-          <div class="text-center py-10 text-slate-400 text-xs">
-            You have not purchased any PDF guides yet.
-          </div>
-        <% } %>
-      </div>
+      <% } %>
     </div>
 
-    <!-- My Sales (As Author / Seller) -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h2 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-          <i class="fa-solid fa-book-bookmark text-blue-600"></i> My Published PDF Methods
-        </h2>
-        <span class="text-xs text-slate-500"><%= sellerOrders.length %> sale(s)</span>
-      </div>
-
-      <div class="divide-y divide-slate-100">
-        <% if (sellerOrders && sellerOrders.length > 0) { %>
-          <% sellerOrders.forEach(ord => { %>
-            <a href="/orders/<%= ord.id %>" class="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-slate-50 transition block">
-              <div class="space-y-1 min-w-0">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 block truncate">#<%= ord.id %> • Buyer: <%= ord.buyerName %></span>
-                <h4 class="text-xs sm:text-sm font-bold text-slate-800 truncate"><%= ord.serviceTitle %></h4>
-                <div class="text-[11px] sm:text-xs text-emerald-600 font-semibold">+<%= ord.amount.toFixed(2) %> USDT</div>
-              </div>
-              <div class="text-right flex-shrink-0">
-                <span class="inline-block text-[10px] sm:text-xs font-bold px-2.5 py-0.5 sm:py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : (ord.status === 'DELIVERED' ? 'bg-amber-100 text-amber-800' : (ord.status === 'DISPUTED' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800')) %>">
-                  <%= ord.status %>
-                </span>
-                <span class="block text-[10px] sm:text-[11px] text-slate-400 mt-1">Details <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
-              </div>
-            </a>
-          <% }) %>
-        <% } else { %>
-          <div class="text-center py-10 text-slate-400 text-xs">
-            No sales recorded for your PDF methods yet.
-          </div>
-        <% } %>
-      </div>
+    <!-- Tab 2: My Sales -->
+    <div id="tab-sales" class="dash-panel hidden divide-y divide-slate-100">
+      <% if (sellerOrders && sellerOrders.length > 0) { %>
+        <% sellerOrders.forEach(ord => { %>
+          <a href="/orders/<%= ord.id %>" class="p-5 flex items-center justify-between gap-4 hover:bg-slate-50/80 transition block">
+            <div class="min-w-0">
+              <div class="text-xs text-slate-400 mb-0.5">Buyer: <%= ord.buyerName %></div>
+              <h4 class="text-sm font-bold text-slate-900 truncate"><%= ord.serviceTitle %></h4>
+            </div>
+            <div class="flex items-center gap-4 flex-shrink-0">
+              <span class="text-xs font-bold text-emerald-600">+<%= ord.amount.toFixed(2) %> USDT</span>
+              <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : (ord.status === 'DISPUTED' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700') %>">
+                <%= ord.status === 'COMPLETED' ? 'Paid' : (ord.status === 'DELIVERED' ? 'Delivered' : (ord.status === 'DISPUTED' ? 'Disputed' : 'In Escrow')) %>
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-300"></i>
+            </div>
+          </a>
+        <% }) %>
+      <% } else { %>
+        <div class="text-center py-12 text-slate-400 text-xs">
+          No sales yet. <a href="/services/new" class="text-slate-900 font-semibold underline ml-1">Publish a method</a>
+        </div>
+      <% } %>
     </div>
 
-  </div>
-
-  <!-- Binance Pay Flows (Deposits & Withdrawals) -->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-    
-    <!-- 1. Binance Deposit History -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h2 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-          <i class="fa-solid fa-circle-down text-emerald-600"></i> Binance Deposit History
-        </h2>
-        <span class="text-xs text-slate-500"><%= typeof deposits !== 'undefined' ? deposits.length : 0 %> deposit(s)</span>
-      </div>
-
-      <div class="divide-y divide-slate-100" id="deposits-list">
-        <% if (typeof deposits !== 'undefined' && deposits.length > 0) { %>
-          <% deposits.forEach(d => { %>
-            <div class="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-slate-50 transition">
-              <div class="space-y-1 min-w-0">
-                <span class="text-[10px] text-slate-400 font-bold block truncate">#<%= d.id %> • TxID: <%= d.txId || 'N/A' %></span>
-                <div class="text-xs font-bold text-slate-800"><%= new Date(d.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></div>
-                <span class="text-[10px] text-slate-500 block truncate">Pay ID: <%= d.binancePayId || 'Binance Pay' %></span>
+    <!-- Tab 3: Deposits & Withdrawals -->
+    <div id="tab-wallet" class="dash-panel hidden divide-y divide-slate-100">
+      <% const allTx = [
+           ...(typeof deposits !== 'undefined' ? deposits.map(d => ({ ...d, txType: 'DEPOSIT' })) : []),
+           ...(typeof withdrawals !== 'undefined' ? withdrawals.map(w => ({ ...w, txType: 'WITHDRAW' })) : [])
+         ]; %>
+      <% if (allTx.length > 0) { %>
+        <% allTx.forEach(tx => { %>
+          <div class="p-5 flex items-center justify-between gap-4">
+            <div>
+              <div class="text-xs font-bold text-slate-900">
+                <%= tx.txType === 'DEPOSIT' ? 'Binance Pay Top-Up' : 'Binance Pay Withdrawal' %>
               </div>
-              <div class="text-right flex-shrink-0">
-                <div class="text-xs sm:text-sm font-black text-emerald-600">+<%= d.amount.toFixed(2) %> USDT</div>
-                <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 bg-emerald-100 text-emerald-800">
-                  <%= d.status === 'COMPLETED' ? 'Credited' : 'Pending' %>
-                </span>
+              <div class="text-[11px] text-slate-400">
+                <%= new Date(tx.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
               </div>
             </div>
-          <% }) %>
-        <% } else { %>
-          <div class="text-center py-8 text-slate-400 text-xs">
-            No deposits completed yet.
-          </div>
-        <% } %>
-      </div>
-    </div>
-
-    <!-- 2. Binance Pay Withdrawal History -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h2 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-          <i class="fa-solid fa-clock-rotate-left text-amber-500"></i> Binance Pay Withdrawal History
-        </h2>
-        <span class="text-xs text-slate-500"><%= typeof withdrawals !== 'undefined' ? withdrawals.length : 0 %> request(s)</span>
-      </div>
-
-      <div class="divide-y divide-slate-100" id="withdrawals-list">
-        <% if (typeof withdrawals !== 'undefined' && withdrawals.length > 0) { %>
-          <% withdrawals.forEach(w => { %>
-            <div class="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-slate-50 transition">
-              <div class="space-y-1 min-w-0">
-                <span class="text-[10px] text-slate-400 font-bold block truncate">#<%= w.id %> • Binance Pay ID: <%= w.binanceId %></span>
-                <div class="text-xs font-bold text-slate-800"><%= new Date(w.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></div>
+            <div class="text-right">
+              <div class="text-xs font-bold <%= tx.txType === 'DEPOSIT' ? 'text-emerald-600' : 'text-slate-900' %>">
+                <%= tx.txType === 'DEPOSIT' ? '+' : '-' %><%= tx.amount.toFixed(2) %> USDT
               </div>
-              <div class="text-right flex-shrink-0">
-                <div class="text-xs sm:text-sm font-black text-rose-600">-<%= w.amount.toFixed(2) %> USDT</div>
-                <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 <%= w.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : (w.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800') %>">
-                  <%= w.status === 'COMPLETED' ? 'Paid' : (w.status === 'REJECTED' ? 'Rejected' : 'Pending') %>
-                </span>
-              </div>
+              <span class="text-[10px] text-slate-400"><%= tx.status === 'COMPLETED' ? 'Completed' : 'Pending' %></span>
             </div>
-          <% }) %>
-        <% } else { %>
-          <div class="text-center py-8 text-slate-400 text-xs">
-            No withdrawal requests made yet.
           </div>
-        <% } %>
-      </div>
+        <% }) %>
+      <% } else { %>
+        <div class="text-center py-12 text-slate-400 text-xs">
+          No deposit or withdrawal transactions yet.
+        </div>
+      <% } %>
     </div>
 
   </div>
@@ -280,183 +177,118 @@
 </div>
 
 <!-- Binance Pay Top-Up Modal -->
-<div id="deposit-modal" class="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-4 overflow-y-auto">
-  <div class="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 toast-anim space-y-4 my-6 max-h-[92vh] overflow-y-auto">
+<div id="deposit-modal" class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs hidden items-center justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 toast-anim space-y-4">
     
-    <!-- Binance Pay Header -->
-    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-      <div class="flex items-center gap-2.5">
-        <div class="w-10 h-10 rounded-2xl bg-[#F0B90B] text-slate-950 flex items-center justify-center shadow-md shadow-amber-200 flex-shrink-0">
-          <i class="fa-brands fa-bitcoin text-xl"></i>
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h3 class="font-black text-slate-900 text-sm sm:text-base">Binance Pay Top-Up</h3>
-            <span class="text-[9px] font-extrabold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full uppercase">0% Fees</span>
-          </div>
-          <p class="text-[11px] text-slate-500">Instant USDT credit guaranteed</p>
-        </div>
-      </div>
-      <button id="close-deposit-modal" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-lg flex items-center justify-center transition">
-        <i class="fa-solid fa-xmark text-lg"></i>
+    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+      <h3 class="font-bold text-slate-900 text-base">Top Up via Binance Pay</h3>
+      <button id="close-deposit-modal" class="text-slate-400 hover:text-slate-700 w-8 h-8 flex items-center justify-center">
+        <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
 
-    <!-- 1. Amount Selection -->
     <div class="space-y-2">
-      <div class="flex items-center justify-between text-xs font-bold text-slate-700">
-        <span>1. Select Amount to Top Up:</span>
-        <span class="text-xs font-black text-emerald-600" id="deposit-amount-display">50.00 USDT</span>
+      <div class="flex items-center justify-between text-xs font-medium text-slate-600">
+        <span>Amount (USDT)</span>
+        <span class="font-bold text-slate-900" id="deposit-amount-display">50.00 USDT</span>
       </div>
-      
-      <!-- Quick Buttons -->
-      <div class="grid grid-cols-4 gap-1.5" id="quick-amounts-container">
-        <button type="button" data-amount="20" class="quick-amt-btn py-1.5 px-1 text-xs font-bold rounded-xl border border-slate-200 hover:border-amber-400 hover:bg-amber-50 text-slate-700 transition">20 $</button>
-        <button type="button" data-amount="50" class="quick-amt-btn active py-1.5 px-1 text-xs font-bold rounded-xl border-2 border-amber-500 bg-amber-50 text-amber-900 transition">50 $</button>
-        <button type="button" data-amount="100" class="quick-amt-btn py-1.5 px-1 text-xs font-bold rounded-xl border border-slate-200 hover:border-amber-400 hover:bg-amber-50 text-slate-700 transition">100 $</button>
-        <button type="button" data-amount="250" class="quick-amt-btn py-1.5 px-1 text-xs font-bold rounded-xl border border-slate-200 hover:border-amber-400 hover:bg-amber-50 text-slate-700 transition">250 $</button>
+      <div class="grid grid-cols-4 gap-2">
+        <button type="button" data-amount="20" class="quick-amt-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 hover:border-slate-900 text-slate-700 transition">20</button>
+        <button type="button" data-amount="50" class="quick-amt-btn active py-2 text-xs font-semibold rounded-xl border-2 border-slate-900 bg-slate-900 text-white transition">50</button>
+        <button type="button" data-amount="100" class="quick-amt-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 hover:border-slate-900 text-slate-700 transition">100</button>
+        <button type="button" data-amount="250" class="quick-amt-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 hover:border-slate-900 text-slate-700 transition">250</button>
       </div>
-
-      <!-- Custom Input -->
-      <div class="relative">
-        <input type="number" id="deposit-amount-input" step="0.01" min="1" value="50" placeholder="Custom amount (USDT)..." class="w-full pl-3.5 pr-14 py-2 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-amber-400 focus:outline-none">
-        <span class="absolute right-3.5 top-2 text-xs font-black text-amber-600">USDT</span>
-      </div>
+      <input type="number" id="deposit-amount-input" step="0.01" min="1" value="50" placeholder="Custom amount..." class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:border-slate-900 focus:outline-none">
     </div>
 
-    <!-- 2. QR Code & Pay on Binance -->
-    <div class="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white p-4 rounded-2xl space-y-3 text-center shadow-inner">
-      <div class="text-[11px] text-amber-400 font-bold uppercase tracking-wider flex items-center justify-center gap-1.5">
-        <i class="fa-solid fa-qrcode"></i> Scan with Binance App
-      </div>
-
-      <!-- QR Code Frame -->
-      <div class="relative inline-block mx-auto bg-white p-2.5 rounded-2xl shadow-lg border border-slate-800">
-        <img id="deposit-qr-image" src="" alt="Binance Pay QR Code" class="w-44 h-44 sm:w-48 sm:h-48 object-contain rounded-xl mx-auto block">
-        <div id="deposit-qr-loader" class="absolute inset-0 bg-white/95 rounded-2xl flex flex-col items-center justify-center gap-2">
-          <i class="fa-solid fa-spinner fa-spin text-2xl text-amber-500"></i>
-          <span class="text-[10px] font-bold text-slate-600">Generating QR Code...</span>
+    <div class="bg-[#FAFAFA] border border-slate-200 p-4 rounded-xl text-center space-y-3">
+      <div class="relative inline-block mx-auto bg-white p-2 rounded-xl border border-slate-200">
+        <img id="deposit-qr-image" src="" alt="Binance Pay QR" class="w-40 h-40 object-contain mx-auto block">
+        <div id="deposit-qr-loader" class="absolute inset-0 bg-white/95 rounded-xl flex items-center justify-center">
+          <i class="fa-solid fa-spinner fa-spin text-lg text-slate-400"></i>
         </div>
       </div>
 
-      <!-- PAY ON BINANCE APP BUTTON -->
-      <div>
-        <a id="binance-app-pay-btn" href="#" target="_blank" rel="noopener noreferrer" class="w-full py-3 px-4 bg-[#F0B90B] hover:bg-[#FCD535] active:scale-95 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-amber-500/25 transition flex items-center justify-center gap-2">
-          <i class="fa-brands fa-bitcoin text-base"></i>
-          <span>Pay on Binance App</span>
-          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-75"></i>
-        </a>
-      </div>
+      <a id="binance-app-pay-btn" href="#" target="_blank" rel="noopener noreferrer" class="w-full py-2.5 px-4 bg-[#F0B90B] hover:bg-[#FCD535] text-slate-950 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2">
+        <span>Open in Binance App</span>
+      </a>
 
-      <!-- Payee Binance Pay Details with Copy -->
-      <div class="bg-slate-800/90 border border-slate-700/80 rounded-xl p-2.5 text-left space-y-1.5 text-[11px]">
-        <div class="flex items-center justify-between">
-          <span class="text-slate-400">Binance Pay ID:</span>
-          <div class="flex items-center gap-1.5">
-            <code id="deposit-binance-id-text" class="text-amber-400 font-mono font-bold"><%= typeof platformBinancePayId !== 'undefined' ? platformBinancePayId : 'BINANCE-PAY-789456' %></code>
-            <button type="button" id="copy-binance-id-btn" class="px-2 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded text-[10px] font-bold transition flex items-center gap-1">
-              <i class="fa-regular fa-copy"></i> Copy
-            </button>
-          </div>
-        </div>
-        <div class="flex items-center justify-between text-slate-400 border-t border-slate-700/60 pt-1.5">
-          <span>Accepted Network:</span>
-          <span class="text-slate-200 font-semibold">Binance Pay / USDT</span>
+      <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-200/80">
+        <span class="text-slate-400">Binance Pay ID:</span>
+        <div class="flex items-center gap-1.5">
+          <code id="deposit-binance-id-text" class="font-mono font-bold text-slate-800"><%= typeof platformBinancePayId !== 'undefined' ? platformBinancePayId : 'BINANCE-PAY-789456' %></code>
+          <button type="button" id="copy-binance-id-btn" class="text-[11px] font-semibold text-emerald-600 hover:underline">Copy</button>
         </div>
       </div>
     </div>
 
-    <!-- 3. Form to Declare TxID / Order ID -->
     <form id="deposit-confirm-form" class="space-y-3">
       <div>
-        <label class="text-xs font-bold text-slate-700 block mb-1">
-          2. Enter your Binance Transaction ID / TxID:
-        </label>
-        <input type="text" id="deposit-txid-input" required placeholder="e.g. 298492019482 (Order ID in Binance Pay)" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-amber-400 focus:outline-none">
-        <p class="text-[10px] text-slate-400 mt-1">
-          Available in your Binance app history (Pay > Payment History).
-        </p>
+        <label class="text-xs font-medium text-slate-600 block mb-1">Binance Order ID / TxID:</label>
+        <input type="text" id="deposit-txid-input" required placeholder="e.g. 298492019482" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-mono focus:border-slate-900 focus:outline-none">
       </div>
-
-      <div class="flex gap-2 pt-1">
-        <button type="button" id="cancel-deposit-btn" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition">
-          Close
-        </button>
-        <button type="submit" id="submit-deposit-btn" class="flex-2 w-2/3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5">
-          <i class="fa-solid fa-circle-check"></i>
-          <span>Verify & Credit</span>
-        </button>
+      <div class="flex gap-2">
+        <button type="button" id="cancel-deposit-btn" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition">Cancel</button>
+        <button type="submit" id="submit-deposit-btn" class="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition">Verify & Credit</button>
       </div>
     </form>
 
   </div>
 </div>
 
-<!-- Withdrawal Request Modal -->
-<div id="withdraw-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
-  <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 toast-anim space-y-4">
-    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-      <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
-        <i class="fa-solid fa-arrow-up-from-bracket text-emerald-600"></i> Request USDT Withdrawal
-      </h3>
-      <button id="close-withdraw-modal" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-lg flex items-center justify-center transition">
-        <i class="fa-solid fa-xmark text-lg"></i>
+<!-- Withdraw USDT Modal -->
+<div id="withdraw-modal" class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 toast-anim space-y-4">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+      <h3 class="font-bold text-slate-900 text-base">Withdraw USDT</h3>
+      <button id="close-withdraw-modal" class="text-slate-400 hover:text-slate-700 w-8 h-8 flex items-center justify-center">
+        <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
 
-    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1">
+    <div class="bg-[#FAFAFA] p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
       <div class="flex justify-between">
         <span class="text-slate-500">Available balance:</span>
-        <span class="font-bold text-emerald-600"><%= user.walletBalance.toFixed(2) %> USDT</span>
+        <span class="font-bold text-slate-900"><%= user.walletBalance.toFixed(2) %> USDT</span>
       </div>
       <div class="flex justify-between">
         <span class="text-slate-500">Binance Pay ID:</span>
-        <span class="font-bold text-slate-800"><%= user.binanceId || 'Not configured' %></span>
+        <span class="font-semibold text-slate-800"><%= user.binanceId || 'Not configured' %></span>
       </div>
     </div>
-
-    <% if (!user.binanceId) { %>
-      <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-800 flex items-start gap-2">
-        <i class="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5"></i>
-        <span>Please configure your <strong>Binance Pay ID</strong> first to enable withdrawals.</span>
-      </div>
-    <% } %>
 
     <form id="withdraw-form" class="space-y-4">
       <div>
         <div class="flex justify-between items-center mb-1">
-          <label class="text-xs font-bold text-slate-700">Amount to withdraw (USDT):</label>
-          <button type="button" id="withdraw-max-btn" class="text-[11px] font-bold text-emerald-600 hover:text-emerald-700">
-            Withdraw all
-          </button>
+          <label class="text-xs font-medium text-slate-600">Amount to withdraw (USDT)</label>
+          <button type="button" id="withdraw-max-btn" class="text-xs font-semibold text-emerald-600 hover:underline">Max</button>
         </div>
-        <div class="relative">
-          <input type="number" id="withdraw-amount-input" step="0.01" min="1" max="<%= user.walletBalance %>" required placeholder="e.g. 50.00" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-          <span class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">USDT</span>
-        </div>
-      </div>
-
-      <div class="text-[11px] text-slate-500">
-        ⚡ Funds are transferred directly via the Binance Pay network upon automated processing.
+        <input type="number" id="withdraw-amount-input" step="0.01" min="1" max="<%= user.walletBalance %>" required placeholder="50.00" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-semibold focus:border-slate-900 focus:outline-none">
       </div>
 
       <div class="flex gap-2">
-        <button type="button" id="cancel-withdraw-btn" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition">
-          Cancel
-        </button>
-        <button type="submit" id="submit-withdraw-btn" <%= !user.binanceId ? 'disabled' : '' %> class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5">
-          <span>Confirm Withdrawal</span>
-        </button>
+        <button type="button" id="cancel-withdraw-btn" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition">Cancel</button>
+        <button type="submit" id="submit-withdraw-btn" <%= !user.binanceId ? 'disabled' : '' %> class="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-xs rounded-xl transition">Confirm</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- AJAX Scripts & Binance Pay -->
 <script>
-  // ==========================================
-  // BINANCE PAY TOP-UP HANDLING
-  // ==========================================
+  const dashTabs = document.querySelectorAll('.dash-tab');
+  const dashPanels = document.querySelectorAll('.dash-panel');
+  dashTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      dashTabs.forEach(t => {
+        t.classList.remove('border-slate-900', 'text-slate-900');
+        t.classList.add('border-transparent', 'text-slate-400');
+      });
+      tab.classList.add('border-slate-900', 'text-slate-900');
+      tab.classList.remove('border-transparent', 'text-slate-400');
+      dashPanels.forEach(p => p.classList.toggle('hidden', p.id !== tab.dataset.tab));
+    });
+  });
+
   const openDepositModalBtn = document.getElementById('open-deposit-modal-btn');
   const depositModal = document.getElementById('deposit-modal');
   const closeDepositModal = document.getElementById('close-deposit-modal');
@@ -478,108 +310,77 @@
   async function loadDepositQR(amount) {
     if (!depositQrImage) return;
     if (depositQrLoader) depositQrLoader.classList.remove('hidden');
-
     try {
       const amtVal = parseFloat(amount) || 50;
       const res = await fetch(`/api/wallet/deposit-qr?amount=${encodeURIComponent(amtVal)}`);
       const data = await res.json();
-      
       if (data.success) {
         depositQrImage.src = data.qrCodeDataUrl;
         if (depositAmountDisplay) depositAmountDisplay.textContent = `${parseFloat(data.amount).toFixed(2)} USDT`;
-        if (binanceAppPayBtn) {
-          binanceAppPayBtn.href = data.deepLink;
-        }
+        if (binanceAppPayBtn) binanceAppPayBtn.href = data.deepLink;
       }
     } catch (e) {
-      console.warn("Error loading Binance QR Code:", e);
+      console.warn(e);
     } finally {
       if (depositQrLoader) depositQrLoader.classList.add('hidden');
     }
   }
 
   function openDepositModal() {
-    if (depositModal) {
-      depositModal.classList.remove('hidden');
-      depositModal.classList.add('flex');
-      loadDepositQR(depositAmountInput ? depositAmountInput.value : 50);
-    }
+    depositModal.classList.remove('hidden');
+    depositModal.classList.add('flex');
+    loadDepositQR(depositAmountInput ? depositAmountInput.value : 50);
   }
-
   function closeDepositModalFn() {
-    if (depositModal) {
-      depositModal.classList.add('hidden');
-      depositModal.classList.remove('flex');
-    }
+    depositModal.classList.add('hidden');
+    depositModal.classList.remove('flex');
   }
 
   if (openDepositModalBtn) openDepositModalBtn.addEventListener('click', openDepositModal);
   if (closeDepositModal) closeDepositModal.addEventListener('click', closeDepositModalFn);
   if (cancelDepositBtn) cancelDepositBtn.addEventListener('click', closeDepositModalFn);
 
-  // Quick amount buttons
   quickAmtBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       quickAmtBtns.forEach(b => {
-        b.classList.remove('active', 'border-2', 'border-amber-500', 'bg-amber-50', 'text-amber-900');
+        b.classList.remove('border-2', 'border-slate-900', 'bg-slate-900', 'text-white');
         b.classList.add('border-slate-200', 'text-slate-700');
       });
-      btn.classList.add('active', 'border-2', 'border-amber-500', 'bg-amber-50', 'text-amber-900');
+      btn.classList.add('border-2', 'border-slate-900', 'bg-slate-900', 'text-white');
       btn.classList.remove('border-slate-200', 'text-slate-700');
-
       const amt = btn.getAttribute('data-amount');
       if (depositAmountInput) depositAmountInput.value = amt;
       loadDepositQR(amt);
     });
   });
 
-  // Custom amount changes
   if (depositAmountInput) {
     depositAmountInput.addEventListener('input', (e) => {
       clearTimeout(qrDebounceTimeout);
       const val = parseFloat(e.target.value);
       if (!isNaN(val) && val > 0) {
-        qrDebounceTimeout = setTimeout(() => {
-          loadDepositQR(val);
-        }, 350);
+        qrDebounceTimeout = setTimeout(() => loadDepositQR(val), 300);
       }
     });
   }
 
-  // 1-click Binance Pay ID copy
   if (copyBinanceIdBtn && depositBinanceIdText) {
     copyBinanceIdBtn.addEventListener('click', () => {
-      const text = depositBinanceIdText.textContent.trim();
-      navigator.clipboard.writeText(text).then(() => {
-        copyBinanceIdBtn.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i> Copied!';
-        setTimeout(() => {
-          copyBinanceIdBtn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy';
-        }, 2000);
-      }).catch(() => {
-        window.showToast('Binance ID copied: ' + text, 'info');
+      navigator.clipboard.writeText(depositBinanceIdText.textContent.trim()).then(() => {
+        copyBinanceIdBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBinanceIdBtn.textContent = 'Copy'; }, 1800);
       });
     });
   }
 
-  // Deposit confirmation submission
   if (depositConfirmForm) {
     depositConfirmForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const amount = parseFloat(depositAmountInput ? depositAmountInput.value : 0);
-      const txId = (depositTxidInput ? depositTxidInput.value : '').trim();
-
-      if (isNaN(amount) || amount <= 0) {
-        window.showToast('Please specify a valid amount greater than 0.', 'error');
-        return;
-      }
-      if (!txId) {
-        window.showToast('Please enter your Binance transaction ID / TxID.', 'error');
-        return;
-      }
-
+      const amount = parseFloat(depositAmountInput.value);
+      const txId = depositTxidInput.value.trim();
+      if (!amount || !txId) return;
       submitDepositBtn.disabled = true;
-      submitDepositBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying payment...';
-
+      submitDepositBtn.textContent = 'Verifying...';
       try {
         const res = await fetch('/api/wallet/deposit-binance', {
           method: 'POST',
@@ -587,40 +388,29 @@
           body: JSON.stringify({ amount, txId })
         });
         const data = await res.json();
-
         if (data.success) {
           window.showToast(data.message, 'success');
-          const dashBal = document.getElementById('dash-wallet-balance');
-          if (dashBal) dashBal.textContent = data.newWalletBalance.toFixed(2);
-          const headerBal = document.getElementById('header-wallet-balance');
-          if (headerBal) headerBal.textContent = data.newWalletBalance.toFixed(0);
-
           closeDepositModalFn();
-          setTimeout(() => window.location.reload(), 1200);
+          setTimeout(() => window.location.reload(), 900);
         } else {
-          window.showToast(data.error || 'Verification error', 'error');
+          window.showToast(data.error || 'Error', 'error');
         }
       } catch (err) {
-        window.showToast('Network error during verification', 'error');
+        window.showToast('Network error', 'error');
       } finally {
         submitDepositBtn.disabled = false;
-        submitDepositBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i> <span>Verify & Credit</span>';
+        submitDepositBtn.textContent = 'Verify & Credit';
       }
     });
   }
 
-  // ==========================================
-  // BINANCE PAY PROFILE CONFIGURATION
-  // ==========================================
   const binanceForm = document.getElementById('binance-form');
   const binanceInput = document.getElementById('binanceId-input');
   const binanceSaveBtn = document.getElementById('binance-save-btn');
-
   if (binanceForm) {
     binanceForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       binanceSaveBtn.disabled = true;
-      binanceSaveBtn.textContent = 'Saving...';
       try {
         const res = await fetch('/api/wallet/update-binance', {
           method: 'POST',
@@ -629,23 +419,15 @@
         });
         const data = await res.json();
         if (data.success) {
-          window.showToast('Binance Pay ID saved successfully!', 'success');
-          setTimeout(() => window.location.reload(), 1000);
-        } else {
-          window.showToast('Error saving Binance ID', 'error');
+          window.showToast('Binance Pay ID saved', 'success');
+          setTimeout(() => window.location.reload(), 800);
         }
-      } catch (err) {
-        window.showToast('Network error', 'error');
       } finally {
         binanceSaveBtn.disabled = false;
-        binanceSaveBtn.textContent = 'Save Binance Pay ID';
       }
     });
   }
 
-  // ==========================================
-  // WITHDRAWAL MODAL HANDLING
-  // ==========================================
   const openWithdrawBtn = document.getElementById('open-withdraw-btn');
   const withdrawModal = document.getElementById('withdraw-modal');
   const closeWithdrawModal = document.getElementById('close-withdraw-modal');
@@ -655,21 +437,14 @@
   const withdrawMaxBtn = document.getElementById('withdraw-max-btn');
   const submitWithdrawBtn = document.getElementById('submit-withdraw-btn');
 
-  function openWithdrawModalFn() {
-    if (withdrawModal) {
-      withdrawModal.classList.remove('hidden');
-      withdrawModal.classList.add('flex');
-    }
-  }
-
   function closeWithdrawModalFn() {
-    if (withdrawModal) {
-      withdrawModal.classList.add('hidden');
-      withdrawModal.classList.remove('flex');
-    }
+    withdrawModal.classList.add('hidden');
+    withdrawModal.classList.remove('flex');
   }
-
-  if (openWithdrawBtn) openWithdrawBtn.addEventListener('click', openWithdrawModalFn);
+  if (openWithdrawBtn) openWithdrawBtn.addEventListener('click', () => {
+    withdrawModal.classList.remove('hidden');
+    withdrawModal.classList.add('flex');
+  });
   if (closeWithdrawModal) closeWithdrawModal.addEventListener('click', closeWithdrawModalFn);
   if (cancelWithdrawBtn) cancelWithdrawBtn.addEventListener('click', closeWithdrawModalFn);
 
@@ -684,14 +459,8 @@
     withdrawForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const amount = parseFloat(withdrawAmountInput.value);
-      if (isNaN(amount) || amount <= 0) {
-        window.showToast('Invalid amount', 'error');
-        return;
-      }
-
+      if (!amount || amount <= 0) return;
       submitWithdrawBtn.disabled = true;
-      submitWithdrawBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
-
       try {
         const res = await fetch('/api/wallet/withdraw', {
           method: 'POST',
@@ -700,17 +469,14 @@
         });
         const data = await res.json();
         if (data.success) {
-          window.showToast(data.message || 'Withdrawal requested successfully!', 'success');
+          window.showToast('Withdrawal completed', 'success');
           closeWithdrawModalFn();
-          setTimeout(() => window.location.reload(), 1200);
+          setTimeout(() => window.location.reload(), 900);
         } else {
-          window.showToast(data.error || 'Error during withdrawal', 'error');
+          window.showToast(data.error || 'Error', 'error');
         }
-      } catch (err) {
-        window.showToast('Network error', 'error');
       } finally {
         submitWithdrawBtn.disabled = false;
-        submitWithdrawBtn.innerHTML = 'Confirm Withdrawal';
       }
     });
   }

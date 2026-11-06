@@ -1,82 +1,64 @@
-<%- include('partials/header', { title: 'Connexion' }) %>
+<%- include('partials/header', { title: 'Sign In' }) %>
 
-<div class="max-w-md mx-auto px-4 py-16">
+<div class="max-w-sm mx-auto px-4 py-16">
   
-  <div class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center">
+  <div class="bg-white p-7 rounded-2xl border border-slate-200/90 text-center">
     
-    <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl mx-auto mb-4">
-      <i class="fa-solid fa-shield-halved"></i>
+    <div class="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center text-sm mx-auto mb-4">
+      <i class="fa-solid fa-layer-group"></i>
     </div>
 
-    <h1 class="text-xl font-bold text-slate-900 mb-2">Bienvenue sur TrustWork</h1>
-    <p class="text-xs text-slate-500 mb-8 leading-relaxed">
-      Connectez-vous avec votre compte Google pour acheter et vendre des méthodes PDF, ZIP et vidéo avec protection séquestre garantie.
+    <h1 class="text-lg font-extrabold text-slate-900 mb-1">Sign in to TrustWork</h1>
+    <p class="text-xs text-slate-500 mb-6">
+      Buy and sell developer PDF & ZIP methods with guaranteed escrow.
     </p>
 
     <% if (typeof msg !== 'undefined' && msg) { %>
-      <div class="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 text-left">
-        <i class="fa-solid fa-circle-info mr-1"></i> <%= msg %>
+      <div class="mb-5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 text-left">
+        <%= msg %>
       </div>
     <% } %>
 
-    <!-- Bouton Officiel Google (OAuth 2.0 Serveur Direct - sans bug sessionStorage) -->
-    <a href="/auth/google" class="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-sm rounded-xl shadow-sm transition mb-6">
-      <svg class="w-4 h-4" viewBox="0 0 24 24">
+    <a href="/auth/google" class="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm rounded-xl transition mb-6">
+      <svg class="w-4 h-4 bg-white rounded-full p-0.5" viewBox="0 0 24 24">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
         <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
       </svg>
-      <span>Continuer avec Google</span>
+      <span>Continue with Google</span>
     </a>
 
-    <!-- Séparateur -->
-    <div class="relative flex items-center justify-center my-6">
-      <div class="border-t border-slate-200 w-full"></div>
-      <span class="bg-white px-3 text-[11px] uppercase tracking-wider text-slate-400 font-semibold absolute">
-        Ou test démo en 1 clic
+    <div class="relative flex items-center justify-center my-5">
+      <div class="border-t border-slate-100 w-full"></div>
+      <span class="bg-white px-3 text-[10px] uppercase tracking-wider text-slate-400 font-semibold absolute">
+        Or instant demo access
       </span>
     </div>
 
-    <!-- Profils de test pré-configurés -->
-    <div class="space-y-2.5 text-left">
-      <a href="/auth/demo-login/buyer" class="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 transition group">
-        <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">
-            A
-          </div>
-          <div>
-            <div class="text-xs font-bold text-slate-900 group-hover:text-blue-700">Thomas (Acheteur)</div>
-            <div class="text-[10px] text-slate-400">Solde : 250 USDT pour tester l'achat d'une méthode</div>
-          </div>
+    <div class="space-y-2 text-left text-xs">
+      <a href="/auth/demo-login/buyer" class="flex items-center justify-between p-3 rounded-xl bg-[#FAFAFA] hover:bg-slate-100 border border-slate-200/80 transition">
+        <div>
+          <div class="font-bold text-slate-900">Thomas — Buyer</div>
+          <div class="text-[11px] text-slate-400">250 USDT available</div>
         </div>
-        <i class="fa-solid fa-arrow-right text-xs text-slate-300 group-hover:text-blue-600"></i>
+        <i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>
       </a>
 
-      <a href="/auth/demo-login/seller" class="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-purple-400 hover:bg-purple-50/50 transition group">
-        <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">
-            V
-          </div>
-          <div>
-            <div class="text-xs font-bold text-slate-900 group-hover:text-purple-700">Sarah (Vendeur / Auteur)</div>
-            <div class="text-[10px] text-slate-400">Pour publier des méthodes et recevoir les paiements</div>
-          </div>
+      <a href="/auth/demo-login/seller" class="flex items-center justify-between p-3 rounded-xl bg-[#FAFAFA] hover:bg-slate-100 border border-slate-200/80 transition">
+        <div>
+          <div class="font-bold text-slate-900">Sarah — Seller</div>
+          <div class="text-[11px] text-slate-400">Method Author</div>
         </div>
-        <i class="fa-solid fa-arrow-right text-xs text-slate-300 group-hover:text-purple-600"></i>
+        <i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>
       </a>
 
-      <a href="/auth/demo-login/admin" class="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-amber-400 hover:bg-amber-50/50 transition group">
-        <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">
-            S
-          </div>
-          <div>
-            <div class="text-xs font-bold text-slate-900 group-hover:text-amber-700">Support / Arbitre (Admin)</div>
-            <div class="text-[10px] text-slate-400">Pour arbitrer les litiges et répondre au support</div>
-          </div>
+      <a href="/auth/demo-login/admin" class="flex items-center justify-between p-3 rounded-xl bg-[#FAFAFA] hover:bg-slate-100 border border-slate-200/80 transition">
+        <div>
+          <div class="font-bold text-slate-900">Support — Admin</div>
+          <div class="text-[11px] text-slate-400">Arbitration & Disputes</div>
         </div>
-        <i class="fa-solid fa-arrow-right text-xs text-slate-300 group-hover:text-amber-600"></i>
+        <i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>
       </a>
     </div>
 

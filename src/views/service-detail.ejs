@@ -1,261 +1,125 @@
 <%- include('partials/header', { title: service.title }) %>
 
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
   
-  <!-- Breadcrumb & Back -->
-  <div class="flex items-center justify-between gap-3 mb-6">
-    <a href="/" class="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-emerald-600 transition bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
-      <i class="fa-solid fa-arrow-left text-[10px]"></i> Retour aux guides
-    </a>
-    <span class="text-[11px] font-semibold text-slate-400">Réf : #<%= service.id %></span>
-  </div>
+  <a href="/" class="inline-flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-900 mb-6 transition">
+    <i class="fa-solid fa-arrow-left text-[10px]"></i> Back to catalog
+  </a>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
     
-    <!-- Main Column (2/3): PDF Method Details -->
-    <div class="lg:col-span-2 space-y-6">
+    <!-- Main Column: Method Overview -->
+    <div class="lg:col-span-2 bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/90 space-y-6">
       
-      <div class="bg-white p-5 sm:p-8 rounded-2xl border border-slate-200 shadow-sm">
-        
-        <!-- Category & Format Badges -->
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <span class="inline-flex items-center gap-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100">
-            <i class="fa-solid fa-tag text-[10px]"></i> <%= service.category %>
-          </span>
-          <div class="flex items-center gap-2">
-            <span class="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
-              <i class="fa-solid fa-file-pdf text-rose-600"></i> Format PDF
-            </span>
-            <span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200">
-              <i class="fa-solid fa-shield-halved text-emerald-600"></i> Séquestre Garanti
-            </span>
-          </div>
-        </div>
-
-        <h1 class="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 leading-tight mb-6">
+      <div>
+        <span class="text-xs font-medium text-slate-400"><%= service.category %> • <%= service.pageCount || 40 %> pages • <%= service.difficulty || 'Intermediate' %></span>
+        <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1.5 leading-snug">
           <%= service.title %>
         </h1>
+      </div>
 
-        <!-- Technical Document Specifications -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200 mb-6 text-xs">
-          <div>
-            <span class="text-[10px] uppercase font-bold text-slate-400 block">Nombre de pages</span>
-            <strong class="text-slate-800 text-sm"><%= service.pageCount || 42 %> pages</strong>
+      <!-- Author & Direct Contact -->
+      <div class="flex items-center justify-between py-4 border-y border-slate-100 gap-4">
+        <a href="/profile/<%= service.sellerId %>" class="flex items-center gap-3 min-w-0 group">
+          <img src="<%= service.sellerAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + service.sellerName %>" class="w-10 h-10 rounded-full border border-slate-200 object-cover flex-shrink-0">
+          <div class="min-w-0">
+            <div class="font-semibold text-slate-900 text-sm group-hover:underline truncate"><%= service.sellerName %></div>
+            <div class="text-xs text-slate-400 truncate"><%= service.sellerBio || 'Verified Author' %></div>
           </div>
-          <div>
-            <span class="text-[10px] uppercase font-bold text-slate-400 block">Difficulté</span>
-            <strong class="text-slate-800 text-sm"><%= service.difficulty || 'Intermédiaire' %></strong>
-          </div>
-          <div>
-            <span class="text-[10px] uppercase font-bold text-slate-400 block">Taille du fichier</span>
-            <strong class="text-slate-800 text-sm"><%= service.fileSize || '2.4 Mo' %></strong>
-          </div>
-          <div>
-            <span class="text-[10px] uppercase font-bold text-slate-400 block">Livraison</span>
-            <strong class="text-emerald-700 text-sm font-bold flex items-center gap-1">
-              <i class="fa-solid fa-bolt text-amber-500"></i> Immédiate
-            </strong>
-          </div>
-        </div>
+        </a>
+        <a href="/chat?recipientId=<%= service.sellerId %>&serviceId=<%= service.id %>" class="text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 flex-shrink-0">
+          <i class="fa-regular fa-comment"></i> Message Author
+        </a>
+      </div>
 
-        <!-- Verified Author Card -->
-        <div class="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-200 mb-6 shadow-sm">
-          <div class="flex items-center gap-3 min-w-0">
-            <img src="<%= service.sellerAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + service.sellerName %>" class="w-12 h-12 rounded-full border-2 border-emerald-500 shadow-sm flex-shrink-0 object-cover">
-            <div class="min-w-0">
-              <h4 class="font-bold text-slate-900 text-sm truncate flex items-center gap-1.5">
-                <%= service.sellerName %>
-                <i class="fa-solid fa-circle-check text-emerald-500 text-xs" title="Auteur vérifié"></i>
-              </h4>
-              <p class="text-xs text-slate-500 truncate"><%= service.sellerBio || "Expert auteur en méthodologies et guides dev" %></p>
-            </div>
-          </div>
-          <a href="/chat?recipientId=<%= service.sellerId %>&serviceId=<%= service.id %>" class="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 flex-shrink-0">
-            <i class="fa-regular fa-comments"></i>
-            <span>Contacter l'auteur</span>
-          </a>
-        </div>
-
-        <h3 class="font-bold text-slate-900 text-sm uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-          <i class="fa-solid fa-list-check text-emerald-600"></i> Sommaire & Plan Détaillé
-        </h3>
-        <div class="text-slate-600 text-sm sm:text-base leading-relaxed whitespace-pre-line mb-8 bg-slate-50/50 p-5 rounded-xl border border-slate-100">
+      <!-- Syllabus / Description -->
+      <div>
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">What You Will Learn & Build</h2>
+        <div class="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
           <%= service.description %>
         </div>
+      </div>
 
-        <!-- Resources Included in the Method Pack -->
-        <div class="mb-8">
-          <h3 class="font-bold text-slate-900 text-sm uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-            <i class="fa-solid fa-box-open text-emerald-600"></i> Ressources Incluses dans ce Pack :
-          </h3>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            
-            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-              <span class="w-9 h-9 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center text-base flex-shrink-0">
-                <i class="fa-solid fa-file-pdf"></i>
-              </span>
-              <div class="min-w-0">
-                <strong class="text-slate-800 block truncate">Guide écrit pas-à-pas</strong>
-                <span class="text-[11px] text-slate-500">Document PDF (<%= service.pageCount || 40 %> pages)</span>
-              </div>
-            </div>
-
-            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-              <span class="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-base flex-shrink-0">
-                <i class="fa-solid fa-file-zipper"></i>
-              </span>
-              <div class="min-w-0">
-                <strong class="text-slate-800 block truncate">Code Source & Modèles</strong>
-                <span class="text-[11px] text-slate-500">Archive ZIP téléchargeable</span>
-              </div>
-            </div>
-
-            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-              <span class="w-9 h-9 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-base flex-shrink-0">
-                <i class="fa-solid fa-file-lines"></i>
-              </span>
-              <div class="min-w-0">
-                <strong class="text-slate-800 block truncate">Scripts Shell & Config</strong>
-                <span class="text-[11px] text-slate-500">Fichiers texte (.txt, .sh, .env)</span>
-              </div>
-            </div>
-
-            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-              <span class="w-9 h-9 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center text-base flex-shrink-0">
-                <i class="fa-solid fa-video"></i>
-              </span>
-              <div class="min-w-0">
-                <strong class="text-slate-800 block truncate">Tutoriel Vidéo pas-à-pas</strong>
-                <span class="text-[11px] text-slate-500">Vidéo de démonstration complète</span>
-              </div>
-            </div>
-
+      <!-- Included Files -->
+      <div class="pt-4 border-t border-slate-100">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Included in This Package</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+          <div class="p-3 rounded-xl bg-[#FAFAFA] border border-slate-200/80">
+            <i class="fa-solid fa-file-pdf text-rose-500 mb-1 block"></i>
+            <strong class="text-slate-800 block">PDF Guide</strong>
+            <span class="text-slate-400 text-[11px]"><%= service.pageCount || 40 %> pages</span>
+          </div>
+          <div class="p-3 rounded-xl bg-[#FAFAFA] border border-slate-200/80">
+            <i class="fa-solid fa-file-zipper text-amber-500 mb-1 block"></i>
+            <strong class="text-slate-800 block">ZIP Archive</strong>
+            <span class="text-slate-400 text-[11px]">Code & templates</span>
+          </div>
+          <div class="p-3 rounded-xl bg-[#FAFAFA] border border-slate-200/80">
+            <i class="fa-solid fa-terminal text-blue-500 mb-1 block"></i>
+            <strong class="text-slate-800 block">TXT Scripts</strong>
+            <span class="text-slate-400 text-[11px]">Ready commands</span>
+          </div>
+          <div class="p-3 rounded-xl bg-[#FAFAFA] border border-slate-200/80">
+            <i class="fa-solid fa-play text-purple-500 mb-1 block"></i>
+            <strong class="text-slate-800 block">Video</strong>
+            <span class="text-slate-400 text-[11px]">Walkthrough</span>
           </div>
         </div>
-
-        <!-- 3-Step Buyer Guarantee -->
-        <div class="border-t border-slate-100 pt-6">
-          <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider mb-4 text-slate-500">
-            Protection de l'Acheteur en 3 Étapes :
-          </h4>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-              <span class="font-bold text-emerald-700 flex items-center gap-1.5 mb-1">
-                <i class="fa-solid fa-lock"></i> 1. Séquestre & Téléchargement
-              </span>
-              <p class="text-slate-500 text-[11px] leading-relaxed">Vos USDT sont bloqués en séquestre et les fichiers se débloquent instantanément.</p>
-            </div>
-
-            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-              <span class="font-bold text-blue-700 flex items-center gap-1.5 mb-1">
-                <i class="fa-solid fa-laptop-code"></i> 2. Mise en Pratique
-              </span>
-              <p class="text-slate-500 text-[11px] leading-relaxed">Suivez le guide pas-à-pas pour accomplir votre tâche sur votre projet.</p>
-            </div>
-
-            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-              <span class="font-bold text-purple-700 flex items-center gap-1.5 mb-1">
-                <i class="fa-solid fa-circle-check"></i> 3. Validation & Support
-              </span>
-              <p class="text-slate-500 text-[11px] leading-relaxed">Libérez les fonds une fois satisfait, ou ouvrez un litige si le contenu est non conforme.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- 100% Satisfaction Box -->
-        <div class="mt-6 bg-emerald-50/70 rounded-2xl p-4 sm:p-5 border border-emerald-100 flex items-start gap-3.5">
-          <span class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-sm flex-shrink-0 shadow-sm">
-            <i class="fa-solid fa-shield-halved"></i>
-          </span>
-          <div class="text-xs text-emerald-900 leading-relaxed">
-            <strong class="font-bold block mb-0.5">Garantie 100% Satisfait ou Remboursé :</strong>
-            Si les fichiers sont corrompus, incomplets ou ne correspondent pas au sommaire, ouvrez une médiation en 1 clic pour geler et récupérer vos <strong><%= service.price.toFixed(2) %> USDT</strong>.
-          </div>
-        </div>
-
       </div>
 
     </div>
 
-    <!-- Side Column (1/3): Escrow Order Box -->
-    <div class="lg:col-span-1">
-      <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm sticky top-20 sm:top-24 space-y-5">
-        
-        <!-- Fixed Price -->
-        <div class="flex items-baseline justify-between pb-3 border-b border-slate-100">
-          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Prix de la Méthode</span>
-          <div class="text-2xl sm:text-3xl font-black text-slate-900 flex items-center gap-1.5">
-            <%= service.price.toFixed(2) %> <span class="text-sm font-bold text-emerald-600">USDT</span>
-          </div>
+    <!-- Side Column: Instant Escrow Checkout -->
+    <div class="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200/90 sticky top-24 space-y-5">
+      
+      <div>
+        <span class="text-xs text-slate-400 font-medium">Instant full package access</span>
+        <div class="text-3xl font-extrabold text-slate-900 mt-0.5">
+          <%= service.price.toFixed(2) %> <span class="text-sm font-semibold text-slate-500">USDT</span>
         </div>
-
-        <!-- Package Features -->
-        <div class="space-y-3 text-xs text-slate-600">
-          <div class="flex items-center justify-between">
-            <span class="flex items-center gap-2"><i class="fa-solid fa-file-pdf text-rose-500"></i> Format</span>
-            <strong class="text-slate-900 font-semibold">Document PDF (<%= service.pageCount || 40 %> pages)</strong>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="flex items-center gap-2"><i class="fa-solid fa-bolt text-amber-500"></i> Accès</span>
-            <strong class="text-emerald-700 font-bold">Téléchargement Immédiat</strong>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="flex items-center gap-2"><i class="fa-solid fa-lock text-emerald-600"></i> Protection Escrow</span>
-            <strong class="text-emerald-700 font-semibold">Fonds Sécurisés</strong>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="flex items-center gap-2"><i class="fa-brands fa-bitcoin text-amber-500"></i> Règlement</span>
-            <strong class="text-slate-900 font-semibold">USDT / Binance Pay</strong>
-          </div>
-        </div>
-
-        <% if (user) { %>
-          <% if (user.id === service.sellerId) { %>
-            <div class="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 text-center font-medium">
-              <i class="fa-solid fa-circle-info mr-1"></i> Vous êtes l'auteur de ce guide PDF.
-            </div>
-          <% } else { %>
-            <!-- Instant Order Form -->
-            <form action="/orders/create" method="POST" class="space-y-4 pt-2 border-t border-slate-100">
-              <input type="hidden" name="serviceId" value="<%= service.id %>">
-              <input type="hidden" name="requirements" value="Achat immédiat du Guide PDF : <%= service.title %>">
-
-              <!-- Interactive USDT Balance -->
-              <div class="p-3 rounded-xl <%= user.walletBalance >= service.price ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200' %> text-xs">
-                <div class="flex justify-between items-center font-semibold mb-1">
-                  <span>Votre solde USDT :</span>
-                  <span><%= user.walletBalance.toFixed(2) %> USDT</span>
-                </div>
-                <% if (user.walletBalance < service.price) { %>
-                  <p class="text-[11px] text-rose-700 mt-1">Solde insuffisant pour obtenir ce guide.</p>
-                  <a href="/dashboard" class="underline font-bold text-[11px] block mt-1 hover:text-rose-900">Recharger via Binance Pay</a>
-                <% } else { %>
-                  <p class="text-[10px] text-emerald-700 mt-0.5">Solde suffisant pour le téléchargement sécurisé.</p>
-                <% } %>
-              </div>
-
-              <button type="submit" <%= user.walletBalance < service.price ? 'disabled' : '' %> class="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-200 transition flex items-center justify-center gap-2">
-                <i class="fa-solid fa-file-arrow-down text-sm"></i> Télécharger le Pack (<%= service.price.toFixed(2) %> USDT)
-              </button>
-            </form>
-
-            <!-- Ask author question button -->
-            <a href="/chat?recipientId=<%= service.sellerId %>&serviceId=<%= service.id %>" class="w-full mt-2 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 border border-slate-200">
-              <i class="fa-regular fa-comments text-emerald-600"></i>
-              <span>💬 Poser une question à l'auteur (Chat)</span>
-            </a>
-          <% } %>
-        <% } else { %>
-          <div class="text-center pt-2 border-t border-slate-100">
-            <p class="text-xs text-slate-500 mb-3">Connectez-vous pour télécharger ce guide PDF.</p>
-            <a href="/login" class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition">
-              Connexion / Commencer
-            </a>
-          </div>
-        <% } %>
-
       </div>
+
+      <% if (user) { %>
+        <% if (user.id === service.sellerId) { %>
+          <div class="p-3 bg-slate-100 rounded-xl text-xs text-slate-600 text-center font-medium">
+            You are the author of this method.
+          </div>
+        <% } else { %>
+          <form action="/orders/create" method="POST" class="space-y-3">
+            <input type="hidden" name="serviceId" value="<%= service.id %>">
+            <input type="hidden" name="requirements" value="Instant purchase of package: <%= service.title %>">
+
+            <button type="submit" <%= user.walletBalance < service.price ? 'disabled' : '' %> class="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-2">
+              <span>Buy & Download Now</span>
+            </button>
+
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
+              <span>Your balance:</span>
+              <span class="font-semibold <%= user.walletBalance >= service.price ? 'text-emerald-600' : 'text-rose-600' %>">
+                <%= user.walletBalance.toFixed(2) %> USDT
+              </span>
+            </div>
+
+            <% if (user.walletBalance < service.price) { %>
+              <a href="/dashboard" class="block text-center text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 py-2 rounded-lg transition">
+                Top up balance via Binance Pay →
+              </a>
+            <% } %>
+          </form>
+        <% } %>
+      <% } else { %>
+        <a href="/login" class="w-full inline-flex items-center justify-center py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm rounded-xl transition">
+          Sign in to purchase
+        </a>
+      <% } %>
+
+      <div class="pt-4 border-t border-slate-100 space-y-2 text-xs text-slate-500 leading-relaxed">
+        <div class="flex items-start gap-2">
+          <i class="fa-solid fa-shield-halved text-emerald-600 mt-0.5"></i>
+          <span><strong>Escrow protection:</strong> your USDT stays safely locked until you download and approve the files.</span>
+        </div>
+      </div>
+
     </div>
 
   </div>
