@@ -217,11 +217,18 @@ function setupAuth(app, pool) {
         return res.status(400).send("Invalid demo role.");
       }
 
+      let targetId = "usr_buyer_demo";
       let email = "buyer@demo.local";
-      if (role === "seller") email = "seller@demo.local";
-      if (role === "admin") email = "admin@demo.local";
+      if (role === "seller") {
+        targetId = "usr_seller_demo";
+        email = "seller@demo.local";
+      }
+      if (role === "admin") {
+        targetId = "usr_admin_demo";
+        email = "admin@demo.local";
+      }
 
-      const userRes = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+      const userRes = await pool.query('SELECT * FROM users WHERE id = $1 OR email = $2 LIMIT 1', [targetId, email]);
       const user = userRes.rows[0];
       if (!user) return res.status(404).send("Demo account not found.");
 

@@ -333,19 +333,22 @@ async function initDatabase() {
       // Ensure existing records have English translations and files attached
       await client.query(`
         UPDATE users
-        SET bio = 'Developer and project creator looking for reliable methods to accomplish technical tasks.',
+        SET email = 'buyer@demo.local',
+            bio = 'Developer and project creator looking for reliable methods to accomplish technical tasks.',
             skills = 'Project Management, JavaScript, Python',
             name = 'Thomas Bernard (Buyer)'
         WHERE id = 'usr_buyer_demo';
 
         UPDATE users
-        SET bio = 'Software Architect and author of step-by-step developer guides.',
+        SET email = 'seller@demo.local',
+            bio = 'Software Architect and author of step-by-step developer guides.',
             skills = 'DevOps, Architecture, Security, Clean Code',
             name = 'Sarah Dev Methods'
         WHERE id = 'usr_seller_demo';
 
         UPDATE users
-        SET name = 'Arbitration Support'
+        SET email = 'admin@demo.local',
+            name = 'Arbitration Support'
         WHERE id = 'usr_admin_demo';
 
         UPDATE services
