@@ -237,31 +237,63 @@ function setupAuth(app, pool) {
     );
   }
 
+  const CANDIDATE_FIREBASE_KEYS = Array.from(new Set([
+    process.env.FIREBASE_API_KEY,
+    "AIzaSyDU6efq9syv4hn3ME2HWyE1VoIssykXcjw",
+    "AIzaSyDm0IadyF7oHhODv3ozRYGazTWl6RueiOU"
+  ].filter(Boolean)));
+
+  async function verifyFirebaseGoogleIdToken(idToken) {
+    for (const apiKey of CANDIDATE_FIREBASE_KEYS) {
+      try {
+        const verifyResp = await fetch(
+          `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken })
+          }
+        );
+        if (!verifyResp.ok) continue;
+        const verifyData = await verifyResp.json();
+        const fbUser = verifyData.users && verifyData.users[0];
+        if (fbUser && fbUser.email && fbUser.emailVerified !== false) {
+          return fbUser;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  function createBridgeState() {
+    const secret = process.env.SESSION_SECRET || 'trustwork-bridge-secret';
+    const payload = `${Date.now()}.${crypto.randomBytes(12).toString('hex')}`;
+    const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    return `${payload}.${sig}`;
+  }
+
+  function verifyBridgeState(stateStr) {
+    if (!stateStr || typeof stateStr !== 'string') return false;
+    const parts = stateStr.split('.');
+    if (parts.length !== 3) return false;
+    const [tsStr, nonce, sig] = parts;
+    const ts = parseInt(tsStr, 10);
+    if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > 15 * 60 * 1000) return false;
+    const secret = process.env.SESSION_SECRET || 'trustwork-bridge-secret';
+    const expected = crypto.createHmac('sha256', secret).update(`${tsStr}.${nonce}`).digest('hex');
+    return sig.length === expected.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+  }
+
   app.post('/auth/firebase-google', async (req, res) => {
     try {
       const { idToken } = req.body || {};
-      const apiKey = process.env.FIREBASE_API_KEY;
-      if (!idToken || !apiKey) {
-        return res.status(400).json({ success: false, error: "Missing token or API key." });
+      if (!idToken) {
+        return res.status(400).json({ success: false, error: "Missing token." });
       }
 
-      const verifyResp = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idToken })
-        }
-      );
-
-      if (!verifyResp.ok) {
+      const fbUser = await verifyFirebaseGoogleIdToken(idToken);
+      if (!fbUser) {
         return res.status(401).json({ success: false, error: "Invalid or expired Google token." });
-      }
-
-      const verifyData = await verifyResp.json();
-      const fbUser = verifyData.users && verifyData.users[0];
-      if (!fbUser || !fbUser.email || fbUser.emailVerified === false) {
-        return res.status(401).json({ success: false, error: "Unable to verify Google email." });
       }
 
       // The admin identity must come from a genuine Google sign-in (never email/password or any other provider)
@@ -294,24 +326,56 @@ function setupAuth(app, pool) {
     }
   });
 
-  app.get('/auth/google', (req, res, next) => {
-    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-      return res.redirect('/login?msg=Google+OAuth+is+not+configured');
-    }
-    passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+  // Same-origin Firebase Hosting OAuth Bridge (avoids redirect_uri_mismatch & mobile popup/third-party storage blocks)
+  app.get('/auth/google', (req, res) => {
+    const host = req.get('host') || 'trustwork.duckdns.org';
+    const origin = host.includes('51.20.182.245.sslip.io')
+      ? 'https://51.20.182.245.sslip.io'
+      : 'https://trustwork.duckdns.org';
+    const state = createBridgeState();
+    const bridgeUrl = `https://salemsaccounts.firebaseapp.com/trustwork-auth.html?start=1&origin=${encodeURIComponent(origin)}&state=${encodeURIComponent(state)}`;
+    return res.redirect(bridgeUrl);
   });
 
-  app.get(
-    '/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: '/login?msg=Google+sign-in+failed' }),
-    (req, res) => {
-      req.session.loginAt = Date.now();
-      if (isRealAdmin(req.user)) {
-        console.log('[ADMIN-AUDIT]', JSON.stringify({ ts: new Date().toISOString(), action: 'ADMIN_LOGIN', ip: req.ip, via: 'oauth' }));
+  app.get('/auth/firebase-callback', async (req, res) => {
+    try {
+      const { idToken, state } = req.query || {};
+      if (!idToken || !verifyBridgeState(state)) {
+        return res.redirect('/login?msg=' + encodeURIComponent('Google sign-in session expired. Please try again.'));
       }
-      res.redirect(consumeReturnTo(req, res) || '/dashboard');
+
+      const fbUser = await verifyFirebaseGoogleIdToken(idToken);
+      if (!fbUser) {
+        return res.redirect('/login?msg=' + encodeURIComponent('Unable to verify Google token. Please try again.'));
+      }
+
+      if (String(fbUser.email).trim().toLowerCase() === getAdminEmail()) {
+        const viaGoogle = Array.isArray(fbUser.providerUserInfo) &&
+          fbUser.providerUserInfo.some(p => p.providerId === 'google.com');
+        if (!viaGoogle) {
+          return res.redirect('/login?msg=' + encodeURIComponent('The administrator account must sign in with Google.'));
+        }
+        console.log('[ADMIN-AUDIT]', JSON.stringify({ ts: new Date().toISOString(), action: 'ADMIN_LOGIN', ip: req.ip, via: 'firebase-bridge' }));
+      }
+
+      const user = await findOrCreateGoogleUser(pool, {
+        googleId: fbUser.localId,
+        email: fbUser.email,
+        displayName: fbUser.displayName || fbUser.email.split('@')[0],
+        avatar: fbUser.photoUrl || null
+      });
+
+      loginWithRegeneratedSession(req, user, (err) => {
+        if (err) {
+          return res.redirect('/login?msg=' + encodeURIComponent('Session error during sign-in.'));
+        }
+        return res.redirect(consumeReturnTo(req, res) || '/dashboard');
+      });
+    } catch (err) {
+      console.error("Firebase callback error:", err);
+      return res.redirect('/login?msg=' + encodeURIComponent('Server error during Google sign-in.'));
     }
-  );
+  });
 
   app.get('/logout', (req, res, next) => {
     req.logout((err) => {

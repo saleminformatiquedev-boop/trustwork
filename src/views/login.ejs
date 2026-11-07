@@ -93,148 +93,49 @@
 </div>
 
 
-<script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-  import {
-    getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
-  } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+<script>
+  (function () {
+    const btn = document.getElementById('google-signin-btn');
+    const label = document.getElementById('google-signin-label');
+    const errBox = document.getElementById('login-error');
 
-  const firebaseConfig = <%- JSON.stringify(typeof firebaseConfig !== 'undefined' ? firebaseConfig : {}).replace(/</g, '\\u003c') %>;
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
-
-  const btn = document.getElementById('google-signin-btn');
-  const label = document.getElementById('google-signin-label');
-  const errBox = document.getElementById('login-error');
-  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-
-  // Facebook / Messenger / Instagram / TikTok... in-app browsers: Google blocks OAuth there
-  const ua = navigator.userAgent || '';
-  const inAppBrowser = /FBAN|FBAV|FB_IAB|FBIOS|FB4A|Messenger|Instagram|Snapchat|TikTok|musical_ly|BytedanceWebview|MicroMessenger|Line\/|Twitter/i.test(ua);
-  if (inAppBrowser) {
-    document.getElementById('inapp-warning').classList.remove('hidden');
-    const isAndroid = /Android/i.test(ua);
-    const isIOS = /iPhone|iPad|iPod/i.test(ua);
-    const chromeLink = document.getElementById('inapp-open-chrome');
-    if (isAndroid) {
-      chromeLink.href = 'intent://' + location.host + location.pathname + location.search +
-        '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' +
-        encodeURIComponent(location.href) + ';end';
-      chromeLink.classList.remove('hidden');
-    }
-    if (isIOS) document.getElementById('inapp-ios-tip').classList.remove('hidden');
-    document.getElementById('inapp-copy-link').addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(location.href); }
-      catch (_) {
-        const ta = document.createElement('textarea'); ta.value = location.href;
-        document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.remove();
-      }
-      document.getElementById('inapp-copied').classList.remove('hidden');
-    });
-  }
-
-  function showError(msg) {
-    errBox.textContent = msg;
-    errBox.classList.remove('hidden');
-  }
-  function setBusy(busy) {
-    btn.disabled = busy;
-    label.textContent = busy ? 'Signing in…' : 'Continue with Google';
-  }
-
-  // Exchange the verified Google/Firebase identity for a TrustWork server session
-  async function completeLogin(user) {
-    const idToken = await user.getIdToken(true);
-    const resp = await fetch('/auth/firebase-google', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrf, 'Accept': 'application/json' },
-      body: JSON.stringify({ idToken })
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data.success) {
-      throw new Error(data.error || 'Sign-in failed. Please try again.');
-    }
-    sessionStorage.removeItem('tw_redirect_tried');
-    window.location.href = data.redirectUrl || '/dashboard';
-  }
-
-  function friendlyError(e) {
-    switch (e && e.code) {
-      case 'auth/popup-closed-by-user':
-      case 'auth/cancelled-popup-request': return null; // user just closed the window
-      case 'auth/unauthorized-domain': return 'This domain is not authorized for Google sign-in yet.';
-      case 'auth/operation-not-allowed': return 'Google sign-in is not enabled for this project yet.';
-      case 'auth/network-request-failed': return 'Network error. Check your connection and try again.';
-      default: return (e && e.message) ? e.message.replace(/^Firebase:\s*/, '') : 'Sign-in failed. Please try again.';
-    }
-  }
-
-  // Find out which Google service the device/network cannot reach (ad-blocker, Private DNS, VPN, captive Wi-Fi...)
-  async function findBlockedHosts() {
-    const targets = {
-      'apis.google.com': 'https://apis.google.com/js/api.js',
-      [firebaseConfig.authDomain]: 'https://' + firebaseConfig.authDomain + '/__/auth/iframe',
-      'identitytoolkit.googleapis.com': 'https://identitytoolkit.googleapis.com/',
-      'accounts.google.com': 'https://accounts.google.com/gsi/client'
-    };
-    const blocked = [];
-    await Promise.all(Object.entries(targets).map(async ([host, url]) => {
-      try {
-        const ctl = new AbortController();
-        const t = setTimeout(() => ctl.abort(), 8000);
-        await fetch(url, { mode: 'no-cors', cache: 'no-store', signal: ctl.signal });
-        clearTimeout(t);
-      } catch (_) { blocked.push(host); }
-    }));
-    return blocked;
-  }
-
-  btn.addEventListener('click', async () => {
-    errBox.classList.add('hidden');
+    const ua = navigator.userAgent || '';
+    const inAppBrowser = /FBAN|FBAV|FB_IAB|FBIOS|FB4A|Messenger|Instagram|Snapchat|TikTok|musical_ly|BytedanceWebview|MicroMessenger|Line\/|Twitter/i.test(ua);
     if (inAppBrowser) {
-      showError('Google blocks sign-in inside this in-app browser. Please open this page in Chrome or Safari (see the box above).');
-      document.getElementById('inapp-warning').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    setBusy(true);
-    try {
-      const result = await signInWithPopup(auth, provider);
-      await completeLogin(result.user);
-    } catch (e) {
-      if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment')) {
-        try { await signInWithRedirect(auth, provider); return; } catch (e2) { e = e2; }
+      document.getElementById('inapp-warning').classList.remove('hidden');
+      const isAndroid = /Android/i.test(ua);
+      const isIOS = /iPhone|iPad|iPod/i.test(ua);
+      const chromeLink = document.getElementById('inapp-open-chrome');
+      if (isAndroid) {
+        chromeLink.href = 'intent://' + location.host + location.pathname + location.search +
+          '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' +
+          encodeURIComponent(location.href) + ';end';
+        chromeLink.classList.remove('hidden');
       }
-      if (e && e.code === 'auth/network-request-failed') {
-        const blocked = await findBlockedHosts();
-        if (blocked.length > 0) {
-          showError('Network error: your device or network is blocking ' + blocked.join(', ') +
-            '. Turn off any ad-blocker, Private DNS or VPN (or switch between Wi-Fi and mobile data), then try again.');
-          setBusy(false);
-          return;
+      if (isIOS) document.getElementById('inapp-ios-tip').classList.remove('hidden');
+      document.getElementById('inapp-copy-link').addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(location.href); }
+        catch (_) {
+          const ta = document.createElement('textarea'); ta.value = location.href;
+          document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.remove();
         }
-        // Everything is reachable: retry once using the full-page redirect flow instead of a popup
-        if (!sessionStorage.getItem('tw_redirect_tried')) {
-          sessionStorage.setItem('tw_redirect_tried', '1');
-          try { await signInWithRedirect(auth, provider); return; } catch (e2) { e = e2; }
-        }
-      }
-      const msg = friendlyError(e);
-      if (msg) showError(msg);
-      setBusy(false);
+        document.getElementById('inapp-copied').classList.remove('hidden');
+      });
     }
-  });
 
-  // Finish a redirect-based sign-in (used when the browser blocks popups)
-  getRedirectResult(auth).then(async (result) => {
-    if (result && result.user) {
-      setBusy(true);
-      try { await completeLogin(result.user); }
-      catch (e) { showError(friendlyError(e) || 'Sign-in failed.'); setBusy(false); }
-    }
-  }).catch((e) => { const m = friendlyError(e); if (m) showError(m); });
+    btn.addEventListener('click', () => {
+      errBox.classList.add('hidden');
+      if (inAppBrowser) {
+        errBox.textContent = 'Google blocks sign-in inside this in-app browser. Please open this page in Chrome or Safari (see the box above).';
+        errBox.classList.remove('hidden');
+        document.getElementById('inapp-warning').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      btn.disabled = true;
+      label.textContent = 'Redirecting to Google…';
+      window.location.href = '/auth/google';
+    });
+  })();
 </script>
 
 <%- include('partials/footer') %>
