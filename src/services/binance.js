@@ -131,10 +131,10 @@ async function verifyIncomingDeposit({ txId, expectedAmount }) {
         }
 
         const receivedAmount = Math.round(rawAmt * 100) / 100;
-        if (Math.abs(receivedAmount - minAmount) > 0.01) {
+        if (receivedAmount < 0.5) {
           return {
             verified: false,
-            reason: `Binance Pay amount (${receivedAmount.toFixed(2)} USDT) does not match the declared deposit amount (${minAmount.toFixed(2)} USDT).`
+            reason: `Binance Pay amount (${receivedAmount.toFixed(2)} USDT) is below the 0.50 USDT minimum.`
           };
         }
 

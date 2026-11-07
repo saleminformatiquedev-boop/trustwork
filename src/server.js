@@ -289,10 +289,17 @@ io.use(async (socket, next) => {
   }
 });
 
-// Global injection of user and unread chat counter in EJS views
+// Global injection of user, total users counter, and unread chat counter in EJS views
 app.use(async (req, res, next) => {
   res.locals.user = req.user ? normalizeUser(req.user) : null;
   res.locals.unreadChatCount = 0;
+  res.locals.totalUsersCount = 1;
+  try {
+    const countRes = await pool.query('SELECT COUNT(*)::int AS total FROM users');
+    res.locals.totalUsersCount = countRes.rows[0]?.total || 1;
+  } catch (e) {
+    res.locals.totalUsersCount = 1;
+  }
   if (req.user) {
     try {
       const unreadRes = await pool.query(
@@ -1943,17 +1950,19 @@ app.get('/history', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// REST AJAX: Binance Pay Dynamic QR Code
+// REST AJAX: Binance Pay ID & On-Chain USDT Wallet QR Code
 app.get('/api/wallet/deposit-qr', ensureAuthenticated, async (req, res) => {
   try {
     const rawAmount = parseFloat(req.query.amount) || 50;
-    const amount = !Number.isFinite(rawAmount) || rawAmount < 1 || rawAmount > 50000 ? 50 : Math.round(rawAmount * 100) / 100;
+    const amount = !Number.isFinite(rawAmount) || rawAmount < 0.5 || rawAmount > 50000 ? 50 : Math.round(rawAmount * 100) / 100;
+    const network = String(req.query.network || 'TRC20').toUpperCase() === 'BEP20' ? 'BEP20' : 'TRC20';
     const binancePayId = PLATFORM_BINANCE_PAY_ID;
+    const trc20Address = PLATFORM_USDT_TRC20;
+    const bep20Address = PLATFORM_USDT_BEP20;
+    const targetAddress = network === 'BEP20' ? bep20Address : trc20Address;
 
-    const deepLink = `https://app.binance.com/qr/dlink?deeplink=binance%3A%2F%2Fpay%3FpayeeId%3D${encodeURIComponent(binancePayId)}%26amount%3D${amount.toFixed(2)}%26currency%3DUSDT`;
-    const appScheme = `binance://pay?payeeId=${encodeURIComponent(binancePayId)}&amount=${amount.toFixed(2)}&currency=USDT`;
-
-    const qrCodeDataUrl = await QRCode.toDataURL(deepLink, {
+    // Encode the clean USDT wallet address in the QR code so any wallet or Binance scanner reads it without deep-link errors
+    const qrCodeDataUrl = await QRCode.toDataURL(targetAddress, {
       width: 320,
       margin: 2,
       errorCorrectionLevel: 'M',
@@ -1967,10 +1976,14 @@ app.get('/api/wallet/deposit-qr', ensureAuthenticated, async (req, res) => {
       success: true,
       qrCodeDataUrl,
       binancePayId,
+      network,
+      address: targetAddress,
+      trc20Address,
+      bep20Address,
       amount: amount.toFixed(2),
       currency: 'USDT',
-      deepLink,
-      appScheme
+      binanceWebPayUrl: 'https://www.binance.com/en/my/wallet/account/payment',
+      androidLauncherIntent: 'intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.binance.dev;S.browser_fallback_url=https%3A%2F%2Fwww.binance.com%2Fen%2Fmy%2Fwallet%2Faccount%2Fpayment;end'
     });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Unable to generate QR code' });
@@ -1988,8 +2001,8 @@ app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) =>
   const txId = String(req.body.txId || '').trim();
   const binancePayId = PLATFORM_BINANCE_PAY_ID;
 
-  if (!Number.isFinite(amount) || amount < 1.00 || amount > 50000.00) {
-    return res.status(400).json({ success: false, error: 'Invalid top-up amount (between 1 and 50,000 USDT).' });
+  if (!Number.isFinite(amount) || amount < 0.50 || amount > 50000.00) {
+    return res.status(400).json({ success: false, error: 'Invalid top-up amount (between 0.50 and 50,000 USDT).' });
   }
 
   if (!txId || !/^[a-zA-Z0-9_-]{8,120}$/.test(txId)) {
