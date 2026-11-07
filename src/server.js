@@ -293,12 +293,12 @@ io.use(async (socket, next) => {
 app.use(async (req, res, next) => {
   res.locals.user = req.user ? normalizeUser(req.user) : null;
   res.locals.unreadChatCount = 0;
-  res.locals.totalUsersCount = 1;
+  res.locals.totalUsersCount = 0;
   try {
     const countRes = await pool.query('SELECT COUNT(*)::int AS total FROM users');
-    res.locals.totalUsersCount = countRes.rows[0]?.total || 1;
+    res.locals.totalUsersCount = countRes.rows[0]?.total ?? 0;
   } catch (e) {
-    res.locals.totalUsersCount = 1;
+    res.locals.totalUsersCount = 0;
   }
   if (req.user) {
     try {
@@ -1256,11 +1256,17 @@ app.get('/chat', ensureAuthenticated, async (req, res) => {
     let requestedConvId = req.query.conversationId || null;
 
     if (req.query.support === '1' || req.query.support === 'true') {
-      const adminRes = await pool.query(
-        currentIsDemo
-          ? "SELECT id, name FROM users WHERE role = 'ADMIN' AND email LIKE '%.local' LIMIT 1"
-          : "SELECT id, name FROM users WHERE role = 'ADMIN' AND email NOT LIKE '%.local' LIMIT 1"
+      let adminRes = await pool.query(
+        "SELECT id, name FROM users WHERE role = 'ADMIN' AND LOWER(email) = 'saleminformatiquedev@gmail.com' LIMIT 1"
       );
+      if (adminRes.rows.length === 0) {
+        adminRes = await pool.query(`
+          INSERT INTO users (id, email, name, role, "walletBalance", "escrowBalance", bio)
+          VALUES ('usr_real_admin', 'saleminformatiquedev@gmail.com', 'Platform Admin', 'ADMIN', 0.00, 0.00, 'Official TrustWork Platform Administrator')
+          ON CONFLICT (email) DO UPDATE SET role = 'ADMIN'
+          RETURNING id, name
+        `);
+      }
       if (adminRes.rows.length > 0 && req.user.role !== 'ADMIN') {
         targetUserId = adminRes.rows[0].id;
       }

@@ -241,11 +241,17 @@ async function completeOrderAndReleaseFunds(pool, { orderId, buyerId, isAdmin = 
       throw new Error("Sandbox isolation: Demo Admin cannot approve or release real users' orders.");
     }
 
-    const adminRes = await client.query(
-      isDemoTx
-        ? "SELECT id FROM users WHERE role = 'ADMIN' AND email LIKE '%.local' ORDER BY \"createdAt\" ASC LIMIT 1"
-        : "SELECT id FROM users WHERE role = 'ADMIN' AND email NOT LIKE '%.local' ORDER BY \"createdAt\" ASC LIMIT 1"
+    let adminRes = await client.query(
+      "SELECT id FROM users WHERE role = 'ADMIN' AND LOWER(email) = 'saleminformatiquedev@gmail.com' LIMIT 1"
     );
+    if (adminRes.rows.length === 0) {
+      adminRes = await client.query(`
+        INSERT INTO users (id, email, name, role, "walletBalance", "escrowBalance", bio)
+        VALUES ('usr_real_admin', 'saleminformatiquedev@gmail.com', 'Platform Admin', 'ADMIN', 0.00, 0.00, 'Official TrustWork Platform Administrator')
+        ON CONFLICT (email) DO UPDATE SET role = 'ADMIN'
+        RETURNING id
+      `);
+    }
     const adminId = adminRes.rows[0] ? adminRes.rows[0].id : null;
 
     // Lock all involved user accounts in deterministic order to prevent deadlocks

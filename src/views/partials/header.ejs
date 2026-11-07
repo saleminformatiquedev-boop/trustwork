@@ -64,9 +64,14 @@
         <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-[11px] font-bold text-emerald-800 shrink-0" title="Total registered users on TrustWork">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
           <i class="fa-solid fa-users text-[10px] text-emerald-600"></i>
-          <span id="header-users-count"><%= typeof totalUsersCount !== 'undefined' ? totalUsersCount : 1 %></span>
+          <span id="header-users-count"><%= typeof totalUsersCount !== 'undefined' ? totalUsersCount : 0 %></span>
           <span class="font-semibold text-emerald-700">Users</span>
         </div>
+        <a href="https://wa.me/21628606748" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 text-[11px] font-bold text-emerald-800 shrink-0 transition" title="WhatsApp Support: 0021628606748">
+          <i class="fa-brands fa-whatsapp text-xs text-[#16a34a]"></i>
+          <span class="hidden sm:inline">0021628606748</span>
+          <span class="sm:hidden">Support</span>
+        </a>
       </div>
 
       <!-- Desktop Navigation -->

@@ -8,7 +8,7 @@ function generateId(prefix = 'usr_') {
 }
 
 function isDemoModeEnabled() {
-  return process.env.ENABLE_DEMO_MODE !== 'false';
+  return false;
 }
 
 function isDemoUser(userOrEmail) {
@@ -394,40 +394,8 @@ function setupAuth(app, pool) {
     });
   });
 
-  app.get('/auth/demo-login/:role', async (req, res) => {
-    try {
-      if (!isDemoModeEnabled()) {
-        return res.status(403).redirect('/login?msg=Demo+accounts+are+disabled+in+production+for+security');
-      }
-
-      const role = (req.params.role || '').toLowerCase();
-      if (!['buyer', 'seller', 'admin'].includes(role)) {
-        return res.status(400).send("Invalid demo role.");
-      }
-
-      let targetId = "usr_buyer_demo";
-      let email = "buyer@demo.local";
-      if (role === "seller") {
-        targetId = "usr_seller_demo";
-        email = "seller@demo.local";
-      }
-      if (role === "admin") {
-        targetId = "usr_admin_demo";
-        email = "admin@demo.local";
-      }
-
-      const userRes = await pool.query('SELECT * FROM users WHERE id = $1 OR email = $2 LIMIT 1', [targetId, email]);
-      const user = userRes.rows[0];
-      if (!user) return res.status(404).send("Demo account not found.");
-
-      loginWithRegeneratedSession(req, normalizeUser(user), (err) => {
-        if (err) return res.status(500).send("Session error");
-        res.redirect(consumeReturnTo(req, res) || '/dashboard');
-      });
-    } catch (e) {
-      console.error("Demo login error:", e);
-      res.status(500).send("Authentication error.");
-    }
+  app.get('/auth/demo-login/:role', (req, res) => {
+    return res.status(403).redirect('/login?msg=' + encodeURIComponent('Test/demo accounts are disabled. Please sign in with Google.'));
   });
 }
 
