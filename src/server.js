@@ -1800,8 +1800,8 @@ app.post('/api/wallet/withdraw', ensureAuthenticated, requireFreshIfAdmin, async
   const rawAmount = parseFloat(req.body.amount);
   const amount = Math.round(rawAmount * 100) / 100;
 
-  if (!Number.isFinite(amount) || amount < 1.00 || amount > 50000.00) {
-    return res.status(400).json({ success: false, error: 'Invalid withdrawal amount (min 1.00 USDT).' });
+  if (!Number.isFinite(amount) || amount < 0.10 || amount > 50000.00) {
+    return res.status(400).json({ success: false, error: 'Invalid withdrawal amount (min 0.10 USDT).' });
   }
 
   const client = await pool.connect();
