@@ -896,14 +896,14 @@ app.post('/services/new', ensureAuthenticated, upload.any(), async (req, res) =>
     const cleanDesc = String(description || '').trim();
     const numericPrice = Math.round(parseFloat(price) * 100) / 100;
 
-    if (!cleanTitle || cleanTitle.length < 5 || cleanTitle.length > 200) {
-      return res.status(400).send("Invalid title (must be between 5 and 200 characters).");
+    if (!cleanTitle || cleanTitle.length < 1 || cleanTitle.length > 200) {
+      return res.status(400).send("<script>alert('Please enter a title (1 to 200 characters).'); window.history.back();</script>");
     }
-    if (!cleanDesc || cleanDesc.length < 10 || cleanDesc.length > 10000) {
-      return res.status(400).send("Invalid description (must be between 10 and 10,000 characters).");
+    if (!cleanDesc || cleanDesc.length < 1 || cleanDesc.length > 10000) {
+      return res.status(400).send("<script>alert('Please enter a description (1 to 10,000 characters).'); window.history.back();</script>");
     }
-    if (!Number.isFinite(numericPrice) || numericPrice < 1.00 || numericPrice > 50000.00) {
-      return res.status(400).send("Invalid price: must be between 1.00 USDT and 50,000.00 USDT.");
+    if (!Number.isFinite(numericPrice) || numericPrice < 0.50 || numericPrice > 50000.00) {
+      return res.status(400).send("<script>alert('Invalid price: must be between 0.50 USDT and 50,000.00 USDT.'); window.history.back();</script>");
     }
 
     let safeVideoUrl = null;
