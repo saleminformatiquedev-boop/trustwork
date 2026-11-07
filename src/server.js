@@ -315,7 +315,7 @@ app.use(async (req, res, next) => {
 });
 
 // Setup auth
-setupAuth(app, pool);
+setupAuth(app, pool, io);
 
 // ==========================================
 // PROTECTED PAID FILE GATEKEEPER (/uploads/:filename)

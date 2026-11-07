@@ -424,6 +424,36 @@ async function notifyUnreadChatMessage({ recipient, sender, conversationId, mess
   });
 }
 
+/**
+ * 9. New user registration notification for Admin
+ */
+async function notifyNewUserRegistration({ user, totalUsers, conversationId }) {
+  if (!user || !user.email) return;
+  const adminTarget = process.env.ADMIN_EMAIL || NOTIFICATION_EMAIL || 'saleminformatiquedev@gmail.com';
+  const chatUrl = conversationId ? `${BASE_URL}/chat?conversationId=${conversationId}` : `${BASE_URL}/chat`;
+
+  sendEmail({
+    to: adminTarget,
+    subject: `🆕 [New User] ${user.name} (${user.email}) joined TrustWork`,
+    html: getEmailTemplate({
+      title: `New user registered on TrustWork`,
+      badge: `Total Users: ${totalUsers || 1}`,
+      content: `
+        A new user has just signed up on <strong>TrustWork</strong> with Google:<br><br>
+        <div class="box">
+          <strong>Name:</strong> ${user.name}<br>
+          <strong>Email:</strong> ${user.email}<br>
+          <strong>User ID:</strong> <code>${user.id}</code><br>
+          <strong>Total Registered Users:</strong> ${totalUsers || 1}
+        </div>
+        A direct support thread has been automatically opened in your Admin Messages inbox.
+      `,
+      ctaText: 'Message User on TrustWork',
+      ctaUrl: chatUrl
+    })
+  });
+}
+
 module.exports = {
   sendEmail,
   notifyNewOrder,
@@ -433,5 +463,6 @@ module.exports = {
   notifyWithdrawalRequested,
   notifyReviewSubmitted,
   notifyDepositReceived,
-  notifyUnreadChatMessage
+  notifyUnreadChatMessage,
+  notifyNewUserRegistration
 };

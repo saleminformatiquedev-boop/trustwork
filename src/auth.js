@@ -2,6 +2,7 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const crypto = require('crypto');
+const emailService = require('./services/email');
 
 function generateId(prefix = 'usr_') {
   return prefix + crypto.randomBytes(8).toString('hex');
@@ -26,7 +27,82 @@ function normalizeUser(u) {
   };
 }
 
-async function findOrCreateGoogleUser(pool, { googleId, email, displayName, avatar }) {
+async function notifyAdminOnNewRegistration(pool, newUser, io) {
+  try {
+    const adminEmail = getAdminEmail();
+    if (!newUser || String(newUser.email || '').trim().toLowerCase() === adminEmail) {
+      return;
+    }
+
+    // 1. Ensure the Admin account exists in PostgreSQL so it receives the in-app notification & unread badge
+    let adminRes = await pool.query(
+      'SELECT id, name, email FROM users WHERE LOWER(email) = $1 LIMIT 1',
+      [adminEmail]
+    );
+    if (adminRes.rows.length === 0) {
+      adminRes = await pool.query(`
+        INSERT INTO users (id, email, name, role, "walletBalance", "escrowBalance", bio)
+        VALUES ('usr_real_admin', $1, 'Platform Admin', 'ADMIN', 0.00, 0.00, 'Official TrustWork Platform Administrator')
+        ON CONFLICT (email) DO UPDATE SET role = 'ADMIN'
+        RETURNING id, name, email
+      `, [adminEmail]);
+    }
+    const adminUser = adminRes.rows[0];
+    if (!adminUser || adminUser.id === newUser.id) return;
+
+    const countRes = await pool.query('SELECT COUNT(*)::int AS total FROM users');
+    const totalUsers = countRes.rows[0]?.total || 1;
+
+    // 2. Create a Support/Direct conversation and unread notification message for the Admin account
+    const convId = generateId('conv_');
+    const msgId = generateId('dmsg_');
+    const msgContent = `🆕 New registration on TrustWork: ${newUser.name} (${newUser.email}) just created an account.`;
+
+    await pool.query(`
+      INSERT INTO conversations (id, type, subject, "lastMessageText", "lastMessageAt")
+      VALUES ($1, 'SUPPORT', $2, $3, CURRENT_TIMESTAMP)
+    `, [convId, `New User: ${newUser.name} (${newUser.email})`, msgContent]);
+
+    await pool.query(`
+      INSERT INTO conversation_participants ("conversationId", "userId", "unreadCount")
+      VALUES ($1, $2, 0), ($1, $3, 1)
+    `, [convId, newUser.id, adminUser.id]);
+
+    const msgRes = await pool.query(`
+      INSERT INTO direct_messages (id, "conversationId", "senderId", content, "isRead", "createdAt")
+      VALUES ($1, $2, $3, $4, FALSE, CURRENT_TIMESTAMP)
+      RETURNING *
+    `, [msgId, convId, newUser.id, msgContent]);
+
+    // 3. Emit real-time Socket.IO notification & unread badge update to the Admin account on the website
+    if (io) {
+      io.to(`user_${adminUser.id}`).emit('user_notification', {
+        title: '🆕 New User Registered!',
+        body: `${newUser.name} (${newUser.email}) just signed up on TrustWork.`,
+        url: `/chat?conversationId=${convId}`,
+        type: 'new_user_registration'
+      });
+
+      io.to(`user_${adminUser.id}`).emit('new_direct_message', {
+        ...msgRes.rows[0],
+        senderName: newUser.name,
+        senderAvatar: newUser.avatar,
+        senderRole: newUser.role
+      });
+    }
+
+    // 4. Send email notification to Admin
+    emailService.notifyNewUserRegistration({
+      user: newUser,
+      totalUsers,
+      conversationId: convId
+    }).catch(err => console.warn('[EmailService] New user email warning:', err.message));
+  } catch (err) {
+    console.warn('[Admin Registration Notification] warning:', err.message);
+  }
+}
+
+async function findOrCreateGoogleUser(pool, { googleId, email, displayName, avatar }, io = null) {
   if (!email) throw new Error("Email not provided by Google");
   const cleanEmail = String(email).trim().toLowerCase();
   const adminEmail = getAdminEmail();
@@ -37,8 +113,10 @@ async function findOrCreateGoogleUser(pool, { googleId, email, displayName, avat
     [googleId, cleanEmail]
   );
   let user = existingRes.rows[0];
+  let isNewRegistration = false;
 
   if (!user) {
+    isNewRegistration = true;
     const newId = generateId('usr_');
     // Real accounts always start with 0.00 USDT balance
     const insertRes = await pool.query(`
@@ -56,7 +134,12 @@ async function findOrCreateGoogleUser(pool, { googleId, email, displayName, avat
     user = updRes.rows[0];
   }
 
-  return normalizeUser(user);
+  const normalized = normalizeUser(user);
+  if (isNewRegistration) {
+    await notifyAdminOnNewRegistration(pool, normalized, io);
+  }
+
+  return normalized;
 }
 
 function getAdminEmail() {
@@ -180,7 +263,7 @@ function loginWithRegeneratedSession(req, user, cb) {
   });
 }
 
-function setupAuth(app, pool) {
+function setupAuth(app, pool, io = null) {
   app.use((req, res, next) => {
     res.locals.demoModeEnabled = isDemoModeEnabled();
     res.locals.firebaseConfig = {
@@ -227,7 +310,7 @@ function setupAuth(app, pool) {
               email,
               displayName: profile.displayName || "Google User",
               avatar
-            });
+            }, io);
             return done(null, user);
           } catch (err) {
             return done(err, null);
@@ -312,7 +395,7 @@ function setupAuth(app, pool) {
         email: fbUser.email,
         displayName: fbUser.displayName || fbUser.email.split('@')[0],
         avatar: fbUser.photoUrl || null
-      });
+      }, io);
 
       loginWithRegeneratedSession(req, user, (err) => {
         if (err) {
@@ -363,7 +446,7 @@ function setupAuth(app, pool) {
         email: fbUser.email,
         displayName: fbUser.displayName || fbUser.email.split('@')[0],
         avatar: fbUser.photoUrl || null
-      });
+      }, io);
 
       loginWithRegeneratedSession(req, user, (err) => {
         if (err) {
