@@ -234,10 +234,10 @@
             <button type="button" id="copy-binance-id-btn" class="px-2 py-0.5 rounded bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 transition">Copy ID</button>
           </div>
         </div>
-        <button type="button" id="binance-app-pay-btn" class="w-full py-2.5 px-4 bg-[#F0B90B] hover:bg-[#FCD535] text-slate-950 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer">
+        <a id="binance-app-pay-btn" href="bnc://app.binance.com/payment" class="w-full py-2.5 px-4 bg-[#F0B90B] hover:bg-[#FCD535] text-slate-950 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer">
           <i class="fa-solid fa-copy"></i>
-          <span id="binance-app-pay-btn-text">Copy Pay ID (1229901779) & Open Binance</span>
-        </button>
+          <span id="binance-app-pay-btn-text">Copy Pay ID (1229901779) & Open Binance App</span>
+        </a>
         <p id="binance-pay-helper-msg" class="text-[11px] text-slate-500 leading-relaxed">
           In Binance App: tap <strong>Pay</strong> (top-right) &rarr; <strong>Send</strong> &rarr; paste Pay ID <strong>1229901779</strong> &rarr; send USDT, then paste your <strong>Order ID</strong> below.
         </p>
@@ -254,8 +254,8 @@
         </div>
 
         <div class="relative inline-block mx-auto bg-white p-2 rounded-xl border border-slate-200">
-          <img id="deposit-qr-image" src="" alt="USDT Deposit Address QR" class="w-36 h-36 object-contain mx-auto block">
-          <div id="deposit-qr-loader" class="absolute inset-0 bg-white/95 rounded-xl flex items-center justify-center">
+          <img id="deposit-qr-image" src="<%= typeof trc20QrDataUrl !== 'undefined' ? trc20QrDataUrl : '' %>" alt="USDT Deposit Address QR" class="w-36 h-36 object-contain mx-auto block">
+          <div id="deposit-qr-loader" class="<%= typeof trc20QrDataUrl !== 'undefined' && trc20QrDataUrl ? 'hidden' : '' %> absolute inset-0 bg-white/95 rounded-xl flex items-center justify-center">
             <i class="fa-solid fa-spinner fa-spin text-lg text-slate-400"></i>
           </div>
         </div>
@@ -364,17 +364,29 @@
 
   let qrDebounceTimeout = null;
   let currentQrNetwork = 'TRC20';
+  const preloadedQrMap = {
+    TRC20: <%- JSON.stringify(typeof trc20QrDataUrl !== 'undefined' ? trc20QrDataUrl : '') %>,
+    BEP20: <%- JSON.stringify(typeof bep20QrDataUrl !== 'undefined' ? bep20QrDataUrl : '') %>
+  };
 
   async function loadDepositQR(amount, network) {
     if (!depositQrImage) return;
     if (network) currentQrNetwork = network;
+    const amtVal = parseFloat(amount) || 50;
+    if (depositAmountDisplay) depositAmountDisplay.textContent = `${amtVal.toFixed(2)} USDT`;
+
+    if (preloadedQrMap[currentQrNetwork]) {
+      depositQrImage.src = preloadedQrMap[currentQrNetwork];
+      if (depositQrLoader) depositQrLoader.classList.add('hidden');
+      return;
+    }
+
     if (depositQrLoader) depositQrLoader.classList.remove('hidden');
     try {
-      const amtVal = parseFloat(amount) || 50;
-      if (depositAmountDisplay) depositAmountDisplay.textContent = `${amtVal.toFixed(2)} USDT`;
       const res = await fetch(`/api/wallet/deposit-qr?amount=${encodeURIComponent(amtVal)}&network=${encodeURIComponent(currentQrNetwork)}`);
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.qrCodeDataUrl) {
+        preloadedQrMap[currentQrNetwork] = data.qrCodeDataUrl;
         depositQrImage.src = data.qrCodeDataUrl;
       }
     } catch (e) {
@@ -471,30 +483,22 @@
   });
 
   if (binanceAppPayBtn && depositBinanceIdText) {
-    binanceAppPayBtn.addEventListener('click', async () => {
+    binanceAppPayBtn.addEventListener('click', () => {
       const payId = depositBinanceIdText.textContent.trim();
       try {
-        await navigator.clipboard.writeText(payId);
-      } catch (e) {}
-      if (binanceAppPayBtnText) binanceAppPayBtnText.textContent = `Pay ID ${payId} Copied! Opening Binance...`;
-      if (binancePayHelperMsg) {
-        binancePayHelperMsg.innerHTML = `<span class="text-emerald-700 font-semibold">✅ Pay ID <strong>${payId}</strong> copied to clipboard!</span> In Binance: tap <strong>Pay</strong> (top-right) &rarr; <strong>Send</strong> &rarr; <strong>Paste ${payId}</strong>.`;
-      }
-      window.showToast(`Pay ID ${payId} copied! Paste it in Binance -> Pay -> Send.`, 'success');
-
-      const ua = navigator.userAgent || '';
-      const isAndroid = /Android/i.test(ua);
-      setTimeout(() => {
-        if (isAndroid) {
-          // Launch the Binance Android app cleanly via its home launcher intent (avoids Binance's broken /qr/dlink error)
-          window.location.href = 'intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.binance.dev;S.browser_fallback_url=https%3A%2F%2Fwww.binance.com%2Fen%2Fmy%2Fwallet%2Faccount%2Fpayment;end';
-        } else {
-          window.open('https://www.binance.com/en/my/wallet/account/payment', '_blank', 'noopener,noreferrer');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(payId).catch(() => {});
         }
-        setTimeout(() => {
-          if (binanceAppPayBtnText) binanceAppPayBtnText.textContent = `Copy Pay ID (${payId}) & Open Binance`;
-        }, 3000);
-      }, 250);
+      } catch (e) {}
+      if (binanceAppPayBtnText) binanceAppPayBtnText.textContent = `Pay ID ${payId} Copied! Opening Binance App...`;
+      if (binancePayHelperMsg) {
+        binancePayHelperMsg.innerHTML = `<span class="text-emerald-700 font-semibold">✅ Pay ID <strong>${payId}</strong> copied to clipboard!</span> In Binance Pay: tap <strong>Send</strong> &rarr; <strong>Paste ${payId}</strong>.`;
+      }
+      window.showToast(`Pay ID ${payId} copied! Opening Binance App...`, 'success');
+      setTimeout(() => {
+        if (binanceAppPayBtnText) binanceAppPayBtnText.textContent = `Copy Pay ID (${payId}) & Open Binance App`;
+      }, 3000);
+      // Do NOT call preventDefault(): the native href="bnc://app.binance.com/payment" opens the Binance App directly to Binance Pay without opening binance.com in the browser
     });
   }
 

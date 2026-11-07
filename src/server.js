@@ -1709,6 +1709,19 @@ app.get('/dashboard', ensureAuthenticated, async (req, res) => {
       totalAdminCommission = adminCommissionOrders.reduce((acc, o) => acc + (o.platformFee || 0), 0);
     }
 
+    const trc20QrDataUrl = await QRCode.toDataURL(binanceService.DEFAULT_USDT_TRC20, {
+      width: 320,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#0f172a', light: '#ffffff' }
+    });
+    const bep20QrDataUrl = await QRCode.toDataURL(binanceService.DEFAULT_USDT_BEP20, {
+      width: 320,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#0f172a', light: '#ffffff' }
+    });
+
     res.render('dashboard', {
       user,
       buyerOrders: formatRows(buyerRes.rows),
@@ -1719,7 +1732,9 @@ app.get('/dashboard', ensureAuthenticated, async (req, res) => {
       totalAdminCommission,
       platformBinancePayId: PLATFORM_BINANCE_PAY_ID,
       trc20Address: binanceService.DEFAULT_USDT_TRC20,
-      bep20Address: binanceService.DEFAULT_USDT_BEP20
+      bep20Address: binanceService.DEFAULT_USDT_BEP20,
+      trc20QrDataUrl,
+      bep20QrDataUrl
     });
   } catch (err) {
     console.error("Dashboard error:", err.message);
@@ -1957,8 +1972,8 @@ app.get('/api/wallet/deposit-qr', ensureAuthenticated, async (req, res) => {
     const amount = !Number.isFinite(rawAmount) || rawAmount < 0.5 || rawAmount > 50000 ? 50 : Math.round(rawAmount * 100) / 100;
     const network = String(req.query.network || 'TRC20').toUpperCase() === 'BEP20' ? 'BEP20' : 'TRC20';
     const binancePayId = PLATFORM_BINANCE_PAY_ID;
-    const trc20Address = PLATFORM_USDT_TRC20;
-    const bep20Address = PLATFORM_USDT_BEP20;
+    const trc20Address = binanceService.DEFAULT_USDT_TRC20;
+    const bep20Address = binanceService.DEFAULT_USDT_BEP20;
     const targetAddress = network === 'BEP20' ? bep20Address : trc20Address;
 
     // Encode the clean USDT wallet address in the QR code so any wallet or Binance scanner reads it without deep-link errors
