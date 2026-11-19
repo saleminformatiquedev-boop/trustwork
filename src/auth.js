@@ -411,10 +411,15 @@ function setupAuth(app, pool, io = null) {
 
   // Same-origin Firebase Hosting OAuth Bridge (avoids redirect_uri_mismatch & mobile popup/third-party storage blocks)
   app.get('/auth/google', (req, res) => {
-    const host = req.get('host') || 'trustwork.duckdns.org';
-    const origin = host.includes('51.20.182.245.sslip.io')
-      ? 'https://51.20.182.245.sslip.io'
-      : 'https://trustwork.duckdns.org';
+    const host = (req.get('host') || '').toLowerCase();
+    let origin = 'https://trustwork.duckdns.org';
+    if (host.includes('methods.13-63-233-163.sslip.io')) {
+      origin = 'https://methods.13-63-233-163.sslip.io';
+    } else if (host.includes('51.20.182.245.sslip.io')) {
+      origin = 'https://51.20.182.245.sslip.io';
+    } else if (host.startsWith('localhost:') || host.startsWith('127.0.0.1:')) {
+      origin = 'http://localhost:3000';
+    }
     const state = createBridgeState();
     const bridgeUrl = `https://salemsaccounts.firebaseapp.com/trustwork-auth.html?start=1&origin=${encodeURIComponent(origin)}&state=${encodeURIComponent(state)}`;
     return res.redirect(bridgeUrl);
@@ -452,7 +457,10 @@ function setupAuth(app, pool, io = null) {
         if (err) {
           return res.redirect('/login?msg=' + encodeURIComponent('Session error during sign-in.'));
         }
-        return res.redirect(consumeReturnTo(req, res) || '/dashboard');
+        const defaultDest = (user.role === 'ADMIN' || String(user.email || '').toLowerCase() === getAdminEmail())
+          ? '/admin/store'
+          : '/';
+        return res.redirect(consumeReturnTo(req, res) || defaultDest);
       });
     } catch (err) {
       console.error("Firebase callback error:", err);
