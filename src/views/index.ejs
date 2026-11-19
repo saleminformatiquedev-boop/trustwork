@@ -14,8 +14,8 @@
         Live Screen-Share Proof
       </span>
       <span class="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
-        <i class="fa-solid fa-star text-[10px]"></i>
-        Secure Telegram Stars Checkout
+        <i class="fa-solid fa-coins text-[10px]"></i>
+        Binance Pay ID &amp; USDT BEP20
       </span>
     </div>
 
@@ -26,7 +26,7 @@
     <p class="max-w-2xl mx-auto text-sm sm:text-base text-slate-600 leading-relaxed">
       Hello everyone! I'm <a href="https://t.me/Melasbit" target="_blank" rel="noopener noreferrer" class="font-extrabold text-sky-600 hover:underline">@Melasbit</a> (<a href="https://t.me/Melasbit" target="_blank" rel="noopener noreferrer" class="font-semibold text-sky-600 hover:underline">https://t.me/Melasbit</a>) — direct supplier for digital accounts and tools.
       <strong>I will share my screen and show you how it works!</strong>
-      Select one or more methods below to pay securely with Telegram Stars, or reach out for bulk deals &amp; method exchanges.
+      Select one or more methods below to buy via Binance, or reach out for bulk deals &amp; method exchanges.
     </p>
 
     <div class="flex flex-wrap items-center justify-center gap-2.5 pt-2">
@@ -67,7 +67,7 @@
         <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[11px]"></i>
         <input type="text" id="method-search-input" placeholder="Search method..." class="text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:border-slate-900 focus:outline-none w-44 sm:w-52">
       </div>
-      <a href="#checkout" id="jump-checkout-btn" class="text-xs font-extrabold text-white bg-sky-600 hover:bg-sky-700 px-3 py-1.5 rounded-lg transition whitespace-nowrap">
+      <a href="#checkout" id="jump-checkout-btn" class="text-xs font-extrabold text-slate-950 bg-[#F0B90B] hover:bg-[#FCD535] px-3 py-1.5 rounded-lg transition whitespace-nowrap">
         Pay ↓
       </a>
     </div>
@@ -111,7 +111,7 @@
               <span class="text-slate-400 font-medium">Cost:</span> <%= service.unitCost || 'Ready to use' %>
             </span>
             <span class="text-[10px] font-semibold text-slate-500 shrink-0">
-              <%= service.durationLabel || 'Ready to use' %> • <span class="text-emerald-700">Telegram Stars</span>
+              <%= service.durationLabel || 'Ready to use' %> • <span class="text-emerald-700">Binance / BEP20</span>
             </span>
           </div>
 
@@ -125,20 +125,19 @@
   </div>
 </section>
 
-<!-- STEP 2: Telegram Stars Checkout -->
+<!-- STEP 2: Simple Binance Payment Checkout (Pay ID & USDT BEP20) -->
 <section id="checkout" class="max-w-4xl mx-auto px-4 sm:px-6 py-6">
   <div class="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-sm space-y-6">
 
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
       <div>
-        <span class="text-[11px] font-bold uppercase tracking-wider text-sky-700">Step 2</span>
-        <h2 class="text-xl font-extrabold text-slate-900">Pay securely with Telegram Stars</h2>
-        <p class="text-xs text-slate-500 mt-0.5">Select your methods, enter a contact, then approve the Stars invoice in Telegram. Payment confirmation is automatic — no TxID to copy.</p>
+        <span class="text-[11px] font-bold uppercase tracking-wider text-amber-700">Step 2</span>
+        <h2 class="text-xl font-extrabold text-slate-900">Pay via Binance (Pay ID or USDT BEP20)</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Send the exact total below, then submit your Order ID / TxID to get instant confirmation &amp; screen-share.</p>
       </div>
       <div class="bg-slate-900 text-white px-5 py-3 rounded-2xl text-right shrink-0">
         <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">Total to Pay</span>
-        <div id="checkout-total-display" class="text-2xl font-extrabold text-sky-400">$10.00 USD</div>
-        <div id="checkout-stars-display" class="text-[11px] font-bold text-amber-300">≈ 770 Stars</div>
+        <div id="checkout-total-display" class="text-2xl font-extrabold text-[#F0B90B]">$10.00 USDT</div>
       </div>
     </div>
 
@@ -147,40 +146,61 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-      <!-- Left: How Telegram Stars works -->
+      <!-- Left: Payment Method Selector (Binance Pay ID vs USDT BEP20) -->
       <div class="space-y-4">
-        <div class="p-5 rounded-2xl bg-sky-50/70 border border-sky-200 space-y-3">
+        <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+          <button type="button" id="tab-binance-pay" class="pay-tab py-2.5 px-3 rounded-lg bg-slate-900 text-white transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-bolt text-[#F0B90B]"></i>
+            <span>Binance Pay ID</span>
+          </button>
+          <button type="button" id="tab-usdt-bep20" class="pay-tab py-2.5 px-3 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-coins text-amber-500"></i>
+            <span>USDT BEP20</span>
+          </button>
+        </div>
+
+        <!-- Panel 1: Binance Pay ID -->
+        <div id="panel-binance-pay" class="p-5 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-3">
           <div class="flex items-center justify-between text-xs">
-            <span class="font-extrabold text-sky-900">
-              <i class="fa-solid fa-star text-amber-500 mr-1"></i> Telegram Stars (XTR)
-            </span>
-            <span class="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Instant • Official</span>
+            <span class="font-extrabold text-amber-900">Binance Pay ID</span>
+            <span class="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">0% Fee • Instant</span>
           </div>
           <p class="text-xs text-slate-600 leading-relaxed">
-            Telegram Stars is Telegram's official currency for digital goods. You buy Stars directly inside Telegram with your preferred payment method, then pay this order in one tap.
+            Open Binance App &rarr; <strong>Pay</strong> &rarr; <strong>Send</strong> &rarr; paste the Pay ID below and send the exact USDT total.
           </p>
-          <ol class="text-xs text-slate-600 space-y-1.5 list-decimal list-inside leading-relaxed">
-            <li>Select one or more methods above.</li>
-            <li>Enter your WhatsApp, Telegram, or Email contact.</li>
-            <li>Tap the Stars button and approve the invoice in Telegram.</li>
-            <li>Your order is marked paid automatically and @Melasbit is notified.</li>
-          </ol>
+          <div class="flex items-center justify-between gap-2 bg-white px-3.5 py-3 rounded-xl border border-amber-200">
+            <code id="checkout-binance-id" class="font-mono font-extrabold text-base text-slate-900 select-all"><%= typeof platformBinancePayId !== 'undefined' ? platformBinancePayId : '1229901779' %></code>
+            <button type="button" onclick="window.copyVal('checkout-binance-id', 'Binance Pay ID')" class="px-3 py-1.5 rounded-lg bg-[#F0B90B] hover:bg-[#FCD535] text-slate-950 font-bold text-xs transition shrink-0">
+              Copy ID
+            </button>
+          </div>
+          <a href="bnc://app.binance.com/home/main" onclick="window.copyVal('checkout-binance-id', 'Binance Pay ID')" class="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+            <span>Copy ID &amp; Open Binance App</span>
+          </a>
+        </div>
 
-          <% if (typeof telegramBotUsername !== 'undefined' && telegramBotUsername) { %>
-            <a href="https://t.me/<%= telegramBotUsername %>" target="_blank" rel="noopener noreferrer"
-               class="w-full py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition flex items-center justify-center gap-2">
-              <i class="fa-brands fa-telegram"></i>
-              <span>Open @<%= telegramBotUsername %> on Telegram</span>
-            </a>
-          <% } else { %>
-            <p class="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
-              Telegram bot not configured yet. Contact <a href="https://t.me/Melasbit" target="_blank" rel="noopener noreferrer" class="font-bold underline">@Melasbit</a> to complete the order.
-            </p>
+        <!-- Panel 2: USDT BEP20 -->
+        <div id="panel-usdt-bep20" class="hidden p-5 rounded-2xl bg-[#FAFAFA] border border-slate-200 space-y-3">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-extrabold text-slate-900">USDT BEP20 Address</span>
+            <span class="text-[11px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">BNB Smart Chain (BSC)</span>
+          </div>
+          <% if (typeof bep20QrDataUrl !== 'undefined' && bep20QrDataUrl) { %>
+            <div class="flex justify-center">
+              <div class="bg-white p-2 rounded-xl border border-slate-200">
+                <img src="<%= bep20QrDataUrl %>" alt="USDT BEP20 QR Code" class="w-32 h-32 object-contain">
+              </div>
+            </div>
           <% } %>
-
+          <div class="flex items-center justify-between gap-2 bg-white px-3 py-2.5 rounded-xl border border-slate-200">
+            <code id="checkout-bep20-addr" class="font-mono font-bold text-xs text-slate-900 truncate select-all"><%= typeof bep20Address !== 'undefined' ? bep20Address : '0x284b2c731c9a9449f88f42bc707c05511bb9b222' %></code>
+            <button type="button" onclick="window.copyVal('checkout-bep20-addr', 'USDT BEP20 Address')" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition shrink-0">
+              Copy
+            </button>
+          </div>
           <p class="text-[11px] text-slate-500">
-            Conversion: <strong><%= typeof starsPerUsd !== 'undefined' ? starsPerUsd : 77 %> Stars = $1 USD</strong>.
-            The exact Stars amount is shown on the button and in the Telegram invoice.
+            Make sure to select <strong>BNB Smart Chain (BEP20)</strong> when sending USDT.
           </p>
         </div>
       </div>
@@ -194,38 +214,33 @@
           </div>
 
           <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Binance Order ID or BEP20 TxID</label>
+            <input type="text" id="order-txid" required placeholder="Paste your Binance Order ID or 0x... TxHash" class="w-full text-sm font-mono px-3.5 py-2.5 bg-[#FAFAFA] border border-slate-200 rounded-xl focus:bg-white focus:border-slate-900 focus:outline-none">
+          </div>
+
+          <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">Note (Optional — e.g. preferred time for screen-share)</label>
             <input type="text" id="order-note" placeholder="Ready now for screen-share demo..." class="w-full text-sm px-3.5 py-2.5 bg-[#FAFAFA] border border-slate-200 rounded-xl focus:bg-white focus:border-slate-900 focus:outline-none">
           </div>
 
-          <button type="submit" id="order-submit-btn" class="w-full py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-sm transition shadow-sm flex items-center justify-center gap-2">
-            <i class="fa-solid fa-star text-amber-300"></i>
-            <span>Pay with Telegram Stars</span>
+          <button type="submit" id="order-submit-btn" class="w-full py-3 px-4 rounded-xl bg-[#F0B90B] hover:bg-[#FCD535] text-slate-950 font-extrabold text-sm transition shadow-sm flex items-center justify-center gap-2">
+            <i class="fa-solid fa-check-circle"></i>
+            <span>Confirm Binance Payment &amp; Submit Order</span>
           </button>
-          <p class="text-[11px] text-center text-slate-400">Secure XTR invoice • Refundable by the admin within Telegram's refund window</p>
         </form>
 
-        <!-- Payment / Confirmation Box -->
+        <!-- Success Confirmation Box -->
         <div id="order-success-box" class="hidden p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-3">
           <div class="flex items-center gap-2 text-emerald-800 font-extrabold text-sm">
             <i class="fa-solid fa-circle-check text-emerald-600 text-lg"></i>
-            <span id="order-success-title">Invoice created!</span>
+            <span>Order Submitted Successfully!</span>
           </div>
           <p id="order-success-text" class="text-xs text-emerald-900 leading-relaxed"></p>
-          <div class="flex flex-wrap gap-2">
-            <a id="order-success-invoice" href="#" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs transition">
-              <i class="fa-brands fa-telegram text-sm"></i> Open Telegram Invoice
-            </a>
-            <button type="button" id="order-check-status-btn" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition">
-              <i class="fa-solid fa-rotate text-sm"></i> Check Payment Status
-            </button>
-          </div>
-          <div id="order-payment-status" class="text-[11px] font-semibold text-slate-600"></div>
           <div class="flex flex-wrap gap-2">
             <a id="order-success-wa" href="#" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold text-xs transition">
               <i class="fa-brands fa-whatsapp text-sm"></i> Send Order on WhatsApp
             </a>
-            <a href="/chat?support=1" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:border-slate-400 text-slate-700 font-bold text-xs transition">
+            <a href="/chat?support=1" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition">
               <i class="fa-regular fa-comments"></i> Open DM Chat
             </a>
           </div>
@@ -239,22 +254,25 @@
 
 
 <script>
-  const STARS_PER_USD = <%- JSON.stringify(typeof starsPerUsd !== 'undefined' ? starsPerUsd : 77) %>;
+  // Copy helper
+  window.copyVal = function(elementId, label) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    const val = el.textContent.trim();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(val).then(() => {
+        if (window.showToast) window.showToast(`${label} copied!`, 'success');
+      }).catch(() => {});
+    }
+  };
+
+  // Multi-select Method Cards & Live Total
   const cards = Array.from(document.querySelectorAll('.method-select-card'));
   const totalDisplay = document.getElementById('checkout-total-display');
-  const starsDisplay = document.getElementById('checkout-stars-display');
   const summaryEl = document.getElementById('selected-items-summary');
   const jumpCheckoutBtn = document.getElementById('jump-checkout-btn');
   const methodSearchInput = document.getElementById('method-search-input');
-  const orderSubmitBtn = document.getElementById('order-submit-btn');
-  let statusPollTimer = null;
-  let currentOrderId = null;
-
-  function starsFor(usd) {
-    const value = Number(usd);
-    if (!Number.isFinite(value) || value <= 0) return 0;
-    return Math.max(1, Math.ceil(value * STARS_PER_USD));
-  }
+  let activePaymentMethod = 'BINANCE_PAY';
 
   if (methodSearchInput) {
     methodSearchInput.addEventListener('input', () => {
@@ -283,14 +301,8 @@
   function renderCart() {
     const selected = getSelectedItems();
     const total = selected.reduce((s, item) => s + item.price, 0);
-    const stars = starsFor(total);
-
-    if (totalDisplay) totalDisplay.textContent = `$${total.toFixed(2)} USD`;
-    if (starsDisplay) starsDisplay.textContent = `≈ ${stars} Stars`;
-    if (jumpCheckoutBtn) jumpCheckoutBtn.textContent = `Pay (${selected.length} • ⭐ ${stars}) ↓`;
-    if (orderSubmitBtn) {
-      orderSubmitBtn.innerHTML = `<i class="fa-solid fa-star text-amber-300"></i> <span>Pay ${stars} Stars</span>`;
-    }
+    if (totalDisplay) totalDisplay.textContent = `$${total.toFixed(2)} USDT`;
+    if (jumpCheckoutBtn) jumpCheckoutBtn.textContent = `Pay (${selected.length} • $${formatUsd(total)}) ↓`;
 
     if (summaryEl) {
       if (selected.length === 0) {
@@ -335,67 +347,25 @@
 
   renderCart();
 
-  function setPaymentStatus(message, tone) {
-    const el = document.getElementById('order-payment-status');
-    if (!el) return;
-    el.textContent = message;
-    el.className = `text-[11px] font-semibold ${tone === 'success' ? 'text-emerald-700' : (tone === 'error' ? 'text-rose-700' : 'text-amber-700')}`;
+  // Payment Method Tabs (Binance Pay ID vs USDT BEP20)
+  const tabBinancePay = document.getElementById('tab-binance-pay');
+  const tabUsdtBep20 = document.getElementById('tab-usdt-bep20');
+  const panelBinancePay = document.getElementById('panel-binance-pay');
+  const panelUsdtBep20 = document.getElementById('panel-usdt-bep20');
+
+  function setPaymentTab(method) {
+    activePaymentMethod = method;
+    const isPay = method === 'BINANCE_PAY';
+    tabBinancePay.className = `pay-tab py-2.5 px-3 rounded-lg transition flex items-center justify-center gap-1.5 ${isPay ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'}`;
+    tabUsdtBep20.className = `pay-tab py-2.5 px-3 rounded-lg transition flex items-center justify-center gap-1.5 ${!isPay ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'}`;
+    panelBinancePay.classList.toggle('hidden', !isPay);
+    panelUsdtBep20.classList.toggle('hidden', isPay);
   }
 
-  function startOrderPolling(orderId) {
-    if (!orderId) return;
-    currentOrderId = orderId;
-    if (statusPollTimer) clearInterval(statusPollTimer);
-    const startedAt = Date.now();
+  if (tabBinancePay) tabBinancePay.addEventListener('click', () => setPaymentTab('BINANCE_PAY'));
+  if (tabUsdtBep20) tabUsdtBep20.addEventListener('click', () => setPaymentTab('USDT_BEP20'));
 
-    const check = async () => {
-      if (Date.now() - startedAt > 10 * 60 * 1000) {
-        clearInterval(statusPollTimer);
-        statusPollTimer = null;
-        setPaymentStatus('Still waiting for Telegram. You can check again later with the button above.', 'error');
-        return;
-      }
-      try {
-        const res = await fetch(`/api/store/orders/${encodeURIComponent(orderId)}/status`);
-        const data = await res.json();
-        if (!data.success || !data.order) return;
-        const ord = data.order;
-
-        if (ord.status === 'PAID') {
-          clearInterval(statusPollTimer);
-          statusPollTimer = null;
-          const title = document.getElementById('order-success-title');
-          const text = document.getElementById('order-success-text');
-          if (title) title.textContent = 'Payment confirmed!';
-          if (text) text.textContent = `Order #${ord.id} is paid (${ord.starsAmount || ''} Stars). @Melasbit has been notified and will contact you to schedule the screen-share.`;
-          setPaymentStatus(`✅ Payment confirmed — ${ord.starsAmount || ''} Stars received.`, 'success');
-          if (window.showToast) window.showToast('Payment confirmed! Your order is now paid.', 'success');
-        } else if (ord.status === 'REJECTED' || ord.status === 'REFUNDED') {
-          clearInterval(statusPollTimer);
-          statusPollTimer = null;
-          setPaymentStatus(`Order status: ${ord.status}. Contact @Melasbit if you need help.`, 'error');
-        } else {
-          setPaymentStatus('⏳ Waiting for Telegram payment confirmation...', 'pending');
-        }
-      } catch (_) {
-        // Keep polling silently on transient network errors.
-      }
-    };
-
-    check();
-    statusPollTimer = setInterval(check, 3000);
-  }
-
-  const checkStatusBtn = document.getElementById('order-check-status-btn');
-  if (checkStatusBtn) {
-    checkStatusBtn.addEventListener('click', () => {
-      if (!currentOrderId) return;
-      startOrderPolling(currentOrderId);
-      if (window.showToast) window.showToast('Checking Telegram payment status...', 'success');
-    });
-  }
-
-  // Submit a Telegram Stars order
+  // Submit Binance Order
   const orderForm = document.getElementById('store-order-form');
   if (orderForm) {
     orderForm.addEventListener('submit', async (e) => {
@@ -407,16 +377,12 @@
       }
 
       const customerContact = document.getElementById('order-contact').value.trim();
+      const txId = document.getElementById('order-txid').value.trim();
       const note = document.getElementById('order-note').value.trim();
-      if (!customerContact) {
-        if (window.showToast) window.showToast('Please enter your contact first.', 'error');
-        return;
-      }
-
       const btn = document.getElementById('order-submit-btn');
-      const original = btn.innerHTML;
+
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating Stars invoice...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
 
       try {
         const res = await fetch('/api/store/order', {
@@ -424,51 +390,74 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             serviceIds: selected.map(s => s.id),
+            paymentMethod: activePaymentMethod,
+            txId,
             customerContact,
             note
           })
         });
         const data = await res.json();
-        if (!data.success || !data.order) {
+        if (data.success && data.order) {
+          const ord = data.order;
+          const itemsList = ord.items.map(i => `${i.title} ($${i.price})`).join(', ');
+          document.getElementById('order-success-text').textContent =
+            `Order #${ord.id} received for ${itemsList} — Total: $${ord.totalAmount.toFixed(2)} USDT via ${ord.paymentMethod} (TxID: ${ord.txId}). Status: ${ord.status}.`;
+          const waMsg = `Hello @Melasbit! Order #${ord.id}\nMethods: ${itemsList}\nTotal: $${ord.totalAmount.toFixed(2)} USDT (${ord.paymentMethod})\nTxID / Order ID: ${ord.txId}\nContact: ${ord.customerContact}\nReady for screen-share!`;
+          document.getElementById('order-success-wa').href = `https://wa.me/21627076373?text=${encodeURIComponent(waMsg)}`;
+          document.getElementById('order-success-box').classList.remove('hidden');
+          document.getElementById('order-txid').value = '';
+          if (window.showToast) window.showToast('Order submitted! @Melasbit has been notified.', 'success');
+        } else {
           if (window.showToast) window.showToast(data.error || 'Error submitting order', 'error');
-          return;
         }
-
-        const ord = data.order;
-        const stars = data.stars || starsFor(ord.totalAmount);
-
-        const title = document.getElementById('order-success-title');
-        const text = document.getElementById('order-success-text');
-        if (title) title.textContent = 'Invoice created — complete payment in Telegram';
-        if (text) {
-          text.textContent = `Order #${ord.id}: ${ord.items.map(i => i.title).join(', ')} — $${ord.totalAmount.toFixed(2)} USD (${stars} Stars). Open the invoice and approve it in Telegram. This page updates automatically.`;
-        }
-
-        const invoiceLink = document.getElementById('order-success-invoice');
-        if (invoiceLink) invoiceLink.href = data.invoiceLink;
-
-        const itemsList = ord.items.map(i => `${i.title} ($${i.price})`).join(', ');
-        const waMsg = `Hello @Melasbit! Order #${ord.id}\nMethods: ${itemsList}\nTotal: $${ord.totalAmount.toFixed(2)} USD (${stars} Stars)\nContact: ${ord.customerContact}\nI'm paying with Telegram Stars — please confirm and start screen-share!`;
-        const waLink = document.getElementById('order-success-wa');
-        if (waLink) waLink.href = `https://wa.me/21627076373?text=${encodeURIComponent(waMsg)}`;
-
-        document.getElementById('order-success-box').classList.remove('hidden');
-        setPaymentStatus('⏳ Waiting for Telegram payment confirmation...', 'pending');
-        startOrderPolling(ord.id);
-
-        // Best-effort automatic open. The "Open Telegram Invoice" button remains as a fallback.
-        try { window.open(data.invoiceLink, '_blank', 'noopener'); } catch (_) {}
-
-        if (window.showToast) window.showToast('Invoice opened in Telegram. Approve it to confirm your order.', 'success');
       } catch (err) {
         if (window.showToast) window.showToast('Network error. Please try again.', 'error');
       } finally {
         btn.disabled = false;
-        btn.innerHTML = original;
+        btn.innerHTML = '<i class="fa-solid fa-check-circle"></i> <span>Confirm Binance Payment &amp; Submit Order</span>';
       }
     });
   }
 
+  // Submit Exchange Request
+  const exchForm = document.getElementById('exchange-form');
+  if (exchForm) {
+    exchForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const senderName = document.getElementById('exch-name').value.trim();
+      const contact = document.getElementById('exch-contact').value.trim();
+      const offeredMethod = document.getElementById('exch-offered').value.trim();
+      const details = document.getElementById('exch-details').value.trim();
+      const wantedMethods = Array.from(exchForm.querySelectorAll('input[name="wanted"]:checked')).map(cb => cb.value);
+      const btn = document.getElementById('exch-submit-btn');
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+
+      try {
+        const res = await fetch('/api/store/exchange', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ senderName, contact, offeredMethod, wantedMethods, details })
+        });
+        const data = await res.json();
+        if (data.success) {
+          const waMsg = `Hello @Melasbit! Method Exchange Request:\nFrom: ${senderName} (${contact})\nI Offer: ${offeredMethod}\nI Want: ${wantedMethods.join(', ') || 'Any method'}${details ? '\nDetails: ' + details : ''}`;
+          document.getElementById('exch-success-wa').href = `https://wa.me/21627076373?text=${encodeURIComponent(waMsg)}`;
+          document.getElementById('exch-success-box').classList.remove('hidden');
+          exchForm.reset();
+          if (window.showToast) window.showToast('Exchange request submitted!', 'success');
+        } else {
+          if (window.showToast) window.showToast(data.error || 'Error submitting exchange request', 'error');
+        }
+      } catch (err) {
+        if (window.showToast) window.showToast('Network error. Please try again.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> <span>Submit Exchange Request</span>';
+      }
+    });
+  }
 </script>
 
 <%- include('partials/footer') %>

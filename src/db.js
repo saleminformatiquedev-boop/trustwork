@@ -185,28 +185,6 @@ async function initDatabase() {
         "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
-      CREATE TABLE IF NOT EXISTS stars_invoices (
-        id VARCHAR(64) PRIMARY KEY,
-        payload VARCHAR(128) UNIQUE NOT NULL,
-        purpose VARCHAR(32) NOT NULL,
-        "userId" VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
-        "storeOrderId" VARCHAR(64) REFERENCES store_orders(id) ON DELETE SET NULL,
-        amount NUMERIC(14, 2) NOT NULL CHECK (amount > 0),
-        stars INTEGER NOT NULL CHECK (stars > 0),
-        status VARCHAR(32) DEFAULT 'PENDING',
-        "telegramPaymentChargeId" VARCHAR(255) UNIQUE,
-        "providerPaymentChargeId" VARCHAR(255),
-        "telegramUserId" BIGINT,
-        "invoiceLink" TEXT,
-        "rawUpdate" JSONB,
-        "paidAt" TIMESTAMP WITH TIME ZONE,
-        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_stars_invoices_payload ON stars_invoices(payload);
-      CREATE INDEX IF NOT EXISTS idx_stars_invoices_status ON stars_invoices(status);
-      CREATE INDEX IF NOT EXISTS idx_stars_invoices_order ON stars_invoices("storeOrderId");
-
       CREATE TABLE IF NOT EXISTS exchange_requests (
         id VARCHAR(64) PRIMARY KEY,
         "userId" VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
@@ -248,24 +226,6 @@ async function initDatabase() {
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS "attachments" JSONB DEFAULT '[]'::jsonb;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS "platformFee" NUMERIC(14, 2) DEFAULT 0.00;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS "sellerNetAmount" NUMERIC(14, 2) DEFAULT 0.00;
-
-      -- Telegram Stars checkout bookkeeping (legacy Binance columns are kept for historical rows)
-      ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS "starsAmount" INTEGER;
-      ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS "telegramPaymentChargeId" VARCHAR(255);
-      ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS "telegramUserId" BIGINT;
-      ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS "invoicePayload" VARCHAR(128);
-      ALTER TABLE deposits ADD COLUMN IF NOT EXISTS "starsAmount" INTEGER;
-      ALTER TABLE deposits ADD COLUMN IF NOT EXISTS provider VARCHAR(32) DEFAULT 'TELEGRAM_STARS';
-
-      -- Older databases were created before deposits.txId was declared UNIQUE.
-      -- Add the guard when existing data allows it; otherwise the server still
-      -- uses an explicit NOT EXISTS check for Telegram charge IDs.
-      DO $$ BEGIN
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_deposits_txid_unique
-          ON deposits ("txId") WHERE "txId" IS NOT NULL;
-      EXCEPTION WHEN unique_violation THEN
-        RAISE NOTICE 'Skipping idx_deposits_txid_unique because existing txIds are duplicated.';
-      END $$;
 
       UPDATE orders
       SET "platformFee" = ROUND(amount * 0.15, 2),

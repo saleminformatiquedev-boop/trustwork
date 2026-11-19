@@ -50,7 +50,7 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
     }
 
     if (balance < price) {
-      throw new Error(`Insufficient balance. You have ${balance.toFixed(2)} USD and this guide costs ${price.toFixed(2)} USD`);
+      throw new Error(`Insufficient balance. You have ${balance.toFixed(2)} USDT and this guide costs ${price.toFixed(2)} USDT`);
     }
 
     // 2. Move funds from wallet to escrow
@@ -106,8 +106,8 @@ async function createOrderWithEscrow(pool, { buyerId, serviceId, requirements })
       orderId,
       buyerUser.id,
       isInstantDelivery 
-        ? `🎉 Order confirmed! Your method pack "${srv.title}" (PDF, ZIP, Scripts & Video) is ready for instant download. Your ${price.toFixed(2)} USD are protected in escrow.\n⏱️ Only 2 days (48h) to validate if the method is good or not. After 2 days, the review will be for the Admin.`
-        : `Order confirmed! An amount of ${price.toFixed(2)} USD has been charged and secured in escrow.\n⏱️ Only 2 days (48h) after delivery to validate if the method is good or not. After 2 days, the review will be for the Admin.`,
+        ? `🎉 Order confirmed! Your method pack "${srv.title}" (PDF, ZIP, Scripts & Video) is ready for instant download. Your ${price.toFixed(2)} USDT are protected in escrow.\n⏱️ Only 2 days (48h) to validate if the method is good or not. After 2 days, the review will be for the Admin.`
+        : `Order confirmed! An amount of ${price.toFixed(2)} USDT has been charged and secured in escrow.\n⏱️ Only 2 days (48h) after delivery to validate if the method is good or not. After 2 days, the review will be for the Admin.`,
       srv.fileUrl || null,
       srv.fileName || null
     ]);
@@ -308,7 +308,7 @@ async function completeOrderAndReleaseFunds(pool, { orderId, buyerId, isAdmin = 
       msgId,
       orderId,
       buyerId,
-      `✅ Order approved by buyer! ${sellerNetAmount.toFixed(2)} USD (85% net payout) has been transferred to the author, and ${platformFee.toFixed(2)} USD (15% platform commission) has been credited to Admin.`
+      `✅ Order approved by buyer! ${sellerNetAmount.toFixed(2)} USDT (85% net payout) has been transferred to the author, and ${platformFee.toFixed(2)} USDT (15% platform commission) has been credited to Admin.`
     ]);
 
     const bRes = await client.query('SELECT * FROM users WHERE id = $1', [order.buyerId]);
@@ -490,7 +490,7 @@ async function resolveDispute(pool, { disputeId, resolution, resolutionNote, adm
         msgId,
         order.id,
         order.buyerId,
-        `⚖️ ARBITRATION COMPLETED: Investigation resolved in favor of the buyer.\nDecision: ${resolutionNote}\nThe full amount of ${amount.toFixed(2)} USD has been refunded to the buyer's wallet.`
+        `⚖️ ARBITRATION COMPLETED: Investigation resolved in favor of the buyer.\nDecision: ${resolutionNote}\nThe full amount of ${amount.toFixed(2)} USDT has been refunded to the buyer's wallet.`
       ]);
     } else if (resolution === "PAY_SELLER") {
       const platformFee = Math.round(amount * PLATFORM_FEE_RATE * 100) / 100;
@@ -544,7 +544,7 @@ async function resolveDispute(pool, { disputeId, resolution, resolutionNote, adm
         msgId,
         order.id,
         order.sellerId,
-        `⚖️ ARBITRATION COMPLETED: Investigation resolved in favor of the author.\nDecision: ${resolutionNote}\n${sellerNetAmount.toFixed(2)} USD (85% net) has been released to the author, and ${platformFee.toFixed(2)} USD (15% platform fee) has been credited to Admin.`
+        `⚖️ ARBITRATION COMPLETED: Investigation resolved in favor of the author.\nDecision: ${resolutionNote}\n${sellerNetAmount.toFixed(2)} USDT (85% net) has been released to the author, and ${platformFee.toFixed(2)} USDT (15% platform fee) has been credited to Admin.`
       ]);
     }
 

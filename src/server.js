@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const { Server } = require('socket.io');
 const multer = require('multer');
+const QRCode = require('qrcode');
 
 const { pool, initDatabase } = require('./db');
 const {
@@ -18,7 +19,7 @@ const {
 } = require('./auth');
 const escrow = require('./escrow');
 const emailService = require('./services/email');
-const telegramStars = require('./services/telegramStars');
+const binanceService = require('./services/binance');
 
 const app = express();
 const server = http.createServer(app);
@@ -30,6 +31,7 @@ app.disable('x-powered-by');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '127.0.0.1';
+const PLATFORM_BINANCE_PAY_ID = binanceService.PLATFORM_BINANCE_PAY_ID;
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(48).toString('hex');
 
 // Strict Security Headers Middleware
@@ -71,7 +73,7 @@ function createRateLimiter(store, maxRequests, errorMessage) {
 
 app.use(createRateLimiter(generalRateMap, 120, 'Too many requests, please wait a moment.'));
 app.use(
-  ['/auth', '/api/wallet', '/api/store/order', '/orders/create', '/disputes', '/admin'],
+  ['/auth', '/api/wallet', '/orders/create', '/disputes', '/admin'],
   createRateLimiter(strictRateMap, 25, 'Rate limit exceeded on sensitive endpoint. Please wait 1 minute.')
 );
 
@@ -206,10 +208,6 @@ function parseCookie(req, name) {
 
 // Synchronizer + HMAC-Bound Cookie CSRF Protection (Prevents MemoryStore DoS on unauthenticated requests)
 app.use((req, res, next) => {
-  // Telegram calls the webhook server-to-server; it is authenticated by the
-  // secret path + X-Telegram-Bot-Api-Secret-Token header, not by a browser CSRF token.
-  if (req.path.startsWith('/telegram/webhook/')) return next();
-
   let csrfSeed = parseCookie(req, 'methods.csrf');
   if (!csrfSeed || !/^[a-f0-9]{32,64}$/.test(csrfSeed)) {
     csrfSeed = crypto.randomBytes(24).toString('hex');
@@ -291,14 +289,23 @@ io.use(async (socket, next) => {
   }
 });
 
-// Global injection of user, total users counter, unread chat counter & Telegram Stars config in EJS views
+// Pre-generate cached USDT BEP20 QR Code for instant rendering across all pages
+let cachedBep20QrDataUrl = '';
+QRCode.toDataURL(binanceService.DEFAULT_USDT_BEP20, {
+  width: 280,
+  margin: 2,
+  errorCorrectionLevel: 'M',
+  color: { dark: '#0f172a', light: '#ffffff' }
+}).then(url => { cachedBep20QrDataUrl = url; }).catch(() => {});
+
+// Global injection of user, total users counter, unread chat counter & Binance payment details in EJS views
 app.use(async (req, res, next) => {
   res.locals.user = req.user ? normalizeUser(req.user) : null;
   res.locals.unreadChatCount = 0;
   res.locals.totalUsersCount = 0;
-  res.locals.starsPerUsd = telegramStars.STARS_PER_USD;
-  res.locals.telegramStarsConfigured = telegramStars.isConfigured();
-  res.locals.telegramBotUsername = telegramStars.BOT_USERNAME;
+  res.locals.platformBinancePayId = PLATFORM_BINANCE_PAY_ID;
+  res.locals.bep20Address = binanceService.DEFAULT_USDT_BEP20;
+  res.locals.bep20QrDataUrl = cachedBep20QrDataUrl;
   try {
     const countRes = await pool.query('SELECT COUNT(*)::int AS total FROM users');
     res.locals.totalUsersCount = countRes.rows[0]?.total ?? 0;
@@ -774,10 +781,7 @@ app.get('/', async (req, res) => {
         s.title ASC
     `, [STORE_OWNER_EMAIL]);
     res.render('index', {
-      services: formatRows(srvRes.rows).map(sanitizePublicService),
-      starsPerUsd: telegramStars.STARS_PER_USD,
-      telegramBotUsername: telegramStars.BOT_USERNAME,
-      telegramStarsConfigured: telegramStars.isConfigured()
+      services: formatRows(srvRes.rows).map(sanitizePublicService)
     });
   } catch (err) {
     console.error("Homepage error:", err.message);
@@ -785,7 +789,7 @@ app.get('/', async (req, res) => {
   }
 });
 
-// Dedicated Method Exchange Page (no Telegram Stars checkout section)
+// Dedicated Method Exchange Page (no Binance checkout section)
 app.get('/exchange', async (req, res) => {
   try {
     const srvRes = await pool.query(`
@@ -812,308 +816,13 @@ app.get('/exchange', async (req, res) => {
 });
 
 // ==========================================
-// TELEGRAM STARS PAYMENT HELPERS & WEBHOOK HANDLER
-// ==========================================
-
-function makeStarsPayload(prefix) {
-  return `${prefix}_${crypto.randomBytes(12).toString('hex')}`;
-}
-
-function safeSecretEquals(a, b) {
-  const left = Buffer.from(String(a || ''));
-  const right = Buffer.from(String(b || ''));
-  return left.length === right.length && crypto.timingSafeEqual(left, right);
-}
-
-async function handleStarsPreCheckout(query) {
-  const payload = String(query.invoice_payload || '');
-  const total = Number(query.total_amount);
-  const currency = String(query.currency || '');
-  let ok = false;
-  let errorMessage = 'Invoice not found or expired.';
-
-  try {
-    const invRes = await pool.query(
-      `SELECT i.*, o.status AS order_status
-       FROM stars_invoices i
-       LEFT JOIN store_orders o ON o.id = i."storeOrderId"
-       WHERE i.payload = $1`,
-      [payload]
-    );
-    const invoice = invRes.rows[0];
-
-    if (!invoice) {
-      errorMessage = 'Invoice not found or expired.';
-    } else if (invoice.status !== 'PENDING') {
-      errorMessage = 'This invoice is no longer active.';
-    } else if (currency !== 'XTR') {
-      errorMessage = 'Unsupported payment currency.';
-    } else if (!Number.isInteger(total) || total !== invoice.stars) {
-      errorMessage = 'Invoice amount mismatch. Please restart the checkout.';
-    } else if (invoice.purpose === 'STORE_ORDER' && ['REJECTED', 'REFUNDED'].includes(invoice.order_status)) {
-      errorMessage = 'This order was cancelled. Please create a new order.';
-    } else {
-      ok = true;
-      errorMessage = '';
-    }
-  } catch (err) {
-    console.error('[Telegram Stars] pre_checkout verification error:', err.message);
-    errorMessage = 'Unable to verify the invoice. Please try again.';
-  }
-
-  try {
-    await telegramStars.answerPreCheckoutQuery(query.id, ok, errorMessage);
-  } catch (err) {
-    console.error('[Telegram Stars] answerPreCheckoutQuery failed:', err.message);
-  }
-}
-
-async function handleStarsSuccessfulPayment(message) {
-  const payment = message.successful_payment || {};
-  const payload = String(payment.invoice_payload || '');
-  const chargeId = String(payment.telegram_payment_charge_id || '');
-  const providerChargeId = String(payment.provider_payment_charge_id || '');
-  const starsAmount = Number(payment.total_amount);
-  const currency = String(payment.currency || '');
-  const telegramUserId = message.from && message.from.id ? message.from.id : null;
-  const chatId = message.chat && message.chat.id ? message.chat.id : null;
-
-  if (!payload || !chargeId) {
-    console.error('[Telegram Stars] successful_payment missing payload or charge id.');
-    return;
-  }
-
-  const client = await pool.connect();
-  let paidInvoice = null;
-  let paidOrder = null;
-  let creditedUser = null;
-
-  try {
-    await client.query('BEGIN');
-
-    const invRes = await client.query(
-      'SELECT * FROM stars_invoices WHERE payload = $1 FOR UPDATE',
-      [payload]
-    );
-    const invoice = invRes.rows[0];
-    if (!invoice) {
-      await client.query('ROLLBACK');
-      console.error('[Telegram Stars] Payment received for unknown payload:', payload);
-      return;
-    }
-
-    // Telegram retries webhooks: a second delivery for the same payload is a no-op.
-    if (invoice.status === 'PAID' || invoice.status === 'REFUNDED') {
-      await client.query('ROLLBACK');
-      return;
-    }
-
-    if (currency !== 'XTR' || !Number.isInteger(starsAmount) || starsAmount !== invoice.stars) {
-      await client.query(
-        `UPDATE stars_invoices
-         SET status = 'FAILED', "rawUpdate" = $1::jsonb
-         WHERE id = $2`,
-        [JSON.stringify(payment), invoice.id]
-      );
-      await client.query('COMMIT');
-      console.error('[Telegram Stars] Paid amount/currency mismatch for invoice', invoice.id);
-      return;
-    }
-
-    const duplicate = await client.query(
-      'SELECT id FROM stars_invoices WHERE "telegramPaymentChargeId" = $1 AND id <> $2',
-      [chargeId, invoice.id]
-    );
-    if (duplicate.rows.length > 0) {
-      await client.query('ROLLBACK');
-      console.error('[Telegram Stars] Duplicate telegram_payment_charge_id:', chargeId);
-      return;
-    }
-
-    const updatedInv = await client.query(
-      `UPDATE stars_invoices
-       SET status = 'PAID',
-           "telegramPaymentChargeId" = $1,
-           "providerPaymentChargeId" = $2,
-           "telegramUserId" = $3,
-           "rawUpdate" = $4::jsonb,
-           "paidAt" = CURRENT_TIMESTAMP
-       WHERE id = $5
-       RETURNING *`,
-      [chargeId, providerChargeId || null, telegramUserId, JSON.stringify(payment), invoice.id]
-    );
-    paidInvoice = updatedInv.rows[0];
-
-    if (invoice.purpose === 'STORE_ORDER') {
-      const ordRes = await client.query(
-        `UPDATE store_orders
-         SET status = 'PAID',
-             "txId" = $1,
-             "starsAmount" = $2,
-             "telegramPaymentChargeId" = $1,
-             "telegramUserId" = $3
-         WHERE id = $4
-         RETURNING *`,
-        [chargeId, starsAmount, telegramUserId, invoice.storeOrderId]
-      );
-      paidOrder = ordRes.rows[0] || null;
-    } else if (invoice.purpose === 'WALLET_TOPUP') {
-      if (!invoice.userId) {
-        console.error('[Telegram Stars] Top-up invoice has no user:', invoice.id);
-      } else {
-        // The invoice row is locked above, so this check is safe even on legacy
-        // databases that were created without a UNIQUE constraint on deposits.txId.
-        const existingDep = await client.query(
-          'SELECT id FROM deposits WHERE "txId" = $1 LIMIT 1',
-          [chargeId]
-        );
-
-        if (existingDep.rows.length === 0) {
-          await client.query(
-            `INSERT INTO deposits (id, "userId", amount, "txId", status, "starsAmount", provider)
-             VALUES ($1, $2, $3, $4, 'COMPLETED', $5, 'TELEGRAM_STARS')`,
-            ['dep_' + crypto.randomBytes(8).toString('hex'), invoice.userId, invoice.amount, chargeId, starsAmount]
-          );
-          await client.query(
-            'UPDATE users SET "walletBalance" = "walletBalance" + $1 WHERE id = $2',
-            [invoice.amount, invoice.userId]
-          );
-          const userRes = await client.query(
-            'SELECT id, name, email, role FROM users WHERE id = $1',
-            [invoice.userId]
-          );
-          creditedUser = userRes.rows[0] || null;
-        }
-      }
-    }
-
-    await client.query('COMMIT');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('[Telegram Stars] successful_payment processing error:', err.message);
-    // Rethrow so the webhook replies 500 and Telegram retries the update.
-    // The handler is idempotent, so retries cannot double-credit a wallet.
-    throw err;
-  } finally {
-    client.release();
-  }
-
-  if (!paidInvoice) return;
-
-  const starsLabel = `${starsAmount} Star${starsAmount === 1 ? '' : 's'}`;
-  const usdLabel = `$${parseFloat(paidInvoice.amount).toFixed(2)}`;
-
-  if (paidOrder) {
-    const titles = Array.isArray(paidOrder.items)
-      ? paidOrder.items.map(i => i.title).join(', ')
-      : 'Digital methods';
-    try {
-      const ownerRes = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1', [STORE_OWNER_EMAIL]);
-      if (ownerRes.rows[0]) {
-        io.to(`user_${ownerRes.rows[0].id}`).emit('user_notification', {
-          title: `⭐ Telegram Stars order paid (${usdLabel})`,
-          body: `${paidOrder.customerContact} paid ${starsLabel} for: ${titles}`,
-          url: '/admin/store',
-          type: 'store_order'
-        });
-      }
-    } catch (err) {
-      console.warn('[Telegram Stars] Owner socket notification failed:', err.message);
-    }
-
-    try {
-      emailService.notifyStoreOrderPaid({
-        order: paidOrder,
-        items: Array.isArray(paidOrder.items) ? paidOrder.items : [],
-        customerContact: paidOrder.customerContact,
-        amount: parseFloat(paidOrder.totalAmount),
-        starsAmount,
-        telegramUsername: message.from && message.from.username ? '@' + message.from.username : ''
-      });
-    } catch (err) {
-      console.warn('[Telegram Stars] Store order email failed:', err.message);
-    }
-
-    if (chatId) {
-      try {
-        await telegramStars.sendMessage(
-          chatId,
-          `✅ Payment received: ${starsLabel} (${usdLabel}).\nOrder #${paidOrder.id} is confirmed.\n@Melasbit will contact you at ${paidOrder.customerContact} for the screen-share.`
-        );
-      } catch (err) {
-        console.warn('[Telegram Stars] Buyer confirmation message failed:', err.message);
-      }
-    }
-  }
-
-  if (creditedUser) {
-    const amount = parseFloat(paidInvoice.amount);
-    io.to(`user_${creditedUser.id}`).emit('user_notification', {
-      title: '⭐ Wallet topped up with Telegram Stars!',
-      body: `+$${amount.toFixed(2)} has been credited to your wallet (${starsLabel}).`,
-      url: '/dashboard',
-      type: 'deposit_decision'
-    });
-
-    try {
-      emailService.notifyDepositReceived({
-        user: creditedUser,
-        amount,
-        txId: chargeId,
-        starsAmount
-      });
-    } catch (err) {
-      console.warn('[Telegram Stars] Deposit email failed:', err.message);
-    }
-
-    if (chatId) {
-      try {
-        await telegramStars.sendMessage(
-          chatId,
-          `✅ Top-up received: ${starsLabel}.\n+$${amount.toFixed(2)} has been credited to your wallet balance.`
-        );
-      } catch (err) {
-        console.warn('[Telegram Stars] Top-up confirmation message failed:', err.message);
-      }
-    }
-  }
-}
-
-async function handleTelegramUpdate(update) {
-  if (!update || typeof update !== 'object') return;
-
-  if (update.pre_checkout_query) {
-    await handleStarsPreCheckout(update.pre_checkout_query);
-    return;
-  }
-
-  const message = update.message;
-  if (message && message.successful_payment) {
-    await handleStarsSuccessfulPayment(message);
-    return;
-  }
-
-  if (message && typeof message.text === 'string' && message.text.startsWith('/start')) {
-    const baseUrl = (process.env.BASE_URL || telegramStars.WEBHOOK_URL || '').replace(/\/$/, '');
-    const text = baseUrl
-      ? `Welcome to @Melasbit Methods!\nBrowse the catalog and pay securely with Telegram Stars:\n${baseUrl}`
-      : 'Welcome to @Melasbit Methods! Open the website, choose a method and pay securely with Telegram Stars.';
-    try {
-      await telegramStars.sendMessage(message.chat.id, text);
-    } catch (err) {
-      console.warn('[Telegram Stars] /start reply failed:', err.message);
-    }
-  }
-}
-
-// ==========================================
 // SIMPLE DIRECT STORE API (BUY 1 OR MORE METHODS + EXCHANGE REQUEST)
 // ==========================================
 
-// Submit a direct Telegram Stars order for 1 or multiple methods
+// Submit a direct Binance Pay ID / USDT BEP20 order for 1 or multiple methods
 app.post('/api/store/order', async (req, res) => {
   try {
-    const { serviceIds, customerContact, note } = req.body || {};
+    const { serviceIds, paymentMethod, txId, customerContact, note } = req.body || {};
 
     if (!Array.isArray(serviceIds) || serviceIds.length === 0) {
       return res.status(400).json({ success: false, error: 'Please select at least one method.' });
@@ -1124,18 +833,16 @@ app.post('/api/store/order', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid method selection.' });
     }
 
+    const cleanPaymentMethod = paymentMethod === 'USDT_BEP20' ? 'USDT_BEP20' : 'BINANCE_PAY';
+    const cleanTxId = String(txId || '').trim().slice(0, 200);
     const cleanContact = String(customerContact || '').trim().slice(0, 200);
     const cleanNote = String(note || '').trim().slice(0, 1000);
 
     if (!cleanContact) {
       return res.status(400).json({ success: false, error: 'Please enter your WhatsApp, Telegram, or Email contact.' });
     }
-
-    if (!telegramStars.isConfigured()) {
-      return res.status(503).json({
-        success: false,
-        error: 'Telegram Stars checkout is not configured yet. Please contact @Melasbit directly.'
-      });
+    if (!cleanTxId || cleanTxId.length < 4) {
+      return res.status(400).json({ success: false, error: 'Please enter your Binance Pay Order ID or BEP20 TxID.' });
     }
 
     // Fetch exact server-side prices from DB
@@ -1153,117 +860,61 @@ app.post('/api/store/order', async (req, res) => {
       price: parseFloat(r.price)
     }));
     const totalAmount = Math.round(items.reduce((sum, i) => sum + i.price, 0) * 100) / 100;
-    const stars = telegramStars.usdToStars(totalAmount);
+
+    // Optional automatic Binance API check if server has API keys configured
+    let initialStatus = 'PENDING';
+    try {
+      if (binanceService.isConfigured()) {
+        const check = await binanceService.verifyIncomingDeposit({ txId: cleanTxId, expectedAmount: totalAmount });
+        if (check && check.verified && check.autoCreditAllowed && check.actualAmount >= totalAmount) {
+          initialStatus = 'PAID';
+        }
+      }
+    } catch (_) {}
 
     const orderId = 'ord_' + crypto.randomBytes(6).toString('hex');
-    const invoiceId = 'inv_' + crypto.randomBytes(8).toString('hex');
-    const payload = makeStarsPayload('ord');
-    const userId = req.user ? req.user.id : null;
+    await pool.query(`
+      INSERT INTO store_orders (id, "userId", "customerContact", items, "totalAmount", "paymentMethod", "txId", note, status)
+      VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9)
+    `, [
+      orderId,
+      req.user ? req.user.id : null,
+      cleanContact,
+      JSON.stringify(items),
+      totalAmount,
+      cleanPaymentMethod,
+      cleanTxId,
+      cleanNote || null,
+      initialStatus
+    ]);
 
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query(`
-        INSERT INTO store_orders
-          (id, "userId", "customerContact", items, "totalAmount", "paymentMethod", "txId", note, status, "invoicePayload")
-        VALUES
-          ($1, $2, $3, $4::jsonb, $5, 'TELEGRAM_STARS', $6, $7, 'PENDING', $6)
-      `, [orderId, userId, cleanContact, JSON.stringify(items), totalAmount, payload, cleanNote || null]);
-
-      await client.query(`
-        INSERT INTO stars_invoices (id, payload, purpose, "userId", "storeOrderId", amount, stars, status)
-        VALUES ($1, $2, 'STORE_ORDER', $3, $4, $5, $6, 'PENDING')
-      `, [invoiceId, payload, userId, orderId, totalAmount, stars]);
-
-      await client.query('COMMIT');
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-
-    let invoiceLink;
-    try {
-      invoiceLink = await telegramStars.createInvoiceLink({
-        title: `Order #${orderId.slice(-6)}`,
-        description: items.map(i => i.title).join(' + ').slice(0, 250),
-        payload,
-        stars
-      });
-      await pool.query('UPDATE stars_invoices SET "invoiceLink" = $1 WHERE id = $2', [invoiceLink, invoiceId]);
-    } catch (linkErr) {
-      console.error('[Telegram Stars] Invoice creation error:', linkErr.message);
-      await pool.query(`UPDATE stars_invoices SET status = 'FAILED' WHERE id = $1`, [invoiceId]);
-      await pool.query(`UPDATE store_orders SET status = 'REJECTED' WHERE id = $1`, [orderId]);
-      return res.status(502).json({
-        success: false,
-        error: 'Unable to create the Telegram Stars invoice. Please try again in a moment.'
+    // Notify sole seller (saleminformatiquedev@gmail.com) in real time
+    const ownerRes = await pool.query(`SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1`, [STORE_OWNER_EMAIL]);
+    if (ownerRes.rows[0]) {
+      const titlesStr = items.map(i => i.title).join(', ');
+      io.to(`user_${ownerRes.rows[0].id}`).emit('user_notification', {
+        title: `💰 New Binance Order ($${totalAmount.toFixed(2)})`,
+        body: `${cleanContact} ordered ${titlesStr} via ${cleanPaymentMethod} (TxID: ${cleanTxId})`,
+        url: '/admin/store',
+        type: 'store_order'
       });
     }
 
     return res.json({
       success: true,
-      invoiceLink,
-      stars,
       order: {
         id: orderId,
         items,
         totalAmount,
-        paymentMethod: 'TELEGRAM_STARS',
+        paymentMethod: cleanPaymentMethod,
+        txId: cleanTxId,
         customerContact: cleanContact,
-        status: 'PENDING',
-        stars
+        status: initialStatus
       }
     });
   } catch (err) {
     console.error('Store order error:', err.message);
     return res.status(500).json({ success: false, error: 'Unable to submit order right now.' });
-  }
-});
-
-// Public payment status for a direct store order (no personal data returned)
-app.get('/api/store/orders/:id/status', async (req, res) => {
-  try {
-    const orderId = String(req.params.id || '').trim();
-    if (!/^ord_[a-f0-9]{12}$/.test(orderId)) {
-      return res.status(400).json({ success: false, error: 'Invalid order id.' });
-    }
-    const ordRes = await pool.query(
-      `SELECT id, status, "totalAmount", "starsAmount", "createdAt"
-       FROM store_orders WHERE id = $1`,
-      [orderId]
-    );
-    if (!ordRes.rows[0]) {
-      return res.status(404).json({ success: false, error: 'Order not found.' });
-    }
-    return res.json({ success: true, order: ordRes.rows[0] });
-  } catch (err) {
-    console.error('Store order status error:', err.message);
-    return res.status(500).json({ success: false, error: 'Unable to check order status.' });
-  }
-});
-
-// Telegram webhook (secret path + secret header). CSRF is intentionally skipped above.
-app.post('/telegram/webhook/:secret', async (req, res) => {
-  const configuredSecret = telegramStars.WEBHOOK_SECRET;
-  if (!configuredSecret) {
-    return res.status(503).send('Telegram webhook is not configured.');
-  }
-
-  const pathSecret = req.params.secret || '';
-  const headerSecret = req.get('x-telegram-bot-api-secret-token') || '';
-  if (!safeSecretEquals(pathSecret, configuredSecret) || !safeSecretEquals(headerSecret, configuredSecret)) {
-    return res.status(403).send('Forbidden');
-  }
-
-  try {
-    await handleTelegramUpdate(req.body);
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error('[Telegram Stars] Webhook handler error:', err.message);
-    // Non-200 makes Telegram retry. The handler is idempotent, so this is safe.
-    return res.status(500).json({ ok: false });
   }
 });
 
@@ -1325,49 +976,9 @@ app.get('/admin/store', ensureAuthenticated, async (req, res) => {
   try {
     const ordersRes = await pool.query(`SELECT * FROM store_orders ORDER BY "createdAt" DESC LIMIT 100`);
     const exchangesRes = await pool.query(`SELECT * FROM exchange_requests ORDER BY "createdAt" DESC LIMIT 100`);
-    const invoicesRes = await pool.query(`SELECT * FROM stars_invoices ORDER BY "createdAt" DESC LIMIT 25`);
-
-    let starBalance = null;
-    let starTransactions = [];
-    let starsError = null;
-    if (telegramStars.isConfigured()) {
-      const [balanceResult, txResult] = await Promise.allSettled([
-        telegramStars.getMyStarBalance(),
-        telegramStars.getStarTransactions({ offset: 0, limit: 15 })
-      ]);
-
-      if (balanceResult.status === 'fulfilled') {
-        const balanceRes = balanceResult.value;
-        const rawBalance = balanceRes && (balanceRes.amount !== undefined ? balanceRes.amount : balanceRes.balance);
-        starBalance = rawBalance !== undefined && rawBalance !== null && Number.isFinite(Number(rawBalance))
-          ? Number(rawBalance)
-          : null;
-      } else {
-        starsError = balanceResult.reason && balanceResult.reason.message
-          ? balanceResult.reason.message
-          : 'Unable to read the Stars balance.';
-      }
-
-      if (txResult.status === 'fulfilled') {
-        const txRes = txResult.value;
-        starTransactions = Array.isArray(txRes && txRes.transactions) ? txRes.transactions : [];
-      } else if (!starsError) {
-        starsError = txResult.reason && txResult.reason.message
-          ? txResult.reason.message
-          : 'Unable to read Stars transactions.';
-      }
-    }
-
     res.render('admin-store', {
       storeOrders: ordersRes.rows,
-      exchangeRequests: exchangesRes.rows,
-      starsInvoices: invoicesRes.rows,
-      starBalance,
-      starTransactions,
-      starsError,
-      starsConfigured: telegramStars.isConfigured(),
-      starsPerUsd: telegramStars.STARS_PER_USD,
-      telegramBotUsername: telegramStars.BOT_USERNAME
+      exchangeRequests: exchangesRes.rows
     });
   } catch (err) {
     console.error('Admin store error:', err.message);
@@ -1385,40 +996,6 @@ app.post('/admin/store/orders/:id/status', ensureAuthenticated, async (req, res)
     res.redirect('/admin/store');
   } catch (err) {
     res.status(500).send('Unable to update order status.');
-  }
-});
-
-// Refund a paid Stars invoice back to the buyer's Telegram Stars balance.
-app.post('/admin/store/orders/:id/refund', ensureAuthenticated, requireFreshAdmin, async (req, res) => {
-  if (!isStoreOwner(req.user)) return res.status(403).send('Forbidden');
-  if (!telegramStars.isConfigured()) {
-    return res.status(503).send('Telegram Stars is not configured on this server.');
-  }
-
-  try {
-    const ordRes = await pool.query('SELECT * FROM store_orders WHERE id = $1', [req.params.id]);
-    const order = ordRes.rows[0];
-    if (!order) return res.status(404).send('Order not found.');
-    if (order.status === 'REFUNDED') return res.redirect('/admin/store');
-    if (!order.telegramPaymentChargeId || !order.telegramUserId) {
-      return res.status(400).send('This order has no Telegram Stars charge to refund.');
-    }
-
-    await telegramStars.refundStarPayment(Number(order.telegramUserId), order.telegramPaymentChargeId);
-    await pool.query(`UPDATE store_orders SET status = 'REFUNDED' WHERE id = $1`, [order.id]);
-    await pool.query(
-      `UPDATE stars_invoices SET status = 'REFUNDED' WHERE "storeOrderId" = $1 AND status = 'PAID'`,
-      [order.id]
-    );
-    adminAudit(req, 'STORE_ORDER_REFUNDED', {
-      orderId: order.id,
-      chargeId: order.telegramPaymentChargeId,
-      starsAmount: order.starsAmount
-    });
-    res.redirect('/admin/store');
-  } catch (err) {
-    console.error('Stars refund error:', err.message);
-    res.status(400).send('Telegram Stars refund failed: ' + err.message);
   }
 });
 
@@ -1474,13 +1051,7 @@ app.get('/services/:id', async (req, res) => {
       ORDER BY r."createdAt" DESC
     `, [service.id]);
 
-    res.render('service-detail', {
-      service,
-      reviews: reviewsRes.rows,
-      starsPerUsd: telegramStars.STARS_PER_USD,
-      telegramBotUsername: telegramStars.BOT_USERNAME,
-      telegramStarsConfigured: telegramStars.isConfigured()
-    });
+    res.render('service-detail', { service, reviews: reviewsRes.rows });
   } catch (err) {
     console.error("Service detail error:", err.message);
     res.status(500).send("Unable to load guide details.");
@@ -1594,7 +1165,7 @@ app.post('/services/new', ensureAuthenticated, upload.any(), async (req, res) =>
       return res.status(400).send("<script>alert('Please enter a description (1 to 10,000 characters).'); window.history.back();</script>");
     }
     if (!Number.isFinite(numericPrice) || numericPrice < 0.50 || numericPrice > 50000.00) {
-      return res.status(400).send("<script>alert('Invalid price: must be between $0.50 and $50,000.00.'); window.history.back();</script>");
+      return res.status(400).send("<script>alert('Invalid price: must be between 0.50 USDT and 50,000.00 USDT.'); window.history.back();</script>");
     }
 
     let safeVideoUrl = null;
@@ -1750,7 +1321,7 @@ app.post('/orders/create', ensureAuthenticated, async (req, res) => {
 
     io.to(`user_${order.sellerId}`).emit('user_notification', {
       title: '🎉 New Order Received!',
-      body: `${req.user.name} purchased your method (${parseFloat(order.amount).toFixed(2)} USD locked in escrow).`,
+      body: `${req.user.name} purchased your method (${parseFloat(order.amount).toFixed(2)} USDT locked in escrow).`,
       url: `/orders/${order.id}`,
       type: 'new_order'
     });
@@ -1853,7 +1424,7 @@ app.post('/orders/:id/complete', ensureAuthenticated, requireFreshIfAdmin, async
     io.to(`order_${req.params.id}`).emit('order_updated', { status: 'COMPLETED', order: updated });
     io.to(`user_${updated.sellerId}`).emit('user_notification', {
       title: '💰 Payment Released!',
-      body: `Order approved! +${netAmt} USD (85% net) has been credited to your wallet.`,
+      body: `Order approved! +${netAmt} USDT (85% net) has been credited to your wallet.`,
       url: `/orders/${req.params.id}`,
       type: 'order_completed'
     });
@@ -2434,6 +2005,19 @@ app.get('/dashboard', ensureAuthenticated, async (req, res) => {
       totalAdminCommission = adminCommissionOrders.reduce((acc, o) => acc + (o.platformFee || 0), 0);
     }
 
+    const trc20QrDataUrl = await QRCode.toDataURL(binanceService.DEFAULT_USDT_TRC20, {
+      width: 320,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#0f172a', light: '#ffffff' }
+    });
+    const bep20QrDataUrl = await QRCode.toDataURL(binanceService.DEFAULT_USDT_BEP20, {
+      width: 320,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#0f172a', light: '#ffffff' }
+    });
+
     res.render('dashboard', {
       user,
       buyerOrders: formatRows(buyerRes.rows),
@@ -2442,9 +2026,11 @@ app.get('/dashboard', ensureAuthenticated, async (req, res) => {
       deposits: formatRows(depRes.rows),
       adminCommissionOrders,
       totalAdminCommission,
-      starsPerUsd: telegramStars.STARS_PER_USD,
-      telegramStarsConfigured: telegramStars.isConfigured(),
-      telegramBotUsername: telegramStars.BOT_USERNAME
+      platformBinancePayId: PLATFORM_BINANCE_PAY_ID,
+      trc20Address: binanceService.DEFAULT_USDT_TRC20,
+      bep20Address: binanceService.DEFAULT_USDT_BEP20,
+      trc20QrDataUrl,
+      bep20QrDataUrl
     });
   } catch (err) {
     console.error("Dashboard error:", err.message);
@@ -2501,17 +2087,17 @@ async function verifyRealUserSolvency(client, user) {
   };
 }
 
-// Request a manual USD payout (bank transfer, PayPal, Fragment, etc. — processed by the admin)
+// Request withdrawal via Binance API (On-Chain TRC20/BEP20 or Binance Pay ID)
 app.post('/api/wallet/withdraw', ensureAuthenticated, requireFreshIfAdmin, async (req, res) => {
   if (isDemoUser(req.user)) {
-    return res.status(403).json({ success: false, error: 'Demo accounts cannot withdraw real funds.' });
+    return res.status(403).json({ success: false, error: 'Demo accounts cannot withdraw real USDT.' });
   }
 
   const rawAmount = parseFloat(req.body.amount);
   const amount = Math.round(rawAmount * 100) / 100;
 
-  if (!Number.isFinite(amount) || amount < 1.00 || amount > 50000.00) {
-    return res.status(400).json({ success: false, error: 'Invalid withdrawal amount (min $1.00).' });
+  if (!Number.isFinite(amount) || amount < 0.10 || amount > 50000.00) {
+    return res.status(400).json({ success: false, error: 'Invalid withdrawal amount (min 0.10 USDT).' });
   }
 
   const client = await pool.connect();
@@ -2528,10 +2114,7 @@ app.post('/api/wallet/withdraw', ensureAuthenticated, requireFreshIfAdmin, async
 
     if (!user || !user.binanceId) {
       await client.query('ROLLBACK');
-      return res.status(400).json({
-        success: false,
-        error: 'Please save your payout details (IBAN, PayPal email, Fragment username, etc.) before requesting a withdrawal.'
-      });
+      return res.status(400).json({ success: false, error: 'Please save your USDT Address (TRC20 / BEP20) or Binance Pay ID before requesting a withdrawal.' });
     }
 
     if (parseFloat(user.walletBalance) < amount) {
@@ -2566,35 +2149,48 @@ app.post('/api/wallet/withdraw', ensureAuthenticated, requireFreshIfAdmin, async
     client.release();
   }
 
+  // Attempt automatic on-chain payout via Binance API if destination is a TRC20 or BEP20 address
+  let autoSent = false;
+  try {
+    const apiResult = await binanceService.executeUsdtWithdrawal({
+      destination,
+      amount,
+      withdrawalId: withId
+    });
+    if (apiResult && apiResult.success) {
+      autoSent = true;
+      await pool.query(
+        "UPDATE withdrawals SET status = 'COMPLETED', \"processedAt\" = CURRENT_TIMESTAMP WHERE id = $1",
+        [withId]
+      );
+      io.to(`user_${req.user.id}`).emit('user_notification', {
+        title: '💸 USDT Withdrawal Sent!',
+        body: `Your withdrawal of ${amount.toFixed(2)} USDT (${apiResult.network}) has been sent automatically via Binance.`,
+        url: '/dashboard',
+        type: 'withdrawal_decision'
+      });
+    }
+  } catch (apiErr) {
+    console.warn("Automatic Binance API withdrawal deferred to Admin:", apiErr.message);
+  }
+
   (async () => {
     try {
       emailService.notifyWithdrawalRequested({
         user: userObj,
         amount,
-        payoutDetails: destination
+        binanceId: destination
       });
     } catch (e) {
       console.warn("Error email withdrawal notification:", e.message);
-    }
-
-    try {
-      const ownerRes = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1', [STORE_OWNER_EMAIL]);
-      if (ownerRes.rows[0]) {
-        io.to(`user_${ownerRes.rows[0].id}`).emit('user_notification', {
-          title: `💸 Payout request ($${amount.toFixed(2)})`,
-          body: `${userObj.name || userObj.email} requested a manual payout to: ${destination}`,
-          url: '/admin/disputes',
-          type: 'withdrawal_request'
-        });
-      }
-    } catch (e) {
-      console.warn("Payout admin notification error:", e.message);
     }
   })();
 
   return res.json({
     success: true,
-    message: `Payout request of $${amount.toFixed(2)} submitted. The admin will process it manually to: ${destination}.`
+    message: autoSent
+      ? `✅ Withdrawal of ${amount.toFixed(2)} USDT has been sent automatically to ${destination} via Binance API!`
+      : `Withdrawal request of ${amount.toFixed(2)} USDT to ${destination} submitted and queued for processing.`
   });
 });
 
@@ -2665,119 +2261,197 @@ app.get('/history', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// REST AJAX: Create a Telegram Stars wallet top-up invoice
-app.post('/api/wallet/topup', ensureAuthenticated, async (req, res) => {
+// REST AJAX: Binance Pay ID & On-Chain USDT Wallet QR Code
+app.get('/api/wallet/deposit-qr', ensureAuthenticated, async (req, res) => {
+  try {
+    const rawAmount = parseFloat(req.query.amount) || 50;
+    const amount = !Number.isFinite(rawAmount) || rawAmount < 0.5 || rawAmount > 50000 ? 50 : Math.round(rawAmount * 100) / 100;
+    const network = String(req.query.network || 'TRC20').toUpperCase() === 'BEP20' ? 'BEP20' : 'TRC20';
+    const binancePayId = PLATFORM_BINANCE_PAY_ID;
+    const trc20Address = binanceService.DEFAULT_USDT_TRC20;
+    const bep20Address = binanceService.DEFAULT_USDT_BEP20;
+    const targetAddress = network === 'BEP20' ? bep20Address : trc20Address;
+
+    // Encode the clean USDT wallet address in the QR code so any wallet or Binance scanner reads it without deep-link errors
+    const qrCodeDataUrl = await QRCode.toDataURL(targetAddress, {
+      width: 320,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#0f172a',
+        light: '#ffffff'
+      }
+    });
+
+    res.json({
+      success: true,
+      qrCodeDataUrl,
+      binancePayId,
+      network,
+      address: targetAddress,
+      trc20Address,
+      bep20Address,
+      amount: amount.toFixed(2),
+      currency: 'USDT',
+      binanceWebPayUrl: 'https://www.binance.com/en/my/wallet/account/payment',
+      androidLauncherIntent: 'intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.binance.dev;S.browser_fallback_url=https%3A%2F%2Fwww.binance.com%2Fen%2Fmy%2Fwallet%2Faccount%2Fpayment;end'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Unable to generate QR code' });
+  }
+});
+
+// REST AJAX: Record & Automatically Verify Binance Pay / On-Chain Deposit via Binance API
+app.post('/api/wallet/deposit-binance', ensureAuthenticated, async (req, res) => {
   if (isDemoUser(req.user)) {
-    return res.status(403).json({ success: false, error: 'Demo test accounts cannot create real Stars invoices.' });
+    return res.status(403).json({ success: false, error: 'Demo test accounts cannot submit real Binance deposits.' });
   }
 
   const rawAmount = parseFloat(req.body.amount);
   const amount = Math.round(rawAmount * 100) / 100;
+  const txId = String(req.body.txId || '').trim();
+  const binancePayId = PLATFORM_BINANCE_PAY_ID;
 
   if (!Number.isFinite(amount) || amount < 0.50 || amount > 50000.00) {
-    return res.status(400).json({ success: false, error: 'Invalid top-up amount (between $0.50 and $50,000).' });
+    return res.status(400).json({ success: false, error: 'Invalid top-up amount (between 0.50 and 50,000 USDT).' });
   }
 
-  if (!telegramStars.isConfigured()) {
-    return res.status(503).json({
-      success: false,
-      error: 'Telegram Stars is not configured on this server yet.'
-    });
+  if (!txId || !/^[a-zA-Z0-9_-]{8,120}$/.test(txId)) {
+    return res.status(400).json({ success: false, error: 'Please enter a valid Binance Pay Order ID or Blockchain TxID (8 to 120 characters).' });
   }
 
-  const invoiceId = 'inv_' + crypto.randomBytes(8).toString('hex');
-  const payload = makeStarsPayload('top');
-  const stars = telegramStars.usdToStars(amount);
-
-  try {
-    await pool.query(`
-      INSERT INTO stars_invoices (id, payload, purpose, "userId", amount, stars, status)
-      VALUES ($1, $2, 'WALLET_TOPUP', $3, $4, $5, 'PENDING')
-    `, [invoiceId, payload, req.user.id, amount, stars]);
-  } catch (err) {
-    console.error('Top-up invoice insert error:', err.message);
-    return res.status(500).json({ success: false, error: 'Unable to create the top-up invoice.' });
-  }
-
-  let invoiceLink;
-  try {
-    invoiceLink = await telegramStars.createInvoiceLink({
-      title: `Wallet top-up $${amount.toFixed(2)}`,
-      description: `Add $${amount.toFixed(2)} to your @Melasbit wallet balance.`,
-      payload,
-      stars
-    });
-    await pool.query('UPDATE stars_invoices SET "invoiceLink" = $1 WHERE id = $2', [invoiceLink, invoiceId]);
-  } catch (err) {
-    console.error('Top-up invoice link error:', err.message);
-    await pool.query(`UPDATE stars_invoices SET status = 'FAILED' WHERE id = $1`, [invoiceId]);
-    return res.status(502).json({ success: false, error: 'Unable to create the Telegram Stars invoice.' });
-  }
-
-  return res.json({
-    success: true,
-    invoiceId,
-    invoiceLink,
-    amount,
-    stars,
-    message: `Invoice created: ${stars} Stars for $${amount.toFixed(2)}.`
+  // 1. Check live Binance API (Binance Pay History + On-Chain USDT Deposit History)
+  const verification = await binanceService.verifyIncomingDeposit({
+    txId,
+    expectedAmount: amount
   });
-});
 
-// Poll a Telegram Stars top-up invoice after the user pays
-app.get('/api/wallet/topup/:id/status', ensureAuthenticated, async (req, res) => {
+  // If Binance API found a matching TxID that is invalid (e.g. outgoing payment, wrong currency, mismatching amount, or expired), block immediately
+  if (
+    !verification.verified &&
+    verification.reason &&
+    (verification.reason.includes('outgoing payment') ||
+     verification.reason.includes('instead of USDT') ||
+     verification.reason.includes('does not match') ||
+     verification.reason.includes('expired or predates'))
+  ) {
+    return res.status(400).json({ success: false, error: verification.reason });
+  }
+
+  const canonicalTxId = verification.canonicalTxId || txId;
+  const shouldAutoCredit = Boolean(verification.verified && verification.autoCreditAllowed);
+  const creditAmount = verification.verified ? verification.actualAmount : amount;
+  const targetStatus = shouldAutoCredit ? 'COMPLETED' : 'PENDING';
+
+  const client = await pool.connect();
   try {
-    const invRes = await pool.query(
-      `SELECT id, status, amount, stars, "paidAt"
-       FROM stars_invoices
-       WHERE id = $1 AND "userId" = $2 AND purpose = 'WALLET_TOPUP'`,
-      [req.params.id, req.user.id]
-    );
-    if (!invRes.rows[0]) {
-      return res.status(404).json({ success: false, error: 'Top-up invoice not found.' });
+    await client.query('BEGIN');
+
+    // Serialize concurrent submissions of the same txId across ALL users using PostgreSQL transaction-level advisory locks
+    const lockKeys = Array.from(new Set([txId.toLowerCase(), canonicalTxId.toLowerCase()])).sort();
+    for (const k of lockKeys) {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [k]);
     }
-    return res.json({ success: true, invoice: invRes.rows[0] });
+
+    // Lock user and check for duplicate txId (case-insensitive)
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [req.user.id]);
+    const existingTx = await client.query(
+      'SELECT id FROM deposits WHERE LOWER("txId") = LOWER($1) OR LOWER("txId") = LOWER($2)',
+      [txId, canonicalTxId]
+    );
+    if (existingTx.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: 'This Transaction ID (TxID) has already been used.' });
+    }
+
+    const depId = 'dep_' + crypto.randomBytes(8).toString('hex');
+    const depRes = await client.query(`
+      INSERT INTO deposits (id, "userId", amount, "binancePayId", "txId", status)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `, [depId, req.user.id, creditAmount, binancePayId, canonicalTxId, targetStatus]);
+
+    if (shouldAutoCredit) {
+      await client.query(
+        'UPDATE users SET "walletBalance" = "walletBalance" + $1 WHERE id = $2',
+        [creditAmount, req.user.id]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    if (shouldAutoCredit) {
+      io.to(`user_${req.user.id}`).emit('user_notification', {
+        title: '💰 Deposit Verified by Binance API!',
+        body: `+${creditAmount.toFixed(2)} USDT has been automatically credited to your wallet.`,
+        url: '/dashboard',
+        type: 'deposit_decision'
+      });
+    }
+
+    (async () => {
+      try {
+        emailService.notifyDepositReceived({
+          user: req.user,
+          amount: creditAmount,
+          txId: canonicalTxId,
+          binancePayId
+        });
+      } catch (e) {
+        console.warn("Error email top-up notification:", e.message);
+      }
+    })();
+
+    return res.json({
+      success: true,
+      autoCredited: shouldAutoCredit,
+      message: shouldAutoCredit
+        ? `✅ Verified by Binance API! +${creditAmount.toFixed(2)} USDT has been credited to your balance immediately.`
+        : verification.verified
+          ? `✅ On-chain deposit of ${creditAmount.toFixed(2)} USDT detected on Binance! Queued for 1-click Admin security confirmation.`
+          : `Deposit (${amount.toFixed(2)} USDT, TxID: ${txId}) recorded as PENDING. ${verification.reason}`,
+      deposit: depRes.rows[0]
+    });
   } catch (err) {
-    console.error('Top-up status error:', err.message);
-    return res.status(500).json({ success: false, error: 'Unable to check top-up status.' });
+    await client.query('ROLLBACK');
+    console.error("Deposit submission error:", err.message);
+    return res.status(500).json({ success: false, error: 'Unable to submit deposit request.' });
+  } finally {
+    client.release();
   }
 });
 
-// REST AJAX: Save payout details (IBAN, PayPal email, Fragment username, etc.) & Bio
-app.post(['/api/wallet/update-payout', '/api/wallet/update-binance'], ensureAuthenticated, requireFreshIfAdmin, async (req, res) => {
+// REST AJAX: Update Binance Pay ID / USDT Address & Bio
+app.post('/api/wallet/update-binance', ensureAuthenticated, requireFreshIfAdmin, async (req, res) => {
   try {
     if (isDemoUser(req.user)) {
       return res.status(403).json({ success: false, error: 'Shared demo accounts cannot modify profile or payout settings.' });
     }
-    const rawPayout = req.body.payoutDetails !== undefined ? req.body.payoutDetails : req.body.binanceId;
-    const payoutDetails = rawPayout ? String(rawPayout).trim().slice(0, 120) : null;
+    const binanceId = req.body.binanceId ? String(req.body.binanceId).trim().slice(0, 100) : null;
     const bio = req.body.bio ? String(req.body.bio).trim().slice(0, 1000) : null;
     const skills = req.body.skills ? String(req.body.skills).trim().slice(0, 500) : null;
 
-    if (payoutDetails && !/^[a-zA-Z0-9_@.+\- ]{4,120}$/.test(payoutDetails)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid payout details. Use 4–120 letters, digits, spaces or @ . + - _ characters.'
-      });
+    if (binanceId && !/^[a-zA-Z0-9_@.-]{4,100}$/.test(binanceId)) {
+      return res.status(400).json({ success: false, error: 'Invalid USDT Address or Binance Pay ID format.' });
     }
 
     // The administrator payout destination is locked in the web app (a stolen session can never redirect funds)
-    if (payoutDetails && req.user.role === 'ADMIN' && payoutDetails !== req.user.binanceId) {
-      adminAudit(req, 'ADMIN_PAYOUT_CHANGE_BLOCKED', { attempted: payoutDetails });
+    if (binanceId && req.user.role === 'ADMIN' && binanceId !== req.user.binanceId) {
+      adminAudit(req, 'ADMIN_PAYOUT_CHANGE_BLOCKED', { attempted: binanceId });
       return res.status(403).json({
         success: false,
-        error: 'The administrator payout details are locked for security. Change them directly on the server.'
+        error: 'The administrator payout address is locked for security. Change it directly on the server.'
       });
     }
 
     await pool.query(`
-      UPDATE users
+      UPDATE users 
       SET "binanceId" = COALESCE($1, "binanceId"),
           bio = COALESCE($2, bio),
           skills = COALESCE($3, skills)
       WHERE id = $4
-    `, [payoutDetails, bio, skills, req.user.id]);
-    res.json({ success: true, payoutDetails });
+    `, [binanceId, bio, skills, req.user.id]);
+    res.json({ success: true, binanceId });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Unable to update profile settings.' });
   }
@@ -2876,13 +2550,13 @@ app.post('/disputes/:id/resolve', ensureAuthenticated, requireFreshAdmin, async 
   }
 });
 
-// Admin: Approve or Reject a Pending Deposit (Stars top-ups are normally auto-credited by the webhook)
+// Admin: Approve, Auto-Verify via Binance API, or Reject a Pending Deposit
 app.post('/admin/deposits/:id/decision', ensureAuthenticated, requireFreshAdmin, async (req, res) => {
   if (req.user.role !== 'ADMIN' || isDemoUser(req.user)) {
     return res.status(403).send("Unauthorized: Real Administrator account required.");
   }
   const { action } = req.body;
-  if (!['APPROVE', 'REJECT'].includes(action)) {
+  if (!['APPROVE', 'REJECT', 'VERIFY_API'].includes(action)) {
     return res.status(400).send("Invalid decision action.");
   }
 
@@ -2906,6 +2580,17 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, requireFreshAdmin,
     }
 
     let finalDecision = action;
+    if (action === 'VERIFY_API') {
+      const check = await binanceService.verifyIncomingDeposit({
+        txId: deposit.txId,
+        expectedAmount: deposit.amount
+      });
+      if (!check.verified) {
+        await client.query('ROLLBACK');
+        return res.status(400).send("Binance API Verification Failed: " + (check.reason || "Transaction not found."));
+      }
+      finalDecision = 'APPROVE';
+    }
 
     if (finalDecision === 'APPROVE') {
       // Ensure no other COMPLETED deposit already used this txId
@@ -2930,8 +2615,8 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, requireFreshAdmin,
     io.to(`user_${deposit.userId}`).emit('user_notification', {
       title: finalDecision === 'APPROVE' ? '💰 Deposit Confirmed!' : '⚠️ Deposit Rejected',
       body: finalDecision === 'APPROVE'
-        ? `+$${parseFloat(deposit.amount).toFixed(2)} has been credited to your available balance.`
-        : `Your deposit request ($${parseFloat(deposit.amount).toFixed(2)}) was rejected.`,
+        ? `+${parseFloat(deposit.amount).toFixed(2)} USDT has been credited to your available balance.`
+        : `Your deposit request (${parseFloat(deposit.amount).toFixed(2)} USDT) was rejected.`,
       url: '/dashboard',
       type: 'deposit_decision'
     });
@@ -2947,13 +2632,13 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, requireFreshAdmin,
   }
 });
 
-// Admin: Mark a manual payout as sent, or reject and refund it
+// Admin: Send via Binance API, Mark Approved, or Reject (and refund) a Pending Withdrawal
 app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, requireFreshAdmin, async (req, res) => {
   if (req.user.role !== 'ADMIN' || isDemoUser(req.user)) {
     return res.status(403).send("Unauthorized: Real Administrator account required.");
   }
   const { action } = req.body;
-  if (!['APPROVE', 'REJECT'].includes(action)) {
+  if (!['APPROVE', 'REJECT', 'SEND_API'].includes(action)) {
     return res.status(400).send("Invalid decision action.");
   }
 
@@ -2975,6 +2660,24 @@ app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, requireFreshAdm
     }
 
     let finalDecision = action;
+    if (action === 'SEND_API') {
+      const solvency = await verifyRealUserSolvency(client, targetUser);
+      if (!solvency.solvent) {
+        await client.query('ROLLBACK');
+        return res.status(403).send("Security Alert: User wallet balance exceeds verified real-money ledger solvency.");
+      }
+
+      const apiOut = await binanceService.executeUsdtWithdrawal({
+        destination: withdrawal.binanceId,
+        amount: withdrawal.amount,
+        withdrawalId: withdrawal.id
+      });
+      if (!apiOut.success) {
+        await client.query('ROLLBACK');
+        return res.status(400).send("Binance API Withdrawal Error: " + apiOut.error);
+      }
+      finalDecision = 'APPROVE';
+    }
 
     if (finalDecision === 'APPROVE') {
       await client.query("UPDATE withdrawals SET status = 'COMPLETED', \"processedAt\" = CURRENT_TIMESTAMP WHERE id = $1", [withdrawal.id]);
@@ -2987,10 +2690,10 @@ app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, requireFreshAdm
     await client.query('COMMIT');
 
     io.to(`user_${withdrawal.userId}`).emit('user_notification', {
-      title: finalDecision === 'APPROVE' ? '💸 Payout Sent!' : '↩️ Payout Refunded',
+      title: finalDecision === 'APPROVE' ? '💸 Withdrawal Sent!' : '↩️ Withdrawal Refunded',
       body: finalDecision === 'APPROVE'
-        ? `Your payout of $${parseFloat(withdrawal.amount).toFixed(2)} has been processed.`
-        : `Your payout of $${parseFloat(withdrawal.amount).toFixed(2)} was cancelled and refunded to your wallet.`,
+        ? `Your withdrawal of ${parseFloat(withdrawal.amount).toFixed(2)} USDT has been processed.`
+        : `Your withdrawal of ${parseFloat(withdrawal.amount).toFixed(2)} USDT was cancelled and refunded to your wallet.`,
       url: '/dashboard',
       type: 'withdrawal_decision'
     });
@@ -3023,30 +2726,11 @@ app.use((err, req, res, next) => {
 
 // Initialize database and start server bound to HOST (127.0.0.1 by default)
 initDatabase().then(() => {
-  server.listen(PORT, HOST, async () => {
+  server.listen(PORT, HOST, () => {
     console.log(`\n🚀 TrustWork Server running on http://${HOST}:${PORT}`);
     console.log(`🛡️ Security: CSRF, HSTS, Magic-Byte Upload Filter, Protected /uploads Active`);
     console.log(`🐘 Database: PostgreSQL (ACID + Non-Negative Check Constraints Enabled)`);
-    console.log(`🔒 Escrow & Telegram Stars payments: Active\n`);
-
-    if (!telegramStars.isConfigured()) {
-      console.warn('⭐ Telegram Stars: TELEGRAM_BOT_TOKEN is not set — Stars checkout is disabled.');
-      return;
-    }
-
-    try {
-      const baseUrl = telegramStars.WEBHOOK_URL.replace(/\/$/, '');
-      if (baseUrl && telegramStars.WEBHOOK_SECRET) {
-        const webhookUrl = `${baseUrl}/telegram/webhook/${telegramStars.WEBHOOK_SECRET}`;
-        await telegramStars.setWebhook(webhookUrl, telegramStars.WEBHOOK_SECRET);
-        console.log(`⭐ Telegram Stars: webhook registered at ${baseUrl}/telegram/webhook/***`);
-      } else {
-        console.log('⭐ Telegram Stars: no webhook configured — starting long polling (development mode).');
-        await telegramStars.startPolling(handleTelegramUpdate);
-      }
-    } catch (err) {
-      console.error('❌ Telegram Stars setup failed:', err.message);
-    }
+    console.log(`🔒 Escrow & Admin Deposit Verification: Active\n`);
   });
 }).catch(err => {
   console.error("❌ Error starting PostgreSQL / Server:", err);

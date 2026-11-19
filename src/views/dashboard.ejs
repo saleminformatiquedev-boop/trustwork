@@ -35,12 +35,12 @@
       <div>
         <span class="text-xs text-slate-400 font-medium">Available Balance</span>
         <div class="text-3xl font-extrabold mt-1">
-          <span id="dash-wallet-balance"><%= user.walletBalance.toFixed(2) %></span> <span class="text-sm font-semibold text-slate-400">USD</span>
+          <span id="dash-wallet-balance"><%= user.walletBalance.toFixed(2) %></span> <span class="text-sm font-semibold text-slate-400">USDT</span>
         </div>
       </div>
 
       <div class="mt-6 flex gap-2">
-        <button id="open-deposit-modal-btn" class="flex-1 py-2.5 px-3 bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold rounded-xl transition">
+        <button id="open-deposit-modal-btn" class="flex-1 py-2.5 px-3 bg-[#F0B90B] hover:bg-[#FCD535] text-slate-950 text-xs font-bold rounded-xl transition">
           + Top Up
         </button>
         <button id="open-withdraw-btn" class="flex-1 py-2.5 px-3 bg-white/10 hover:bg-white/15 text-white text-xs font-semibold rounded-xl transition">
@@ -55,7 +55,7 @@
           <div>
             <span class="text-xs text-emerald-700 font-semibold">Admin Commission Earned (15%)</span>
             <div class="text-3xl font-extrabold text-emerald-600 mt-1">
-              <span><%= (typeof totalAdminCommission !== 'undefined' ? totalAdminCommission : 0).toFixed(2) %></span> <span class="text-sm font-semibold text-slate-400">USD</span>
+              <span><%= (typeof totalAdminCommission !== 'undefined' ? totalAdminCommission : 0).toFixed(2) %></span> <span class="text-sm font-semibold text-slate-400">USDT</span>
             </div>
           </div>
           <p class="text-xs text-slate-400 mt-4 flex items-center gap-1.5">
@@ -65,7 +65,7 @@
           <div>
             <span class="text-xs text-slate-400 font-medium">In Escrow (Active Orders)</span>
             <div class="text-3xl font-extrabold text-slate-900 mt-1">
-              <span id="dash-escrow-balance"><%= user.escrowBalance.toFixed(2) %></span> <span class="text-sm font-semibold text-slate-400">USD</span>
+              <span id="dash-escrow-balance"><%= user.escrowBalance.toFixed(2) %></span> <span class="text-sm font-semibold text-slate-400">USDT</span>
             </div>
           </div>
           <p class="text-xs text-slate-400 mt-4 flex items-center gap-1.5">
@@ -74,15 +74,14 @@
         <% } %>
       </div>
 
-    <!-- Payout details -->
+    <!-- Binance Pay ID / USDT Payout Address -->
     <div class="bg-white p-6 rounded-2xl border border-slate-200/90 flex flex-col justify-between">
       <div>
-        <span class="text-xs text-slate-400 font-medium block mb-1">Payout details (IBAN / PayPal / Fragment)</span>
-        <p class="text-[11px] text-slate-500 mb-2 leading-relaxed">Payouts are processed manually by the admin. Telegram Stars cannot be transferred directly to users, so payouts are sent through your chosen method.</p>
-        <form id="payout-form" class="mt-2 space-y-2">
-          <input type="text" id="payout-input" name="payoutDetails" value="<%= user.binanceId || '' %>" placeholder="IBAN, PayPal email, Fragment username..." class="w-full text-xs px-3 py-2.5 bg-[#FAFAFA] border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-slate-900 focus:outline-none">
-          <button type="submit" id="payout-save-btn" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-xl transition">
-            Save Payout Details
+        <span class="text-xs text-slate-400 font-medium block mb-1">USDT Address (TRC20 / BEP20) or Binance ID</span>
+        <form id="binance-form" class="mt-2 space-y-2">
+          <input type="text" id="binanceId-input" name="binanceId" value="<%= user.binanceId || '' %>" placeholder="TRC20 (T...), BEP20 (0x...), or Binance ID" class="w-full text-xs px-3 py-2.5 bg-[#FAFAFA] border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-slate-900 focus:outline-none">
+          <button type="submit" id="binance-save-btn" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-xl transition">
+            Save Payout Address / ID
           </button>
         </form>
       </div>
@@ -115,7 +114,7 @@
               <h4 class="text-sm font-bold text-slate-900 truncate"><%= ord.serviceTitle %></h4>
             </div>
             <div class="flex items-center gap-4 flex-shrink-0">
-              <span class="text-xs font-bold text-slate-900"><%= ord.amount.toFixed(2) %> USD</span>
+              <span class="text-xs font-bold text-slate-900"><%= ord.amount.toFixed(2) %> USDT</span>
               <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : (ord.status === 'DISPUTED' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700') %>">
                 <%= ord.status === 'COMPLETED' ? 'Completed' : (ord.status === 'DELIVERED' ? 'Ready to review' : (ord.status === 'DISPUTED' ? 'Disputed' : 'In Escrow')) %>
               </span>
@@ -141,7 +140,7 @@
             </div>
             <div class="flex items-center gap-4 flex-shrink-0">
               <div class="text-right">
-                <span class="text-xs font-bold text-emerald-600 block">+<%= (ord.sellerNetAmount || (ord.amount * 0.85)).toFixed(2) %> USD net</span>
+                <span class="text-xs font-bold text-emerald-600 block">+<%= (ord.sellerNetAmount || (ord.amount * 0.85)).toFixed(2) %> USDT net</span>
                 <span class="text-[10px] text-slate-400">Gross: <%= ord.amount.toFixed(2) %> (15% fee)</span>
               </div>
               <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : (ord.status === 'DISPUTED' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700') %>">
@@ -169,7 +168,7 @@
           <div class="p-5 flex items-center justify-between gap-4">
             <div>
               <div class="text-xs font-bold text-slate-900">
-                <%= tx.txType === 'DEPOSIT' ? 'Telegram Stars Top-Up' : 'Manual Payout' %>
+                <%= tx.txType === 'DEPOSIT' ? 'Binance Pay Top-Up' : 'Binance Pay Withdrawal' %>
               </div>
               <div class="text-[11px] text-slate-400">
                 <%= new Date(tx.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
@@ -177,7 +176,7 @@
             </div>
             <div class="text-right">
               <div class="text-xs font-bold <%= tx.txType === 'DEPOSIT' ? 'text-emerald-600' : 'text-slate-900' %>">
-                <%= tx.txType === 'DEPOSIT' ? '+' : '-' %><%= tx.amount.toFixed(2) %> USD
+                <%= tx.txType === 'DEPOSIT' ? '+' : '-' %><%= tx.amount.toFixed(2) %> USDT
               </div>
               <span class="text-[10px] font-semibold <%= tx.status === 'COMPLETED' ? 'text-emerald-600' : (tx.status === 'REJECTED' ? 'text-rose-600' : 'text-amber-600') %>">
                 <%= tx.status === 'COMPLETED' ? 'Completed' : (tx.status === 'REJECTED' ? 'Rejected' : 'Pending Verification') %>
@@ -196,17 +195,12 @@
 
 </div>
 
-<!-- Telegram Stars Top-Up Modal -->
+<!-- Binance Pay Top-Up Modal -->
 <div id="deposit-modal" class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs hidden items-center justify-center p-4 overflow-y-auto">
   <div class="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-xl border border-slate-200 toast-anim space-y-4 my-auto">
-
+    
     <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-      <div>
-        <h3 class="font-bold text-slate-900 text-base">
-          <i class="fa-solid fa-star text-amber-500 mr-1"></i> Top Up with Telegram Stars
-        </h3>
-        <p class="text-[11px] text-slate-400 mt-0.5">Secure XTR invoice — credited automatically after payment.</p>
-      </div>
+      <h3 class="font-bold text-slate-900 text-base">Top Up via Binance Pay / USDT</h3>
       <button id="close-deposit-modal" class="text-slate-400 hover:text-slate-700 w-8 h-8 flex items-center justify-center">
         <i class="fa-solid fa-xmark"></i>
       </button>
@@ -214,53 +208,92 @@
 
     <div class="space-y-2">
       <div class="flex items-center justify-between text-xs font-medium text-slate-600">
-        <span>Amount to add (USD)</span>
-        <span class="font-bold text-slate-900" id="deposit-amount-display">50.00 USD</span>
+        <span>Amount (USDT)</span>
+        <span class="font-bold text-slate-900" id="deposit-amount-display">50.00 USDT</span>
       </div>
       <div class="grid grid-cols-4 gap-2">
-        <button type="button" data-amount="1" class="quick-amt-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 hover:border-slate-900 text-slate-700 transition">$1</button>
-        <button type="button" data-amount="5" class="quick-amt-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 hover:border-slate-900 text-slate-700 transition">$5</button>
-        <button type="button" data-amount="10" class="quick-amt-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 hover:border-slate-900 text-slate-700 transition">$10</button>
-        <button type="button" data-amount="50" class="quick-amt-btn active py-2 text-xs font-semibold rounded-xl border-2 border-slate-900 bg-slate-900 text-white transition">$50</button>
+        <button type="button" data-amount="1" class="quick-amt-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 hover:border-slate-900 text-slate-700 transition">1</button>
+        <button type="button" data-amount="20" class="quick-amt-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 hover:border-slate-900 text-slate-700 transition">20</button>
+        <button type="button" data-amount="50" class="quick-amt-btn active py-2 text-xs font-semibold rounded-xl border-2 border-slate-900 bg-slate-900 text-white transition">50</button>
+        <button type="button" data-amount="100" class="quick-amt-btn py-2 text-xs font-semibold rounded-xl border border-slate-200 hover:border-slate-900 text-slate-700 transition">100</button>
       </div>
-      <input type="number" id="deposit-amount-input" step="0.01" min="0.5" value="50" placeholder="Custom amount (min $0.50)..." class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:border-slate-900 focus:outline-none">
+      <input type="number" id="deposit-amount-input" step="0.01" min="0.5" value="50" placeholder="Custom amount (min 0.50 USDT)..." class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:border-slate-900 focus:outline-none">
     </div>
 
-    <div class="bg-sky-50/70 border border-sky-200 rounded-xl p-4 space-y-2">
-      <div class="flex items-center justify-between text-xs">
-        <span class="text-slate-600">You will pay</span>
-        <span class="font-extrabold text-amber-700 text-sm" id="deposit-stars-display">⭐ 3,850 Stars</span>
+    <div class="bg-[#FAFAFA] border border-slate-200 p-4 rounded-xl text-center space-y-3">
+      <!-- Method 1: Instant 0% Fee Binance Pay ID -->
+      <div class="bg-white border border-amber-200 rounded-xl p-3 text-left space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-amber-700">1. Instant Binance Pay (0% Fee)</span>
+          <span class="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">Auto-Credited</span>
+        </div>
+        <div class="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-lg border border-slate-200/80">
+          <span class="text-xs text-slate-500">Admin Pay ID:</span>
+          <div class="flex items-center gap-2">
+            <code id="deposit-binance-id-text" class="font-mono font-extrabold text-sm text-slate-900 select-all"><%= typeof platformBinancePayId !== 'undefined' ? platformBinancePayId : '1229901779' %></code>
+            <button type="button" id="copy-binance-id-btn" class="px-2 py-0.5 rounded bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 transition">Copy ID</button>
+          </div>
+        </div>
+        <a id="binance-app-pay-btn" href="bnc://app.binance.com/home/main" class="w-full py-2.5 px-4 bg-[#F0B90B] hover:bg-[#FCD535] text-slate-950 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer">
+          <i class="fa-solid fa-copy"></i>
+          <span id="binance-app-pay-btn-text">Copy Pay ID (1229901779) & Open Binance App</span>
+        </a>
+        <p id="binance-pay-helper-msg" class="text-[11px] text-slate-500 leading-relaxed">
+          In Binance App: tap <strong>Pay</strong> (top-right) &rarr; <strong>Send</strong> &rarr; paste Pay ID <strong>1229901779</strong> &rarr; send USDT, then paste your <strong>Order ID</strong> below.
+        </p>
       </div>
-      <div class="flex items-center justify-between text-[11px] text-slate-500">
-        <span>Conversion rate</span>
-        <span><%= typeof starsPerUsd !== 'undefined' ? starsPerUsd : 77 %> Stars = $1 USD</span>
+
+      <!-- Method 2: On-Chain USDT QR Code (BEP20 Default / TRC20) -->
+      <div class="pt-2 border-t border-slate-200/80 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-semibold text-slate-600">2. Or Scan USDT BEP20 (BSC) Address:</span>
+          <div class="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-[10px] font-bold">
+            <button type="button" data-net="BEP20" class="qr-net-btn px-2 py-1 rounded-md bg-slate-900 text-white transition">BEP20 (USDT)</button>
+            <button type="button" data-net="TRC20" class="qr-net-btn px-2 py-1 rounded-md text-slate-600 hover:text-slate-900 transition">TRC20</button>
+          </div>
+        </div>
+
+        <div class="relative inline-block mx-auto bg-white p-2 rounded-xl border border-slate-200">
+          <img id="deposit-qr-image" src="<%= typeof bep20QrDataUrl !== 'undefined' ? bep20QrDataUrl : '' %>" alt="USDT BEP20 Deposit Address QR" class="w-36 h-36 object-contain mx-auto block">
+          <div id="deposit-qr-loader" class="<%= typeof bep20QrDataUrl !== 'undefined' && bep20QrDataUrl ? 'hidden' : '' %> absolute inset-0 bg-white/95 rounded-xl flex items-center justify-center">
+            <i class="fa-solid fa-spinner fa-spin text-lg text-slate-400"></i>
+          </div>
+        </div>
+
+        <div class="text-left space-y-1.5 text-[11px]">
+          <div class="flex items-center justify-between gap-2 bg-amber-50/70 px-2.5 py-2 rounded-lg border border-amber-200/90">
+            <span class="text-amber-900 shrink-0 font-bold">BEP20 (BSC):</span>
+            <code id="deposit-bep20-text" class="font-mono font-bold text-slate-900 truncate select-all"><%= typeof bep20Address !== 'undefined' ? bep20Address : '0x284b2c731c9a9449f88f42bc707c05511bb9b222' %></code>
+            <button type="button" data-copy-target="deposit-bep20-text" class="copy-addr-btn text-[11px] font-bold text-emerald-700 hover:underline shrink-0">Copy</button>
+          </div>
+          <div class="flex items-center justify-between gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/70">
+            <span class="text-slate-400 shrink-0 font-medium">TRC20:</span>
+            <code id="deposit-trc20-text" class="font-mono text-slate-700 truncate select-all"><%= typeof trc20Address !== 'undefined' ? trc20Address : 'TNw9pxbxwf6qtvymRSnr2quaWxVCi5fwqu' %></code>
+            <button type="button" data-copy-target="deposit-trc20-text" class="copy-addr-btn text-[11px] font-semibold text-emerald-600 hover:underline shrink-0">Copy</button>
+          </div>
+        </div>
       </div>
-      <p class="text-[11px] text-slate-500 leading-relaxed border-t border-sky-200/70 pt-2">
-        Telegram opens the official Stars invoice. Stars can be purchased inside Telegram with your card, Apple Pay, Google Pay, or Telegram Premium balance.
-      </p>
     </div>
 
-    <div id="deposit-status-box" class="hidden p-3 rounded-xl text-[11px] leading-relaxed"></div>
-
-    <div class="flex gap-2">
-      <button type="button" id="cancel-deposit-btn" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition">Cancel</button>
-      <button type="button" id="submit-deposit-btn" class="flex-1 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1.5">
-        <i class="fa-solid fa-star text-amber-300"></i>
-        <span>Pay with Stars</span>
-      </button>
-    </div>
+    <form id="deposit-confirm-form" class="space-y-3">
+      <div>
+        <label class="text-xs font-medium text-slate-600 block mb-1">Binance Pay Order ID or Blockchain TxID (Auto-Verified via API):</label>
+        <input type="text" id="deposit-txid-input" required placeholder="e.g. 463780934864084992" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-mono focus:border-slate-900 focus:outline-none">
+      </div>
+      <div class="flex gap-2">
+        <button type="button" id="cancel-deposit-btn" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition">Cancel</button>
+        <button type="submit" id="submit-deposit-btn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl transition">Verify via Binance API</button>
+      </div>
+    </form>
 
   </div>
 </div>
 
-<!-- Request Payout Modal -->
+<!-- Withdraw USDT Modal -->
 <div id="withdraw-modal" class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs hidden items-center justify-center p-4">
   <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 toast-anim space-y-4">
     <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-      <div>
-        <h3 class="font-bold text-slate-900 text-base">Request a Payout</h3>
-        <p class="text-[11px] text-slate-400 mt-0.5">Processed manually by the admin.</p>
-      </div>
+      <h3 class="font-bold text-slate-900 text-base">Withdraw USDT</h3>
       <button id="close-withdraw-modal" class="text-slate-400 hover:text-slate-700 w-8 h-8 flex items-center justify-center">
         <i class="fa-solid fa-xmark"></i>
       </button>
@@ -269,39 +302,32 @@
     <div class="bg-[#FAFAFA] p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
       <div class="flex justify-between">
         <span class="text-slate-500">Available balance:</span>
-        <span class="font-bold text-slate-900"><%= user.walletBalance.toFixed(2) %> USD</span>
+        <span class="font-bold text-slate-900"><%= user.walletBalance.toFixed(2) %> USDT</span>
       </div>
-      <div class="flex justify-between gap-3">
-        <span class="text-slate-500 shrink-0">Payout details:</span>
-        <span class="font-semibold text-slate-800 truncate text-right"><%= user.binanceId || 'Not configured' %></span>
+      <div class="flex justify-between">
+        <span class="text-slate-500">Binance Pay ID:</span>
+        <span class="font-semibold text-slate-800"><%= user.binanceId || 'Not configured' %></span>
       </div>
     </div>
-
-    <p class="text-[11px] text-slate-500 leading-relaxed">
-      Telegram Stars cannot be transferred directly between users. Payouts are sent manually by the admin via your saved method (bank transfer, PayPal, Fragment, etc.).
-    </p>
 
     <form id="withdraw-form" class="space-y-4">
       <div>
         <div class="flex justify-between items-center mb-1">
-          <label class="text-xs font-medium text-slate-600">Amount to withdraw (USD)</label>
+          <label class="text-xs font-medium text-slate-600">Amount to withdraw (USDT)</label>
           <button type="button" id="withdraw-max-btn" class="text-xs font-semibold text-emerald-600 hover:underline">Max</button>
         </div>
-        <input type="number" id="withdraw-amount-input" step="0.01" min="1" max="<%= user.walletBalance > 1 ? user.walletBalance : 1 %>" required placeholder="10.00" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-semibold focus:border-slate-900 focus:outline-none">
+        <input type="number" id="withdraw-amount-input" step="0.01" min="0.10" max="<%= user.walletBalance > 0 ? user.walletBalance : 0.10 %>" required placeholder="0.85" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-semibold focus:border-slate-900 focus:outline-none">
       </div>
 
       <div class="flex gap-2">
         <button type="button" id="cancel-withdraw-btn" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition">Cancel</button>
-        <button type="submit" id="submit-withdraw-btn" <%= !user.binanceId ? 'disabled' : '' %> class="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-xs rounded-xl transition">Request Payout</button>
+        <button type="submit" id="submit-withdraw-btn" <%= !user.binanceId ? 'disabled' : '' %> class="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-xs rounded-xl transition">Confirm</button>
       </div>
     </form>
   </div>
 </div>
 
 <script>
-  const STARS_PER_USD = <%- JSON.stringify(typeof starsPerUsd !== 'undefined' ? starsPerUsd : 77) %>;
-  const TELEGRAM_STARS_CONFIGURED = <%- JSON.stringify(typeof telegramStarsConfigured !== 'undefined' ? telegramStarsConfigured : false) %>;
-
   const dashTabs = document.querySelectorAll('.dash-tab');
   const dashPanels = document.querySelectorAll('.dash-panel');
   dashTabs.forEach(tab => {
@@ -316,91 +342,68 @@
     });
   });
 
-  function starsFromUsd(usd) {
-    const value = Number(usd);
-    if (!Number.isFinite(value) || value <= 0) return 0;
-    return Math.max(1, Math.ceil(value * STARS_PER_USD));
-  }
-
   const openDepositModalBtn = document.getElementById('open-deposit-modal-btn');
   const depositModal = document.getElementById('deposit-modal');
   const closeDepositModal = document.getElementById('close-deposit-modal');
   const cancelDepositBtn = document.getElementById('cancel-deposit-btn');
   const depositAmountInput = document.getElementById('deposit-amount-input');
   const depositAmountDisplay = document.getElementById('deposit-amount-display');
-  const depositStarsDisplay = document.getElementById('deposit-stars-display');
-  const depositStatusBox = document.getElementById('deposit-status-box');
+  const depositQrImage = document.getElementById('deposit-qr-image');
+  const depositQrLoader = document.getElementById('deposit-qr-loader');
+  const binanceAppPayBtn = document.getElementById('binance-app-pay-btn');
+  const depositConfirmForm = document.getElementById('deposit-confirm-form');
+  const depositTxidInput = document.getElementById('deposit-txid-input');
   const submitDepositBtn = document.getElementById('submit-deposit-btn');
+  const copyBinanceIdBtn = document.getElementById('copy-binance-id-btn');
+  const depositBinanceIdText = document.getElementById('deposit-binance-id-text');
   const quickAmtBtns = document.querySelectorAll('.quick-amt-btn');
-  let topupPollTimer = null;
+  const qrNetBtns = document.querySelectorAll('.qr-net-btn');
+  const copyAddrBtns = document.querySelectorAll('.copy-addr-btn');
+  const binanceAppPayBtnText = document.getElementById('binance-app-pay-btn-text');
+  const binancePayHelperMsg = document.getElementById('binance-pay-helper-msg');
 
-  function renderDepositEstimate() {
-    const amount = parseFloat(depositAmountInput ? depositAmountInput.value : 50) || 0;
-    const stars = starsFromUsd(amount);
-    if (depositAmountDisplay) depositAmountDisplay.textContent = `${amount.toFixed(2)} USD`;
-    if (depositStarsDisplay) depositStarsDisplay.textContent = `⭐ ${stars.toLocaleString('en-US')} Stars`;
-    return stars;
-  }
+  let qrDebounceTimeout = null;
+  let currentQrNetwork = 'BEP20';
+  const preloadedQrMap = {
+    TRC20: <%- JSON.stringify(typeof trc20QrDataUrl !== 'undefined' ? trc20QrDataUrl : '') %>,
+    BEP20: <%- JSON.stringify(typeof bep20QrDataUrl !== 'undefined' ? bep20QrDataUrl : '') %>
+  };
 
-  function showDepositStatus(message, tone) {
-    if (!depositStatusBox) return;
-    depositStatusBox.classList.remove('hidden');
-    depositStatusBox.textContent = message;
-    depositStatusBox.className = `p-3 rounded-xl text-[11px] leading-relaxed ${
-      tone === 'success'
-        ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-        : (tone === 'error' ? 'bg-rose-50 border border-rose-200 text-rose-700' : 'bg-sky-50 border border-sky-200 text-sky-800')
-    }`;
+  async function loadDepositQR(amount, network) {
+    if (!depositQrImage) return;
+    if (network) currentQrNetwork = network;
+    const amtVal = parseFloat(amount) || 50;
+    if (depositAmountDisplay) depositAmountDisplay.textContent = `${amtVal.toFixed(2)} USDT`;
+
+    if (preloadedQrMap[currentQrNetwork]) {
+      depositQrImage.src = preloadedQrMap[currentQrNetwork];
+      if (depositQrLoader) depositQrLoader.classList.add('hidden');
+      return;
+    }
+
+    if (depositQrLoader) depositQrLoader.classList.remove('hidden');
+    try {
+      const res = await fetch(`/api/wallet/deposit-qr?amount=${encodeURIComponent(amtVal)}&network=${encodeURIComponent(currentQrNetwork)}`);
+      const data = await res.json();
+      if (data.success && data.qrCodeDataUrl) {
+        preloadedQrMap[currentQrNetwork] = data.qrCodeDataUrl;
+        depositQrImage.src = data.qrCodeDataUrl;
+      }
+    } catch (e) {
+      console.warn(e);
+    } finally {
+      if (depositQrLoader) depositQrLoader.classList.add('hidden');
+    }
   }
 
   function openDepositModal() {
     depositModal.classList.remove('hidden');
     depositModal.classList.add('flex');
-    renderDepositEstimate();
+    loadDepositQR(depositAmountInput ? depositAmountInput.value : 50, currentQrNetwork);
   }
   function closeDepositModalFn() {
     depositModal.classList.add('hidden');
     depositModal.classList.remove('flex');
-    if (topupPollTimer) {
-      clearInterval(topupPollTimer);
-      topupPollTimer = null;
-    }
-  }
-
-  function pollTopupStatus(invoiceId) {
-    if (topupPollTimer) clearInterval(topupPollTimer);
-    const startedAt = Date.now();
-
-    const tick = async () => {
-      if (Date.now() - startedAt > 10 * 60 * 1000) {
-        clearInterval(topupPollTimer);
-        topupPollTimer = null;
-        showDepositStatus('Still waiting for Telegram. You can close this window and check your balance later.', 'pending');
-        return;
-      }
-      try {
-        const res = await fetch(`/api/wallet/topup/${encodeURIComponent(invoiceId)}/status`);
-        const data = await res.json();
-        if (!data.success || !data.invoice) return;
-
-        if (data.invoice.status === 'PAID') {
-          clearInterval(topupPollTimer);
-          topupPollTimer = null;
-          showDepositStatus(`✅ Payment confirmed — +$${parseFloat(data.invoice.amount).toFixed(2)} credited to your wallet (${data.invoice.stars} Stars).`, 'success');
-          if (window.showToast) window.showToast('Wallet topped up with Telegram Stars!', 'success');
-          setTimeout(() => window.location.reload(), 1200);
-        } else if (data.invoice.status === 'FAILED' || data.invoice.status === 'REFUNDED') {
-          clearInterval(topupPollTimer);
-          topupPollTimer = null;
-          showDepositStatus(`Invoice status: ${data.invoice.status}. Please create a new top-up.`, 'error');
-        } else {
-          showDepositStatus('⏳ Waiting for Telegram payment confirmation...', 'pending');
-        }
-      } catch (_) {}
-    };
-
-    tick();
-    topupPollTimer = setInterval(tick, 3000);
   }
 
   if (openDepositModalBtn) openDepositModalBtn.addEventListener('click', openDepositModal);
@@ -415,91 +418,141 @@
       });
       btn.classList.add('border-2', 'border-slate-900', 'bg-slate-900', 'text-white');
       btn.classList.remove('border-slate-200', 'text-slate-700');
-      if (depositAmountInput) depositAmountInput.value = btn.getAttribute('data-amount');
-      renderDepositEstimate();
+      const amt = btn.getAttribute('data-amount');
+      if (depositAmountInput) depositAmountInput.value = amt;
+      if (depositAmountDisplay) depositAmountDisplay.textContent = `${parseFloat(amt).toFixed(2)} USDT`;
+      loadDepositQR(amt, currentQrNetwork);
+    });
+  });
+
+  qrNetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      qrNetBtns.forEach(b => {
+        b.classList.remove('bg-slate-900', 'text-white');
+        b.classList.add('text-slate-600');
+      });
+      btn.classList.add('bg-slate-900', 'text-white');
+      btn.classList.remove('text-slate-600');
+      const net = btn.getAttribute('data-net') || 'TRC20';
+      loadDepositQR(depositAmountInput ? depositAmountInput.value : 50, net);
     });
   });
 
   if (depositAmountInput) {
-    depositAmountInput.addEventListener('input', renderDepositEstimate);
-  }
-
-  if (submitDepositBtn) {
-    submitDepositBtn.addEventListener('click', async () => {
-      if (!TELEGRAM_STARS_CONFIGURED) {
-        showDepositStatus('Telegram Stars is not configured on this server yet. Please contact @Melasbit.', 'error');
-        return;
-      }
-
-      const amount = parseFloat(depositAmountInput.value);
-      if (!Number.isFinite(amount) || amount < 0.5 || amount > 50000) {
-        showDepositStatus('Please enter an amount between $0.50 and $50,000.', 'error');
-        return;
-      }
-
-      const original = submitDepositBtn.innerHTML;
-      submitDepositBtn.disabled = true;
-      submitDepositBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating invoice...';
-
-      try {
-        const res = await fetch('/api/wallet/topup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount })
-        });
-        const data = await res.json();
-        if (!data.success) {
-          showDepositStatus(data.error || 'Unable to create the top-up invoice.', 'error');
-          return;
+    depositAmountInput.addEventListener('input', (e) => {
+      clearTimeout(qrDebounceTimeout);
+      const val = parseFloat(e.target.value);
+      quickAmtBtns.forEach(b => {
+        if (parseFloat(b.getAttribute('data-amount')) === val) {
+          b.classList.add('border-2', 'border-slate-900', 'bg-slate-900', 'text-white');
+          b.classList.remove('border-slate-200', 'text-slate-700');
+        } else {
+          b.classList.remove('border-2', 'border-slate-900', 'bg-slate-900', 'text-white');
+          b.classList.add('border-slate-200', 'text-slate-700');
         }
-
-        showDepositStatus(`Invoice created: ${data.stars} Stars for $${data.amount.toFixed(2)}. Approve it in Telegram — this window updates automatically.`, 'pending');
-
-        if (depositStatusBox) {
-          const link = document.createElement('a');
-          link.href = data.invoiceLink;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
-          link.className = 'block mt-1 font-bold underline text-sky-700';
-          link.textContent = 'Open the Telegram Stars invoice →';
-          depositStatusBox.appendChild(link);
-        }
-
-        try { window.open(data.invoiceLink, '_blank', 'noopener'); } catch (_) {}
-        pollTopupStatus(data.invoiceId);
-      } catch (err) {
-        showDepositStatus('Network error. Please try again.', 'error');
-      } finally {
-        submitDepositBtn.disabled = false;
-        submitDepositBtn.innerHTML = original;
+      });
+      if (!isNaN(val) && val > 0) {
+        if (depositAmountDisplay) depositAmountDisplay.textContent = `${val.toFixed(2)} USDT`;
+        qrDebounceTimeout = setTimeout(() => loadDepositQR(val, currentQrNetwork), 300);
       }
     });
   }
 
-  const payoutForm = document.getElementById('payout-form');
-  const payoutInput = document.getElementById('payout-input');
-  const payoutSaveBtn = document.getElementById('payout-save-btn');
-  if (payoutForm) {
-    payoutForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      payoutSaveBtn.disabled = true;
+  if (copyBinanceIdBtn && depositBinanceIdText) {
+    copyBinanceIdBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(depositBinanceIdText.textContent.trim()).then(() => {
+        copyBinanceIdBtn.textContent = 'Copied!';
+        window.showToast('Binance Pay ID 1229901779 copied!', 'success');
+        setTimeout(() => { copyBinanceIdBtn.textContent = 'Copy ID'; }, 1800);
+      });
+    });
+  }
+
+  copyAddrBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.getAttribute('data-copy-target');
+      const el = document.getElementById(targetId);
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent.trim()).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        window.showToast('USDT Deposit Address copied!', 'success');
+        setTimeout(() => { btn.textContent = orig; }, 1800);
+      });
+    });
+  });
+
+  if (binanceAppPayBtn && depositBinanceIdText) {
+    binanceAppPayBtn.addEventListener('click', () => {
+      const payId = depositBinanceIdText.textContent.trim();
       try {
-        const res = await fetch('/api/wallet/update-payout', {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(payId).catch(() => {});
+        }
+      } catch (e) {}
+      if (binanceAppPayBtnText) binanceAppPayBtnText.textContent = `Pay ID ${payId} Copied! Opening Binance App...`;
+      if (binancePayHelperMsg) {
+        binancePayHelperMsg.innerHTML = `<span class="text-emerald-700 font-semibold">✅ Pay ID <strong>${payId}</strong> copied to clipboard!</span> In Binance: tap the <strong>Pay icon</strong> (top-right) &rarr; <strong>Envoyer / Send</strong> &rarr; <strong>Paste ${payId}</strong>.`;
+      }
+      window.showToast(`Pay ID ${payId} copied! Opening Binance App...`, 'success');
+      setTimeout(() => {
+        if (binanceAppPayBtnText) binanceAppPayBtnText.textContent = `Copy Pay ID (${payId}) & Open Binance App`;
+      }, 3000);
+      // Do NOT call preventDefault(): the native 2-segment ARouter route href="bnc://app.binance.com/home/main" opens the Binance App cleanly without any deep-link error popup
+    });
+  }
+
+  if (depositConfirmForm) {
+    depositConfirmForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const amount = parseFloat(depositAmountInput.value);
+      const txId = depositTxidInput.value.trim();
+      if (!amount || !txId) return;
+      submitDepositBtn.disabled = true;
+      submitDepositBtn.textContent = 'Verifying...';
+      try {
+        const res = await fetch('/api/wallet/deposit-binance', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ payoutDetails: payoutInput.value.trim() })
+          body: JSON.stringify({ amount, txId })
         });
         const data = await res.json();
         if (data.success) {
-          window.showToast('Payout details saved', 'success');
-          setTimeout(() => window.location.reload(), 800);
+          window.showToast(data.message, 'success');
+          closeDepositModalFn();
+          setTimeout(() => window.location.reload(), 900);
         } else {
-          window.showToast(data.error || 'Unable to save payout details', 'error');
+          window.showToast(data.error || 'Error', 'error');
         }
-      } catch (_) {
+      } catch (err) {
         window.showToast('Network error', 'error');
       } finally {
-        payoutSaveBtn.disabled = false;
+        submitDepositBtn.disabled = false;
+        submitDepositBtn.textContent = 'Verify & Credit';
+      }
+    });
+  }
+
+  const binanceForm = document.getElementById('binance-form');
+  const binanceInput = document.getElementById('binanceId-input');
+  const binanceSaveBtn = document.getElementById('binance-save-btn');
+  if (binanceForm) {
+    binanceForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      binanceSaveBtn.disabled = true;
+      try {
+        const res = await fetch('/api/wallet/update-binance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ binanceId: binanceInput.value.trim() })
+        });
+        const data = await res.json();
+        if (data.success) {
+          window.showToast('Binance Pay ID saved', 'success');
+          setTimeout(() => window.location.reload(), 800);
+        }
+      } finally {
+        binanceSaveBtn.disabled = false;
       }
     });
   }
@@ -535,12 +588,8 @@
     withdrawForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const amount = parseFloat(withdrawAmountInput.value);
-      if (!amount || amount < 1) {
-        window.showToast('Minimum payout is $1.00', 'error');
-        return;
-      }
+      if (!amount || amount <= 0) return;
       submitWithdrawBtn.disabled = true;
-      submitWithdrawBtn.textContent = 'Submitting...';
       try {
         const res = await fetch('/api/wallet/withdraw', {
           method: 'POST',
@@ -549,17 +598,14 @@
         });
         const data = await res.json();
         if (data.success) {
-          window.showToast(data.message || 'Payout request submitted', 'success');
+          window.showToast('Withdrawal completed', 'success');
           closeWithdrawModalFn();
           setTimeout(() => window.location.reload(), 900);
         } else {
           window.showToast(data.error || 'Error', 'error');
         }
-      } catch (_) {
-        window.showToast('Network error', 'error');
       } finally {
         submitWithdrawBtn.disabled = false;
-        submitWithdrawBtn.textContent = 'Request Payout';
       }
     });
   }
