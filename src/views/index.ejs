@@ -52,14 +52,20 @@
 
 <!-- STEP 1: Select 1 or More Methods -->
 <section id="methods" class="max-w-4xl mx-auto px-4 sm:px-6 pt-10 pb-6">
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
     <div>
       <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Step 1</span>
-      <h2 class="text-xl font-extrabold text-slate-900">🚀 Available Methods — Select 1 or More</h2>
+      <h2 class="text-xl font-extrabold text-slate-900">🚀 Available Methods (<%= services ? services.length : 0 %>) — Select 1 or More</h2>
     </div>
-    <button type="button" id="select-all-btn" class="text-xs font-bold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 hover:border-slate-400 px-3 py-1.5 rounded-lg transition self-start sm:self-auto">
-      Select All <%= services ? services.length : 3 %> ($<%= services ? services.reduce((sum, s) => sum + s.price, 0).toFixed(0) : 30 %>)
-    </button>
+    <div class="flex items-center gap-2">
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[11px]"></i>
+        <input type="text" id="method-search-input" placeholder="Search method..." class="text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:border-slate-900 focus:outline-none w-44 sm:w-52">
+      </div>
+      <a href="#checkout" id="jump-checkout-btn" class="text-xs font-extrabold text-slate-950 bg-[#F0B90B] hover:bg-[#FCD535] px-3 py-1.5 rounded-lg transition whitespace-nowrap">
+        Pay ($10) ↓
+      </a>
+    </div>
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="methods-list">
@@ -253,8 +259,19 @@
   const cards = Array.from(document.querySelectorAll('.method-select-card'));
   const totalDisplay = document.getElementById('checkout-total-display');
   const summaryEl = document.getElementById('selected-items-summary');
-  const selectAllBtn = document.getElementById('select-all-btn');
+  const jumpCheckoutBtn = document.getElementById('jump-checkout-btn');
+  const methodSearchInput = document.getElementById('method-search-input');
   let activePaymentMethod = 'BINANCE_PAY';
+
+  if (methodSearchInput) {
+    methodSearchInput.addEventListener('input', () => {
+      const q = methodSearchInput.value.toLowerCase().trim();
+      cards.forEach(card => {
+        const title = (card.getAttribute('data-title') || '').toLowerCase();
+        card.style.display = (!q || title.includes(q)) ? 'flex' : 'none';
+      });
+    });
+  }
 
   function getSelectedItems() {
     return cards
@@ -270,6 +287,7 @@
     const selected = getSelectedItems();
     const total = selected.reduce((s, item) => s + item.price, 0);
     if (totalDisplay) totalDisplay.textContent = `$${total.toFixed(2)} USDT`;
+    if (jumpCheckoutBtn) jumpCheckoutBtn.textContent = `Pay (${selected.length} • $${total.toFixed(0)}) ↓`;
 
     if (summaryEl) {
       if (selected.length === 0) {
@@ -311,15 +329,6 @@
       renderCart();
     });
   });
-
-  if (selectAllBtn) {
-    selectAllBtn.addEventListener('click', () => {
-      const allSelected = cards.every(c => c.getAttribute('data-selected') === 'true');
-      cards.forEach(c => c.setAttribute('data-selected', allSelected ? 'false' : 'true'));
-      if (allSelected && cards[0]) cards[0].setAttribute('data-selected', 'true');
-      renderCart();
-    });
-  }
 
   renderCart();
 

@@ -310,20 +310,13 @@ async function initDatabase() {
       `, [ownerId]);
     }
 
-    // Remove any non-official services that have no legacy orders attached
-    await client.query(`
-      DELETE FROM services
-      WHERE id NOT IN ('srv_notion_edu_plus_1y', 'srv_adobe_express_6m_script', 'srv_capcut_ready')
-        AND NOT EXISTS (SELECT 1 FROM orders WHERE "serviceId" = services.id);
-    `);
-
-    // Seed the 3 official methods sold exclusively by saleminformatiquedev@gmail.com (@Melasbit)
+    // Seed the official methods sold exclusively by saleminformatiquedev@gmail.com (@Melasbit)
     const coreOffers = [
       {
         id: 'srv_notion_edu_plus_1y',
         title: 'Notion Edu Plus (1 Year)',
         description: `Complete working method for Notion Edu Plus (1 Year).\n\n• Cost: only $0.02 / mail\n• Price: $10\n• Live Screen-Share: I will share my screen and show you how it works!\n• Direct supplier (@Melasbit) — also open to method exchanges & bulk deals.`,
-        category: 'Methods',
+        category: 'Featured',
         price: 10.00,
         difficulty: 'Beginner',
         formats: 'METHOD,SCREEN-SHARE',
@@ -338,7 +331,7 @@ async function initDatabase() {
         id: 'srv_adobe_express_6m_script',
         title: 'Adobe Express (6 Months) + Script',
         description: `Complete working method + automation script for Adobe Express (6 Months).\n\n• Cost: $0.02 / mail & $0.07 / link\n• Price: $15\n• Live Screen-Share: I will share my screen and show you how it works!\n• Direct supplier (@Melasbit) — also open to method exchanges & bulk deals.`,
-        category: 'Methods & Scripts',
+        category: 'Featured',
         price: 15.00,
         difficulty: 'Beginner',
         formats: 'METHOD,SCRIPT,SCREEN-SHARE',
@@ -353,7 +346,7 @@ async function initDatabase() {
         id: 'srv_capcut_ready',
         title: 'CapCut — Ready to use',
         description: `CapCut ready to use immediately.\n\n• Status: Ready to use\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!\n• Direct supplier (@Melasbit) — also open to method exchanges & bulk deals.`,
-        category: 'Ready to use',
+        category: 'Featured',
         price: 5.00,
         difficulty: 'Beginner',
         formats: 'READY-TO-USE,SCREEN-SHARE',
@@ -363,8 +356,317 @@ async function initDatabase() {
         screenShareDemo: true,
         openToExchange: true,
         bulkAvailable: true
+      },
+      // Simple $5 Edu / Student Methods (no GitHub Student Pack or complex verification)
+      {
+        id: 'srv_azure_students',
+        title: 'Microsoft Azure for Students ($100 Credit)',
+        description: `Simple working method for Microsoft Azure for Students ($100 free cloud credit, no credit card needed).\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: '1 Year',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_jetbrains_edu',
+        title: 'JetBrains All Products Pack (Education)',
+        description: `Simple working method for JetBrains Education (IntelliJ IDEA, PyCharm, WebStorm, PhpStorm & all IDEs).\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: '1 Year',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_office365_edu',
+        title: 'Microsoft Office 365 Education',
+        description: `Simple working method for Microsoft Office 365 Education (Word, Excel, PowerPoint, Teams & OneDrive).\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: 'Education Plan',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_figma_edu',
+        title: 'Figma Education Plan (Pro Features)',
+        description: `Simple working method for Figma Education Plan with full Pro design & prototyping features.\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: '2 Years',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_canva_edu',
+        title: 'Canva for Education',
+        description: `Simple working method for Canva Education with premium templates & tools.\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: 'Education Plan',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_cursor_students',
+        title: 'Cursor Pro for Students',
+        description: `Simple working method for Cursor Pro Student plan (AI code editor).\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: '1 Year',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_perplexity_students',
+        title: 'Perplexity Pro for Students',
+        description: `Simple working method for Perplexity Pro Student access.\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: 'Student Plan',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_miro_edu',
+        title: 'Miro Education Plan',
+        description: `Simple working method for Miro Education (unlimited boards & collaboration tools).\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: '2 Years',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_lucidchart_edu',
+        title: 'Lucidchart Education',
+        description: `Simple working method for Lucidchart Education (diagramming & flowcharts).\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: 'Education Plan',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_autodesk_edu',
+        title: 'Autodesk Education (AutoCAD, Maya, Fusion)',
+        description: `Simple working method for Autodesk Education 1-year license (AutoCAD, Maya, Fusion 360, Revit).\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: '1 Year',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_framer_students',
+        title: 'Framer for Students (Pro Plan)',
+        description: `Simple working method for Framer Student Pro website builder.\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: '1 Year',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_webflow_classroom',
+        title: 'Webflow Classroom / Student Plan',
+        description: `Simple working method for Webflow Student CMS & hosting access.\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: '1 Year',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_replit_students',
+        title: 'Replit for Students',
+        description: `Simple working method for Replit Student cloud IDE & AI features.\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: 'Student Plan',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_overleaf_edu',
+        title: 'Overleaf Education (LaTeX Pro)',
+        description: `Simple working method for Overleaf Education Pro features.\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: 'Education Plan',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_postman_student',
+        title: 'Postman Student Program',
+        description: `Simple working method for Postman Student Program API developer plan.\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: 'Student Plan',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_termius_edu',
+        title: 'Termius Education (SSH Pro)',
+        description: `Simple working method for Termius Pro SSH/SFTP client for students.\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: '1 Year',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_mongodb_students',
+        title: 'MongoDB for Students ($50 Atlas Credit)',
+        description: `Simple working method for MongoDB Student Pack (Atlas cloud credits & free certification).\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: 'Student Plan',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_aws_educate',
+        title: 'AWS Educate',
+        description: `Simple working method for AWS Educate cloud labs & training resources.\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: 'Education Plan',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_tableau_students',
+        title: 'Tableau for Students (1 Year License)',
+        description: `Simple working method for Tableau Desktop & Prep 1-year student license.\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: '1 Year',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_todoist_edu',
+        title: 'Todoist Education Plan',
+        description: `Simple working method for Todoist Education Pro productivity plan.\n\n• Cost: only $0.02 / mail\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!`,
+        category: 'Simple Methods ($5)',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: 'Education Plan',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
       }
     ];
+
+    const officialIds = coreOffers.map(o => o.id);
+    // Remove any non-official services that have no legacy orders attached
+    await client.query(`
+      DELETE FROM services
+      WHERE id <> ALL($1::text[])
+        AND NOT EXISTS (SELECT 1 FROM orders WHERE "serviceId" = services.id);
+    `, [officialIds]);
 
     for (const offer of coreOffers) {
       await client.query(`

@@ -776,7 +776,7 @@ app.get('/', async (req, res) => {
           WHEN 'srv_capcut_ready' THEN 3
           ELSE 4
         END ASC,
-        s."createdAt" DESC
+        s.title ASC
     `, [STORE_OWNER_EMAIL]);
     res.render('index', { services: formatRows(srvRes.rows).map(sanitizePublicService) });
   } catch (err) {
