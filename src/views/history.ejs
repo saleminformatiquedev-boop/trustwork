@@ -29,7 +29,7 @@
               <h4 class="text-sm font-bold text-slate-900 truncate mt-0.5"><%= ord.serviceTitle %></h4>
             </div>
             <div class="flex items-center gap-4 flex-shrink-0">
-              <span class="text-xs font-bold text-slate-900"><%= ord.amount.toFixed(2) %> USDT</span>
+              <span class="text-xs font-bold text-slate-900"><%= ord.amount.toFixed(2) %> USD</span>
               <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' %>">
                 <%= ord.status === 'COMPLETED' ? 'Completed' : 'Active' %>
               </span>
@@ -56,7 +56,7 @@
               <h4 class="text-sm font-bold text-slate-900 truncate mt-0.5"><%= ord.serviceTitle %></h4>
             </div>
             <div class="flex items-center gap-4 flex-shrink-0">
-              <span class="text-xs font-bold text-emerald-600">+<%= ord.amount.toFixed(2) %> USDT</span>
+              <span class="text-xs font-bold text-emerald-600">+<%= ord.amount.toFixed(2) %> USD</span>
               <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full <%= ord.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' %>">
                 <%= ord.status === 'COMPLETED' ? 'Paid' : 'Active' %>
               </span>

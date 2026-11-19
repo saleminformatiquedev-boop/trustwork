@@ -5,7 +5,7 @@
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
     <div>
       <h1 class="text-2xl font-extrabold text-slate-900">Admin Store Panel</h1>
-      <p class="text-xs text-slate-500 mt-0.5">Owner: <strong>saleminformatiquedev@gmail.com</strong> (@Melasbit) — Manage Binance orders &amp; method exchange requests.</p>
+      <p class="text-xs text-slate-500 mt-0.5">Owner: <strong>saleminformatiquedev@gmail.com</strong> (@Melasbit) — Manage Telegram Stars orders &amp; method exchange requests.</p>
     </div>
     <div class="flex items-center gap-2">
       <a href="/chat" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition">
@@ -17,13 +17,78 @@
     </div>
   </div>
 
-  <!-- Binance Orders -->
+  <!-- Telegram Stars Balance & Revenue -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-slate-900 text-white p-5 rounded-2xl">
+      <span class="text-xs text-slate-400 font-medium">Telegram Stars Balance</span>
+      <div class="text-3xl font-extrabold mt-1 text-amber-300">
+        <% if (typeof starBalance !== 'undefined' && starBalance !== null) { %>
+          ⭐ <%= Number(starBalance).toLocaleString('en-US') %>
+        <% } else { %>
+          —
+        <% } %>
+      </div>
+      <p class="text-[11px] text-slate-400 mt-2">
+        <% if (typeof starsError !== 'undefined' && starsError) { %>
+          <span class="text-rose-300"><%= starsError %></span>
+        <% } else { %>
+          Live balance from Telegram Bot API.
+        <% } %>
+      </p>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl border border-slate-200/90">
+      <span class="text-xs text-slate-400 font-medium">Conversion Rate</span>
+      <div class="text-2xl font-extrabold text-slate-900 mt-1">⭐ <%= typeof starsPerUsd !== 'undefined' ? starsPerUsd : 77 %> <span class="text-sm text-slate-400">/ $1</span></div>
+      <p class="text-[11px] text-slate-500 mt-2">Change <code class="bg-slate-100 px-1 rounded">TG_STARS_PER_USD</code> in the server environment.</p>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl border border-slate-200/90">
+      <span class="text-xs text-slate-400 font-medium">Bot Status</span>
+      <div class="text-sm font-extrabold mt-1 <%= typeof starsConfigured !== 'undefined' && starsConfigured ? 'text-emerald-600' : 'text-rose-600' %>">
+        <%= typeof starsConfigured !== 'undefined' && starsConfigured ? 'Connected' : 'Not configured' %>
+      </div>
+      <p class="text-[11px] text-slate-500 mt-2">
+        <% if (typeof telegramBotUsername !== 'undefined' && telegramBotUsername) { %>
+          @<%= telegramBotUsername %>
+        <% } else { %>
+          Set <code class="bg-slate-100 px-1 rounded">TELEGRAM_BOT_TOKEN</code>
+        <% } %>
+      </p>
+    </div>
+  </div>
+
+  <!-- Recent Telegram Stars Transactions -->
+  <% if (typeof starTransactions !== 'undefined' && starTransactions.length > 0) { %>
+  <div class="bg-white rounded-2xl border border-slate-200/90 overflow-hidden">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+      <h2 class="font-extrabold text-slate-900 text-base">⭐ Recent Stars Transactions</h2>
+      <span class="text-xs text-slate-400">Latest 15 from Telegram</span>
+    </div>
+    <div class="divide-y divide-slate-100">
+      <% starTransactions.forEach(tx => { %>
+        <div class="px-5 py-3 flex items-center justify-between gap-3 text-xs">
+          <div class="min-w-0">
+            <div class="font-bold text-slate-900"><%= tx.source ? (tx.source.type || 'Stars transaction') : (tx.type || 'Stars transaction') %></div>
+            <div class="text-[11px] text-slate-400 font-mono truncate"><%= tx.id || tx.transactionId || '' %></div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="font-extrabold text-amber-700">⭐ <%= tx.amount || 0 %></div>
+            <div class="text-[11px] text-slate-400"><%= tx.date ? new Date(tx.date * 1000).toLocaleString() : '' %></div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Telegram Stars Orders -->
   <div class="bg-white rounded-2xl border border-slate-200/90 overflow-hidden">
     <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
       <h2 class="font-extrabold text-slate-900 text-base">
-        💰 Binance Orders (<%= storeOrders.length %>)
+        ⭐ Telegram Stars Orders (<%= storeOrders.length %>)
       </h2>
-      <span class="text-xs text-slate-400">Binance Pay ID &amp; USDT BEP20</span>
+      <span class="text-xs text-slate-400">Paid automatically via invoice</span>
     </div>
 
     <div class="divide-y divide-slate-100">
@@ -34,11 +99,12 @@
             <div class="space-y-1.5 min-w-0">
               <div class="flex flex-wrap items-center gap-2">
                 <span class="font-mono text-xs font-bold text-slate-500">#<%= ord.id %></span>
-                <span class="text-xs font-extrabold px-2 py-0.5 rounded-full <%= ord.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-800' : (ord.status === 'PAID' ? 'bg-sky-100 text-sky-800' : (ord.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800')) %>">
+                <span class="text-xs font-extrabold px-2 py-0.5 rounded-full <%= ord.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-800' : (ord.status === 'PAID' ? 'bg-sky-100 text-sky-800' : (ord.status === 'REFUNDED' || ord.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800')) %>">
                   <%= ord.status %>
                 </span>
                 <span class="text-xs font-bold text-slate-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                  $<%= parseFloat(ord.totalAmount).toFixed(2) %> USDT (<%= ord.paymentMethod %>)
+                  $<%= parseFloat(ord.totalAmount).toFixed(2) %> USD
+                  <% if (ord.starsAmount) { %>· ⭐ <%= ord.starsAmount %><% } %>
                 </span>
               </div>
 
@@ -48,7 +114,11 @@
 
               <div class="text-xs text-slate-600 space-y-0.5">
                 <div><strong>Contact:</strong> <%= ord.customerContact %></div>
-                <div><strong>Order ID / TxID:</strong> <code class="font-mono bg-slate-100 px-1.5 py-0.5 rounded select-all"><%= ord.txId %></code></div>
+                <% if (ord.telegramPaymentChargeId) { %>
+                  <div><strong>Telegram charge:</strong> <code class="font-mono bg-slate-100 px-1.5 py-0.5 rounded select-all"><%= ord.telegramPaymentChargeId %></code></div>
+                <% } else if (ord.txId) { %>
+                  <div><strong>Legacy reference:</strong> <code class="font-mono bg-slate-100 px-1.5 py-0.5 rounded select-all"><%= ord.txId %></code></div>
+                <% } %>
                 <% if (ord.note) { %>
                   <div><strong>Note:</strong> <%= ord.note %></div>
                 <% } %>
@@ -69,11 +139,45 @@
                 <input type="hidden" name="status" value="REJECTED">
                 <button type="submit" class="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold transition">Reject</button>
               </form>
+              <% if (ord.telegramPaymentChargeId && ord.status !== 'REFUNDED') { %>
+                <form action="/admin/store/orders/<%= ord.id %>/refund" method="POST">
+                  <button type="submit" class="px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold transition">Refund Stars</button>
+                </form>
+              <% } %>
             </div>
           </div>
         <% }) %>
       <% } else { %>
-        <div class="p-10 text-center text-xs text-slate-400">No Binance orders yet.</div>
+        <div class="p-10 text-center text-xs text-slate-400">No Telegram Stars orders yet.</div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Telegram Stars Invoices (debug / audit) -->
+  <div class="bg-white rounded-2xl border border-slate-200/90 overflow-hidden">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+      <h2 class="font-extrabold text-slate-900 text-base">🧾 Recent Stars Invoices</h2>
+      <span class="text-xs text-slate-400">Latest 25</span>
+    </div>
+    <div class="divide-y divide-slate-100">
+      <% if (typeof starsInvoices !== 'undefined' && starsInvoices.length > 0) { %>
+        <% starsInvoices.forEach(inv => { %>
+          <div class="px-5 py-3 flex items-center justify-between gap-3 text-xs">
+            <div class="min-w-0">
+              <div class="font-mono text-[11px] text-slate-500 truncate"><%= inv.id %></div>
+              <div class="text-slate-600">
+                <strong><%= inv.purpose %></strong>
+                · $<%= parseFloat(inv.amount).toFixed(2) %> · ⭐ <%= inv.stars %>
+              </div>
+              <div class="text-[10px] text-slate-400"><%= new Date(inv.createdAt).toLocaleString() %></div>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 <%= inv.status === 'PAID' ? 'bg-emerald-100 text-emerald-800' : (inv.status === 'PENDING' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800') %>">
+              <%= inv.status %>
+            </span>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <div class="p-8 text-center text-xs text-slate-400">No invoices yet.</div>
       <% } %>
     </div>
   </div>

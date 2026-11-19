@@ -88,7 +88,7 @@ function getEmailTemplate({ title, badge, content, ctaText, ctaUrl }) {
     <div class="container">
       <div class="header">
         <div class="logo">🛡️ TrustWork</div>
-        <div style="font-size: 13px; opacity: 0.9; margin-top: 4px;">Guaranteed Escrow System & Binance Pay</div>
+        <div style="font-size: 13px; opacity: 0.9; margin-top: 4px;">Guaranteed Escrow System &amp; Telegram Stars</div>
       </div>
       <div class="body">
         ${badge ? `<div class="badge">${badge}</div>` : ''}
@@ -121,7 +121,7 @@ async function notifyNewOrder({ order, service, buyer, seller }) {
   if (seller && seller.email && !seller.email.endsWith('.local')) {
     sendEmail({
       to: seller.email,
-      subject: `🎉 New order received (#${order.id}) - ${amount} USDT in escrow`,
+      subject: `🎉 New order received (#${order.id}) - ${amount} USD in escrow`,
       html: getEmailTemplate({
         title: `You have received a new order!`,
         badge: 'Escrow Protected (Guaranteed)',
@@ -130,10 +130,10 @@ async function notifyNewOrder({ order, service, buyer, seller }) {
           Buyer <strong>${buyer.name}</strong> just placed an order for your guide:<br>
           <div class="box">
             <strong>Guide:</strong> ${service.title}<br>
-            <strong>Locked amount:</strong> ${amount} USDT<br>
+            <strong>Locked amount:</strong> ${amount} USD<br>
             <strong>Buyer instructions:</strong> <em>${order.requirements || 'None'}</em>
           </div>
-          🔒 <strong>The ${amount} USDT are already locked on the platform.</strong> You can proceed with full confidence.
+          🔒 <strong>The ${amount} USD are already locked on the platform.</strong> You can proceed with full confidence.
         `,
         ctaText: 'Access Order & Deliver',
         ctaUrl: orderUrl
@@ -153,7 +153,7 @@ async function notifyNewOrder({ order, service, buyer, seller }) {
           Hello <strong>${buyer.name}</strong>,<br><br>
           Your order has been transmitted to author <strong>${seller.name}</strong>.<br>
           <div class="box">
-            <strong>Amount in escrow:</strong> ${amount} USDT<br>
+            <strong>Amount in escrow:</strong> ${amount} USD<br>
             <strong>Delivery timeframe:</strong> ${service.deliveryDays} business day(s)
           </div>
           Your funds remain protected until you validate the delivery.
@@ -167,11 +167,11 @@ async function notifyNewOrder({ order, service, buyer, seller }) {
   // Admin Copy
   sendEmail({
     to: NOTIFICATION_EMAIL,
-    subject: `[TrustWork Admin] New order #${order.id} (${amount} USDT)`,
+    subject: `[TrustWork Admin] New order #${order.id} (${amount} USD)`,
     html: getEmailTemplate({
       title: `New order registered on the platform`,
       badge: 'Admin Alert',
-      content: `Buyer: ${buyer.name} (${buyer.email})<br>Author: ${seller.name} (${seller.email})<br>Amount: ${amount} USDT<br>Guide: ${service.title}`,
+      content: `Buyer: ${buyer.name} (${buyer.email})<br>Author: ${seller.name} (${seller.email})<br>Amount: ${amount} USD<br>Guide: ${service.title}`,
       ctaText: 'View Order',
       ctaUrl: orderUrl
     })
@@ -198,7 +198,7 @@ async function notifyOrderDelivered({ order, buyer, seller }) {
             <strong>Delivery note:</strong><br>
             ${order.deliveryNote || 'Check the files and links on the website.'}
           </div>
-          Please take the time to review the work. If everything is complete, click below to release the <strong>${parseFloat(order.amount).toFixed(2)} USDT</strong>.
+          Please take the time to review the work. If everything is complete, click below to release the <strong>${parseFloat(order.amount).toFixed(2)} USD</strong>.
         `,
         ctaText: 'Verify & Approve Delivery',
         ctaUrl: orderUrl
@@ -222,14 +222,14 @@ async function notifyOrderCompleted({ order, buyer, seller }) {
   if (seller && seller.email && !seller.email.endsWith('.local')) {
     sendEmail({
       to: seller.email,
-      subject: `💰 Payment Released! +${net.toFixed(2)} USDT net received (Order #${order.id})`,
+      subject: `💰 Payment Released! +${net.toFixed(2)} USD net received (Order #${order.id})`,
       html: getEmailTemplate({
         title: `Congratulations! Your earnings are available`,
         badge: 'Payment Released (85% Net)',
         content: `
           Hello <strong>${seller.name}</strong>,<br><br>
-          The buyer has approved the order. Your net payout of <strong>${net.toFixed(2)} USDT (85%)</strong> has been released and credited to your available balance (Gross: ${gross.toFixed(2)} USDT, Platform Fee 15%: ${fee.toFixed(2)} USDT).<br>
-          You can withdraw your funds to your Binance Pay wallet at any time.
+          The buyer has approved the order. Your net payout of <strong>${net.toFixed(2)} USD (85%)</strong> has been released and credited to your available balance (Gross: ${gross.toFixed(2)} USD, Platform Fee 15%: ${fee.toFixed(2)} USD).<br>
+          You can request a manual payout (bank transfer, PayPal, Fragment, etc.) from your dashboard at any time.
         `,
         ctaText: 'View My Wallet',
         ctaUrl: `${BASE_URL}/dashboard`
@@ -277,7 +277,7 @@ async function notifyDisputeOpened({ order, dispute, initiator, otherParty }) {
       content: `
         <strong>Initiated by:</strong> ${initiator.name} (${initiator.email})<br>
         <strong>Reason:</strong> ${dispute.reason}<br>
-        <strong>Frozen amount:</strong> ${parseFloat(order.amount).toFixed(2)} USDT<br>
+        <strong>Frozen amount:</strong> ${parseFloat(order.amount).toFixed(2)} USD<br>
         <strong>Details:</strong> ${dispute.details}
       `,
       ctaText: 'Arbitrate Case',
@@ -289,20 +289,21 @@ async function notifyDisputeOpened({ order, dispute, initiator, otherParty }) {
 /**
  * 5. Withdrawal request
  */
-async function notifyWithdrawalRequested({ user, amount, binanceId }) {
+async function notifyWithdrawalRequested({ user, amount, payoutDetails }) {
   const amtStr = parseFloat(amount).toFixed(2);
-  
+  const destination = payoutDetails || 'Payout details not provided';
+
   if (user && user.email && !user.email.endsWith('.local')) {
     sendEmail({
       to: user.email,
-      subject: `📤 Withdrawal request received - ${amtStr} USDT to Binance Pay`,
+      subject: `📤 Payout request received - $${amtStr} USD`,
       html: getEmailTemplate({
-        title: `Your withdrawal request is being processed`,
-        badge: 'Withdrawal Pending',
+        title: `Your payout request is being processed`,
+        badge: 'Payout Pending',
         content: `
           Hello <strong>${user.name}</strong>,<br><br>
-          Your withdrawal request of <strong>${amtStr} USDT</strong> to Binance Pay ID <code>${binanceId}</code> has been recorded.<br>
-          The transfer will be processed shortly.
+          Your payout request of <strong>$${amtStr} USD</strong> to <code>${destination}</code> has been recorded.<br>
+          The admin processes payouts manually and will send the funds shortly.
         `,
         ctaText: 'Go to Dashboard',
         ctaUrl: `${BASE_URL}/dashboard`
@@ -312,13 +313,13 @@ async function notifyWithdrawalRequested({ user, amount, binanceId }) {
 
   sendEmail({
     to: NOTIFICATION_EMAIL,
-    subject: `[Admin Withdrawal] Request of ${amtStr} USDT by ${user.name}`,
+    subject: `[Admin Payout] Request of $${amtStr} USD by ${user.name}`,
     html: getEmailTemplate({
-      title: `Binance Pay withdrawal request received`,
-      badge: 'Withdrawal Request',
-      content: `User: ${user.name} (${user.email})<br>Amount: ${amtStr} USDT<br>Binance Pay ID: <code>${binanceId}</code>`,
+      title: `Manual payout request received`,
+      badge: 'Payout Request',
+      content: `User: ${user.name} (${user.email})<br>Amount: $${amtStr} USD<br>Payout details: <code>${destination}</code>`,
       ctaText: 'Check on Admin Dashboard',
-      ctaUrl: `${BASE_URL}/dashboard`
+      ctaUrl: `${BASE_URL}/admin/disputes`
     })
   });
 }
@@ -350,25 +351,26 @@ async function notifyReviewSubmitted({ review, order, seller, buyer }) {
 }
 
 /**
- * 7. Deposit confirmation via Binance Pay
+ * 7. Wallet top-up confirmed via Telegram Stars
  */
-async function notifyDepositReceived({ user, amount, txId, binancePayId }) {
+async function notifyDepositReceived({ user, amount, txId, starsAmount }) {
   const amtStr = parseFloat(amount).toFixed(2);
-  
+  const starsStr = Number(starsAmount) > 0 ? `${Number(starsAmount)} Stars` : 'Telegram Stars';
+
   if (user && user.email && !user.email.endsWith('.local')) {
     sendEmail({
       to: user.email,
-      subject: `💰 Deposit confirmed: +${amtStr} USDT in your account`,
+      subject: `💰 Top-up confirmed: +$${amtStr} in your account`,
       html: getEmailTemplate({
         title: `Your account has been credited!`,
-        badge: 'Binance Pay Deposit',
+        badge: 'Telegram Stars Top-Up',
         content: `
           Hello <strong>${user.name}</strong>,<br><br>
-          Your deposit of <strong>${amtStr} USDT</strong> via Binance Pay has been validated successfully.<br>
+          Your top-up of <strong>$${amtStr} USD</strong> paid with <strong>${starsStr}</strong> has been validated successfully.<br>
           <div class="box">
-            <strong>Amount credited:</strong> ${amtStr} USDT<br>
-            <strong>Transaction ID (TxID):</strong> <code>${txId || 'N/A'}</code><br>
-            <strong>Binance Pay ID:</strong> <code>${binancePayId || 'N/A'}</code>
+            <strong>Amount credited:</strong> $${amtStr} USD<br>
+            <strong>Telegram charge ID:</strong> <code>${txId || 'N/A'}</code><br>
+            <strong>Stars paid:</strong> ${starsStr}
           </div>
           Your funds are immediately available to purchase guides and methods.
         `,
@@ -380,13 +382,42 @@ async function notifyDepositReceived({ user, amount, txId, binancePayId }) {
 
   sendEmail({
     to: NOTIFICATION_EMAIL,
-    subject: `[Admin Deposit] Deposit of ${amtStr} USDT received (${user.name})`,
+    subject: `[Admin Top-Up] $${amtStr} received from ${user.name}`,
     html: getEmailTemplate({
-      title: `New Binance Pay deposit recorded`,
-      badge: 'Client Deposit',
-      content: `User: ${user.name} (${user.email})<br>Amount: ${amtStr} USDT<br>TxID: <code>${txId || 'N/A'}</code><br>Binance Pay ID: <code>${binancePayId || 'N/A'}</code>`,
+      title: `New Telegram Stars top-up recorded`,
+      badge: 'Client Top-Up',
+      content: `User: ${user.name} (${user.email})<br>Amount: $${amtStr} USD<br>Stars: ${starsStr}<br>Charge ID: <code>${txId || 'N/A'}</code>`,
       ctaText: 'Admin Dashboard',
-      ctaUrl: `${BASE_URL}/dashboard`
+      ctaUrl: `${BASE_URL}/admin/disputes`
+    })
+  });
+}
+
+/**
+ * 7b. Direct store order paid with Telegram Stars
+ */
+async function notifyStoreOrderPaid({ order, items, customerContact, amount, starsAmount, telegramUsername }) {
+  const amtStr = parseFloat(amount || order.totalAmount || 0).toFixed(2);
+  const titles = Array.isArray(items) && items.length > 0
+    ? items.map(i => `${i.title} ($${parseFloat(i.price || 0).toFixed(2)})`).join('<br>')
+    : 'Digital methods order';
+
+  sendEmail({
+    to: NOTIFICATION_EMAIL,
+    subject: `⭐ Stars order paid: $${amtStr} (#${order.id})`,
+    html: getEmailTemplate({
+      title: `New paid Telegram Stars order`,
+      badge: 'Store Order Paid',
+      content: `
+        <strong>Order:</strong> #${order.id}<br>
+        <strong>Amount:</strong> $${amtStr} USD — <strong>${Number(starsAmount) || 0} Stars</strong><br>
+        <strong>Contact:</strong> ${customerContact || 'N/A'}<br>
+        ${telegramUsername ? `<strong>Telegram:</strong> ${telegramUsername}<br>` : ''}
+        <div class="box">${titles}</div>
+        ${order.note ? `<strong>Note:</strong> ${order.note}` : ''}
+      `,
+      ctaText: 'Open Admin Store',
+      ctaUrl: `${BASE_URL}/admin/store`
     })
   });
 }
@@ -463,6 +494,7 @@ module.exports = {
   notifyWithdrawalRequested,
   notifyReviewSubmitted,
   notifyDepositReceived,
+  notifyStoreOrderPaid,
   notifyUnreadChatMessage,
   notifyNewUserRegistration
 };

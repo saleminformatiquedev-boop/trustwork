@@ -118,7 +118,7 @@ async function findOrCreateGoogleUser(pool, { googleId, email, displayName, avat
   if (!user) {
     isNewRegistration = true;
     const newId = generateId('usr_');
-    // Real accounts always start with 0.00 USDT balance
+    // Real accounts always start with a 0.00 USD ledger balance
     const insertRes = await pool.query(`
       INSERT INTO users (id, "googleId", email, name, avatar, role, "walletBalance", "escrowBalance")
       VALUES ($1, $2, $3, $4, $5, $6, 0.00, 0.00)

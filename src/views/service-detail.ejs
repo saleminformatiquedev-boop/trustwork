@@ -6,6 +6,8 @@
   const whatsappClean = String(whatsappRaw).replace(/[^0-9]/g, '');
   const telegramBot = service.telegramBot || '@LicenzioChannel';
   const telegramBotSlug = String(telegramBot).replace(/^@/, '');
+  const starsRate = (typeof starsPerUsd !== 'undefined' ? starsPerUsd : 77);
+  const starsPrice = Math.max(1, Math.ceil(Number(service.price) * starsRate));
   const waOrderUrl = `https://wa.me/${whatsappClean}?text=${encodeURIComponent(`Hello ${supplierHandle}! I want to order: ${service.title} ($${service.price.toFixed(0)}). Can we do a quick screen-share demo?`)}`;
   const waExchangeUrl = `https://wa.me/${whatsappClean}?text=${encodeURIComponent(`Hello ${supplierHandle}! I'm a supplier and I'd like to propose a method exchange for: ${service.title}.`)}`;
 %>
@@ -56,7 +58,7 @@
           <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold block">Method Price</span>
           <div class="text-xl font-extrabold text-white mt-0.5">
             $<%= Number.isInteger(service.price) ? service.price : service.price.toFixed(2) %>
-            <span class="text-xs font-medium text-slate-400">USDT</span>
+            <span class="text-xs font-medium text-slate-400">USD</span>
           </div>
         </div>
 
@@ -133,15 +135,18 @@
 
     </div>
 
-    <!-- Side Column: Direct Order, WhatsApp & Binance Payment -->
+    <!-- Side Column: Direct Order, WhatsApp & Telegram Stars Payment -->
     <div class="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200/90 sticky top-24 space-y-5">
 
       <div>
         <span class="text-xs text-slate-400 font-medium">Direct Supplier Price</span>
         <div class="text-3xl font-extrabold text-slate-900 mt-0.5">
           $<%= Number.isInteger(service.price) ? service.price : service.price.toFixed(2) %>
-          <span class="text-sm font-semibold text-slate-500">USDT</span>
+          <span class="text-sm font-semibold text-slate-500">USD</span>
         </div>
+        <p class="text-xs font-bold text-amber-700 mt-1">
+          <i class="fa-solid fa-star text-[10px]"></i> <%= starsPrice %> Telegram Stars
+        </p>
         <% if (service.unitCost) { %>
           <p class="text-xs font-semibold text-emerald-700 mt-1">
             Cost: <%= service.unitCost %>
@@ -149,47 +154,40 @@
         <% } %>
       </div>
 
-      <!-- Direct Binance Payment (Binance Pay ID & USDT BEP20) -->
-      <div class="p-4 rounded-xl bg-amber-50/70 border border-amber-200/90 space-y-3">
+      <!-- Direct Telegram Stars Payment -->
+      <div class="p-4 rounded-xl bg-sky-50/70 border border-sky-200/90 space-y-3">
         <div class="flex items-center justify-between">
-          <span class="text-[11px] font-extrabold uppercase tracking-wider text-amber-900">
-            <i class="fa-solid fa-coins text-amber-600 mr-1"></i> Pay via Binance (USDT)
+          <span class="text-[11px] font-extrabold uppercase tracking-wider text-sky-900">
+            <i class="fa-solid fa-star text-amber-500 mr-1"></i> Pay with Telegram Stars
           </span>
-          <span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">0% Fee / BEP20</span>
+          <span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Instant XTR</span>
         </div>
 
-        <!-- Binance Pay ID -->
-        <div class="bg-white px-3 py-2 rounded-lg border border-amber-200/80 flex items-center justify-between gap-2">
-          <div class="min-w-0">
-            <span class="text-[10px] text-slate-400 uppercase font-semibold block">Binance Pay ID</span>
-            <code id="detail-binance-id" class="font-mono font-extrabold text-xs text-slate-900 select-all"><%= typeof platformBinancePayId !== 'undefined' ? platformBinancePayId : '1229901779' %></code>
+        <div class="bg-white px-3 py-2.5 rounded-lg border border-sky-200/80 space-y-1 text-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">Method price</span>
+            <strong class="text-slate-900">$<%= Number.isInteger(service.price) ? service.price : service.price.toFixed(2) %> USD</strong>
           </div>
-          <button type="button" onclick="copyDetailPay('detail-binance-id', 'Binance Pay ID')" class="px-2 py-1 rounded bg-[#F0B90B] hover:bg-[#FCD535] text-slate-950 font-bold text-[11px] shrink-0 transition">Copy ID</button>
-        </div>
-
-        <!-- USDT BEP20 -->
-        <div class="bg-white p-2.5 rounded-lg border border-slate-200 space-y-2">
-          <div class="flex items-center justify-between text-[10px]">
-            <span class="font-bold text-slate-700 uppercase">USDT BEP20 (BNB Smart Chain)</span>
-          </div>
-          <% if (typeof bep20QrDataUrl !== 'undefined' && bep20QrDataUrl) { %>
-            <div class="flex justify-center">
-              <img src="<%= bep20QrDataUrl %>" alt="USDT BEP20 QR" class="w-28 h-28 object-contain rounded border border-slate-100 p-1">
-            </div>
-          <% } %>
-          <div class="flex items-center justify-between gap-1.5 bg-slate-50 px-2 py-1.5 rounded border border-slate-200/80">
-            <code id="detail-bep20-addr" class="font-mono text-[10px] font-bold text-slate-800 truncate select-all"><%= typeof bep20Address !== 'undefined' ? bep20Address : '0x284b2c731c9a9449f88f42bc707c05511bb9b222' %></code>
-            <button type="button" onclick="copyDetailPay('detail-bep20-addr', 'USDT BEP20 Address')" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] shrink-0 transition">Copy</button>
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">You pay in Telegram</span>
+            <strong class="text-amber-700">⭐ <%= starsPrice %> Stars</strong>
           </div>
         </div>
 
         <div class="space-y-1.5">
-          <input type="text" id="detail-txid-input" placeholder="Paste Binance Order ID or BEP20 TxID..." class="w-full px-2.5 py-2 text-[11px] font-mono bg-white border border-amber-200 rounded-lg focus:border-slate-900 focus:outline-none">
-          <button type="button" id="detail-wa-paid-btn" class="w-full py-2 px-3 rounded-lg bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold text-xs transition flex items-center justify-center gap-1.5">
-            <i class="fa-brands fa-whatsapp text-sm"></i>
-            <span>I Paid — Send Proof on WhatsApp</span>
+          <input type="text" id="detail-contact-input" value="<%= user ? user.email : '' %>" placeholder="Your WhatsApp / Telegram / Email..." class="w-full px-2.5 py-2 text-[11px] bg-white border border-sky-200 rounded-lg focus:border-slate-900 focus:outline-none">
+          <input type="text" id="detail-note-input" placeholder="Preferred time for screen-share (optional)" class="w-full px-2.5 py-2 text-[11px] bg-white border border-sky-200 rounded-lg focus:border-slate-900 focus:outline-none">
+          <button type="button" id="detail-stars-buy-btn" class="w-full py-2.5 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-star text-amber-300"></i>
+            <span>Pay <%= starsPrice %> Stars &amp; Order</span>
           </button>
         </div>
+
+        <div id="detail-order-status" class="hidden p-2.5 rounded-lg bg-white border border-slate-200 text-[11px] text-slate-600 leading-relaxed"></div>
+
+        <p class="text-[10px] text-slate-500 leading-relaxed">
+          You will approve the official Telegram Stars invoice inside Telegram. Payment is confirmed automatically — no TxID needed.
+        </p>
       </div>
 
       <!-- Direct WhatsApp Order / Screen-Share CTA -->
@@ -229,23 +227,114 @@
 </div>
 
 <script>
-  function copyDetailPay(id, label) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const val = el.textContent.trim();
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(val).then(() => {
-        if (window.showToast) window.showToast(`${label} copied!`, 'success');
-      }).catch(() => {});
-    }
+  const SERVICE_ID = <%- JSON.stringify(service.id) %>;
+  const STARS_PER_USD = <%- JSON.stringify(starsRate) %>;
+  const STARS_PRICE = <%- JSON.stringify(starsPrice) %>;
+  const detailBuyBtn = document.getElementById('detail-stars-buy-btn');
+  const detailStatusEl = document.getElementById('detail-order-status');
+  let detailPollTimer = null;
+
+  function showDetailStatus(message, tone) {
+    if (!detailStatusEl) return;
+    detailStatusEl.classList.remove('hidden');
+    detailStatusEl.textContent = message;
+    detailStatusEl.className = `p-2.5 rounded-lg border text-[11px] leading-relaxed ${
+      tone === 'success'
+        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+        : (tone === 'error' ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-white border-slate-200 text-slate-600')
+    }`;
   }
 
-  const detailPaidBtn = document.getElementById('detail-wa-paid-btn');
-  if (detailPaidBtn) {
-    detailPaidBtn.addEventListener('click', () => {
-      const txId = (document.getElementById('detail-txid-input').value || '').trim();
-      const msg = `Hello <%= supplierHandle %>! I just paid $<%= service.price.toFixed(2) %> USDT via Binance for: <%= service.title %>.${txId ? '\nOrder ID / TxID: ' + txId : ''}\nPlease confirm and start screen-share!`;
-      window.open(`https://wa.me/<%= whatsappClean %>?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+  function pollDetailOrder(orderId) {
+    if (detailPollTimer) clearInterval(detailPollTimer);
+    const startedAt = Date.now();
+
+    const tick = async () => {
+      if (Date.now() - startedAt > 10 * 60 * 1000) {
+        clearInterval(detailPollTimer);
+        detailPollTimer = null;
+        return;
+      }
+      try {
+        const res = await fetch(`/api/store/orders/${encodeURIComponent(orderId)}/status`);
+        const data = await res.json();
+        if (!data.success || !data.order) return;
+        const ord = data.order;
+
+        if (ord.status === 'PAID') {
+          clearInterval(detailPollTimer);
+          detailPollTimer = null;
+          showDetailStatus(`✅ Payment confirmed — ${ord.starsAmount || STARS_PRICE} Stars received. @Melasbit will contact you for the screen-share.`, 'success');
+          if (window.showToast) window.showToast('Payment confirmed! Order is paid.', 'success');
+        } else if (ord.status === 'REJECTED' || ord.status === 'REFUNDED') {
+          clearInterval(detailPollTimer);
+          detailPollTimer = null;
+          showDetailStatus(`Order status: ${ord.status}. Contact @Melasbit if you need help.`, 'error');
+        }
+      } catch (_) {}
+    };
+
+    tick();
+    detailPollTimer = setInterval(tick, 3000);
+  }
+
+  if (detailBuyBtn) {
+    detailBuyBtn.addEventListener('click', async () => {
+      const contactInput = document.getElementById('detail-contact-input');
+      const noteInput = document.getElementById('detail-note-input');
+      const customerContact = (contactInput.value || '').trim();
+      const note = (noteInput.value || '').trim();
+
+      if (!customerContact) {
+        if (window.showToast) window.showToast('Please enter your WhatsApp, Telegram or Email contact.', 'error');
+        return;
+      }
+
+      const original = detailBuyBtn.innerHTML;
+      detailBuyBtn.disabled = true;
+      detailBuyBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating invoice...';
+
+      try {
+        const res = await fetch('/api/store/order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            serviceIds: [SERVICE_ID],
+            customerContact,
+            note
+          })
+        });
+        const data = await res.json();
+
+        if (!data.success || !data.order) {
+          showDetailStatus(data.error || 'Unable to create the invoice.', 'error');
+          if (window.showToast) window.showToast(data.error || 'Unable to create the invoice.', 'error');
+          return;
+        }
+
+        const ord = data.order;
+        const stars = data.stars || STARS_PRICE;
+        showDetailStatus(`Invoice created for ${stars} Stars ($${ord.totalAmount.toFixed(2)} USD). Complete the payment in Telegram — this page updates automatically.`, 'pending');
+
+        if (data.invoiceLink && detailStatusEl) {
+          const link = document.createElement('a');
+          link.href = data.invoiceLink;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.className = 'block mt-1 font-bold underline text-sky-700';
+          link.textContent = 'Open the Telegram Stars invoice →';
+          detailStatusEl.appendChild(link);
+        }
+
+        pollDetailOrder(ord.id);
+        try { window.open(data.invoiceLink, '_blank', 'noopener'); } catch (_) {}
+        if (window.showToast) window.showToast('Invoice created. Approve it in Telegram.', 'success');
+      } catch (err) {
+        showDetailStatus('Network error. Please try again.', 'error');
+      } finally {
+        detailBuyBtn.disabled = false;
+        detailBuyBtn.innerHTML = original;
+      }
     });
   }
 </script>
