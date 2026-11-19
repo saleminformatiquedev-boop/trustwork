@@ -68,53 +68,51 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" id="methods-list">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5" id="methods-list">
     <% if (services && services.length > 0) { %>
       <% services.forEach((service, idx) => { %>
         <% const isAdminTested = ['srv_notion_edu_plus_1y', 'srv_adobe_express_6m_script', 'srv_capcut_ready'].includes(service.id); %>
         <div
-          class="method-select-card cursor-pointer bg-white rounded-xl border-2 <%= idx === 0 ? 'border-slate-900 ring-2 ring-slate-900/10' : 'border-slate-200 hover:border-slate-400' %> p-3 transition flex flex-col justify-between select-none"
+          class="method-select-card cursor-pointer bg-white rounded-xl border-2 <%= idx === 0 ? 'border-slate-900 ring-2 ring-slate-900/10' : 'border-slate-200 hover:border-slate-400' %> px-3 py-2 transition flex flex-col justify-between gap-1.5 select-none"
           data-id="<%= service.id %>"
           data-title="<%= service.title %>"
           data-price="<%= service.price %>"
           data-selected="<%= idx === 0 ? 'true' : 'false' %>">
 
-          <div>
-            <% if (isAdminTested) { %>
-              <div class="mb-2 px-2 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-extrabold tracking-tight flex items-center justify-center gap-1.5 shadow-xs">
-                <i class="fa-solid fa-flag text-[#F0B90B] text-[10px]"></i>
-                <span>Tested by the admin @Melasbit</span>
-              </div>
-            <% } %>
+          <% if (isAdminTested) { %>
+            <div class="px-2.5 py-0.5 rounded-md bg-emerald-600 text-white text-[11px] font-extrabold tracking-wide flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-flag text-[#F0B90B] text-[10px]"></i>
+              <span>Tested by the admin @Melasbit</span>
+            </div>
+          <% } %>
 
-            <div class="flex items-center justify-between gap-2 mb-1.5">
-              <span class="method-check inline-flex items-center gap-1 text-[11px] font-bold <%= idx === 0 ? 'text-emerald-700' : 'text-slate-400' %>">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="method-check inline-flex items-center gap-1 text-[11px] font-bold shrink-0 <%= idx === 0 ? 'text-emerald-700' : 'text-slate-400' %>">
                 <i class="<%= idx === 0 ? 'fa-solid fa-circle-check text-emerald-600' : 'fa-regular fa-circle text-slate-300' %> text-sm"></i>
-                <span class="method-check-label"><%= idx === 0 ? 'Selected' : 'Select' %></span>
+                <span class="method-check-label sr-only"><%= idx === 0 ? 'Selected' : 'Select' %></span>
               </span>
-              <span class="text-sm font-extrabold text-slate-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                $<%= Number.isInteger(service.price) ? service.price : service.price.toFixed(2) %>
-              </span>
+              <h3 class="font-extrabold text-slate-900 text-[13px] leading-tight truncate">
+                <%= service.title %>
+              </h3>
             </div>
-
-            <h3 class="font-extrabold text-slate-900 text-[13px] leading-snug mb-1.5">
-              <%= service.title %>
-            </h3>
-
-            <div class="px-2.5 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-semibold flex items-center justify-between gap-1.5 mb-1.5">
-              <span class="text-slate-400">Cost:</span>
-              <span class="text-emerald-400 font-bold text-right truncate"><%= service.unitCost || 'Ready to use' %></span>
-            </div>
-
-            <p class="text-[11px] text-slate-500 leading-snug">
-              <i class="fa-solid fa-display text-indigo-600 mr-1 text-[10px]"></i>
-              Live screen-share demo included — I show you how it works!
-            </p>
+            <span class="text-xs font-extrabold text-slate-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md shrink-0">
+              $<%= Number.isInteger(service.price) ? service.price : service.price.toFixed(2) %>
+            </span>
           </div>
 
-          <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-semibold text-slate-500">
-            <span><%= service.durationLabel || 'Ready to use' %></span>
-            <span class="text-emerald-700">Binance / BEP20</span>
+          <div class="flex items-center justify-between gap-2 text-[11px]">
+            <span class="px-2 py-0.5 rounded-md bg-slate-900 text-emerald-400 font-bold truncate">
+              <span class="text-slate-400 font-medium">Cost:</span> <%= service.unitCost || 'Ready to use' %>
+            </span>
+            <span class="text-[10px] font-semibold text-slate-500 shrink-0">
+              <%= service.durationLabel || 'Ready to use' %> • <span class="text-emerald-700">Binance / BEP20</span>
+            </span>
+          </div>
+
+          <div class="text-[10px] text-slate-500 truncate">
+            <i class="fa-solid fa-display text-indigo-600 mr-1"></i>
+            Live screen-share demo included — I show you how it works!
           </div>
         </div>
       <% }) %>
