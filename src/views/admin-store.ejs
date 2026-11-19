@@ -1,0 +1,133 @@
+<%- include('partials/header', { title: 'Admin — Orders & Exchanges' }) %>
+
+<div class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-8">
+
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-extrabold text-slate-900">Admin Store Panel</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Owner: <strong>saleminformatiquedev@gmail.com</strong> (@Melasbit) — Manage Binance orders &amp; method exchange requests.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/chat" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition">
+        <i class="fa-regular fa-comments mr-1"></i> DM Inbox
+      </a>
+      <a href="/" class="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:border-slate-400 text-slate-700 text-xs font-bold transition">
+        View Storefront
+      </a>
+    </div>
+  </div>
+
+  <!-- Binance Orders -->
+  <div class="bg-white rounded-2xl border border-slate-200/90 overflow-hidden">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+      <h2 class="font-extrabold text-slate-900 text-base">
+        💰 Binance Orders (<%= storeOrders.length %>)
+      </h2>
+      <span class="text-xs text-slate-400">Binance Pay ID &amp; USDT BEP20</span>
+    </div>
+
+    <div class="divide-y divide-slate-100">
+      <% if (storeOrders && storeOrders.length > 0) { %>
+        <% storeOrders.forEach(ord => { %>
+          <% const items = Array.isArray(ord.items) ? ord.items : []; %>
+          <div class="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="space-y-1.5 min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-mono text-xs font-bold text-slate-500">#<%= ord.id %></span>
+                <span class="text-xs font-extrabold px-2 py-0.5 rounded-full <%= ord.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-800' : (ord.status === 'PAID' ? 'bg-sky-100 text-sky-800' : (ord.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800')) %>">
+                  <%= ord.status %>
+                </span>
+                <span class="text-xs font-bold text-slate-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                  $<%= parseFloat(ord.totalAmount).toFixed(2) %> USDT (<%= ord.paymentMethod %>)
+                </span>
+              </div>
+
+              <div class="text-sm font-bold text-slate-900">
+                <%= items.map(i => `${i.title} ($${i.price})`).join(' + ') %>
+              </div>
+
+              <div class="text-xs text-slate-600 space-y-0.5">
+                <div><strong>Contact:</strong> <%= ord.customerContact %></div>
+                <div><strong>Order ID / TxID:</strong> <code class="font-mono bg-slate-100 px-1.5 py-0.5 rounded select-all"><%= ord.txId %></code></div>
+                <% if (ord.note) { %>
+                  <div><strong>Note:</strong> <%= ord.note %></div>
+                <% } %>
+                <div class="text-[11px] text-slate-400"><%= new Date(ord.createdAt).toLocaleString() %></div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+              <form action="/admin/store/orders/<%= ord.id %>/status" method="POST">
+                <input type="hidden" name="status" value="PAID">
+                <button type="submit" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition">Mark Paid</button>
+              </form>
+              <form action="/admin/store/orders/<%= ord.id %>/status" method="POST">
+                <input type="hidden" name="status" value="DELIVERED">
+                <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition">Delivered</button>
+              </form>
+              <form action="/admin/store/orders/<%= ord.id %>/status" method="POST">
+                <input type="hidden" name="status" value="REJECTED">
+                <button type="submit" class="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold transition">Reject</button>
+              </form>
+            </div>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <div class="p-10 text-center text-xs text-slate-400">No Binance orders yet.</div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Method Exchange Requests -->
+  <div class="bg-white rounded-2xl border border-slate-200/90 overflow-hidden">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+      <h2 class="font-extrabold text-slate-900 text-base">
+        🔄 Method Exchange Requests (<%= exchangeRequests.length %>)
+      </h2>
+      <span class="text-xs text-slate-400">From other suppliers</span>
+    </div>
+
+    <div class="divide-y divide-slate-100">
+      <% if (exchangeRequests && exchangeRequests.length > 0) { %>
+        <% exchangeRequests.forEach(ex => { %>
+          <div class="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="space-y-1.5 min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-bold text-sm text-slate-900"><%= ex.senderName %></span>
+                <span class="text-xs text-slate-500">(<%= ex.contact %>)</span>
+                <span class="text-[11px] font-bold px-2 py-0.5 rounded-full <%= ex.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' : (ex.status === 'DECLINED' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800') %>">
+                  <%= ex.status %>
+                </span>
+              </div>
+
+              <div class="text-xs text-slate-700 space-y-0.5">
+                <div><strong>Offers:</strong> <%= ex.offeredMethod %></div>
+                <div><strong>Wants:</strong> <%= ex.wantedMethods %></div>
+                <% if (ex.details) { %>
+                  <div><strong>Details:</strong> <%= ex.details %></div>
+                <% } %>
+                <div class="text-[11px] text-slate-400"><%= new Date(ex.createdAt).toLocaleString() %></div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+              <form action="/admin/store/exchanges/<%= ex.id %>/status" method="POST">
+                <input type="hidden" name="status" value="ACCEPTED">
+                <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition">Accept</button>
+              </form>
+              <form action="/admin/store/exchanges/<%= ex.id %>/status" method="POST">
+                <input type="hidden" name="status" value="DECLINED">
+                <button type="submit" class="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold transition">Decline</button>
+              </form>
+            </div>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <div class="p-10 text-center text-xs text-slate-400">No exchange requests yet.</div>
+      <% } %>
+    </div>
+  </div>
+
+</div>
+
+<%- include('partials/footer') %>

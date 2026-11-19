@@ -154,12 +154,51 @@ async function initDatabase() {
         "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS method_exchanges (
+        id VARCHAR(64) PRIMARY KEY,
+        "requesterId" VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+        "targetServiceId" VARCHAR(64) REFERENCES services(id) ON DELETE SET NULL,
+        "requestType" VARCHAR(32) NOT NULL DEFAULT 'EXCHANGE',
+        "offeredMethod" VARCHAR(255),
+        quantity VARCHAR(64),
+        "contactInfo" VARCHAR(255) NOT NULL,
+        message TEXT,
+        status VARCHAR(32) DEFAULT 'PENDING',
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE INDEX IF NOT EXISTS idx_conv_participants_user ON conversation_participants("userId");
       CREATE INDEX IF NOT EXISTS idx_direct_messages_conv ON direct_messages("conversationId");
       CREATE INDEX IF NOT EXISTS idx_conversations_lastmsg ON conversations("lastMessageAt" DESC);
+      CREATE INDEX IF NOT EXISTS idx_method_exchanges_created ON method_exchanges("createdAt" DESC);
+
+      CREATE TABLE IF NOT EXISTS store_orders (
+        id VARCHAR(64) PRIMARY KEY,
+        "userId" VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+        "customerContact" VARCHAR(255) NOT NULL,
+        items JSONB NOT NULL DEFAULT '[]'::jsonb,
+        "totalAmount" NUMERIC(14, 2) NOT NULL CHECK ("totalAmount" > 0),
+        "paymentMethod" VARCHAR(32) NOT NULL,
+        "txId" VARCHAR(255) NOT NULL,
+        note TEXT,
+        status VARCHAR(32) DEFAULT 'PENDING',
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS exchange_requests (
+        id VARCHAR(64) PRIMARY KEY,
+        "userId" VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+        "senderName" VARCHAR(255) NOT NULL,
+        contact VARCHAR(255) NOT NULL,
+        "offeredMethod" TEXT NOT NULL,
+        "wantedMethods" TEXT NOT NULL,
+        details TEXT,
+        status VARCHAR(32) DEFAULT 'NEW',
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
-    // Migrations for Multi-format methods (PDF, ZIP, Text, Video)
+    // Migrations for Digital Methods, Supplier Costs, Screen-Share Demos & Exchanges
     await client.query(`
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "fileUrl" TEXT;
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "fileName" TEXT;
@@ -169,6 +208,16 @@ async function initDatabase() {
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "formats" VARCHAR(255) DEFAULT 'PDF,ZIP,TEXT,VIDEO';
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "videoUrl" TEXT;
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "attachments" JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "unitCost" VARCHAR(255);
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "durationLabel" VARCHAR(128);
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "offerType" VARCHAR(64) DEFAULT 'METHOD';
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "screenShareDemo" BOOLEAN DEFAULT TRUE;
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "openToExchange" BOOLEAN DEFAULT TRUE;
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "bulkAvailable" BOOLEAN DEFAULT TRUE;
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "includesScript" BOOLEAN DEFAULT FALSE;
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "supplierHandle" VARCHAR(128) DEFAULT '@Melasbit';
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "whatsappNumber" VARCHAR(64) DEFAULT '+21627076373';
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "telegramBot" VARCHAR(128) DEFAULT '@Licenziobot';
       
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS "fileUrl" TEXT;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS "fileName" TEXT;
@@ -230,12 +279,145 @@ async function initDatabase() {
           "attachments" = CASE WHEN "attachments" IS NULL OR "attachments" = '[]'::jsonb THEN $1::jsonb ELSE "attachments" END
     `, [defaultAttachments]);
 
-    // Ensure if saleminformatiquedev@gmail.com already exists, it always has ADMIN role
+    // Ensure sole store owner saleminformatiquedev@gmail.com exists with ADMIN role
+    const ownerRes = await client.query(
+      `SELECT id FROM users WHERE LOWER(email) = 'saleminformatiquedev@gmail.com' LIMIT 1`
+    );
+    let ownerId;
+    if (ownerRes.rows.length > 0) {
+      ownerId = ownerRes.rows[0].id;
+      await client.query(
+        `UPDATE users SET role = 'ADMIN' WHERE id = $1`,
+        [ownerId]
+      );
+    } else {
+      ownerId = 'usr_owner_melasbit';
+      await client.query(`
+        INSERT INTO users (id, email, name, avatar, bio, skills, role, "walletBalance", "escrowBalance")
+        VALUES (
+          $1,
+          'saleminformatiquedev@gmail.com',
+          '@Melasbit',
+          'https://api.dicebear.com/7.x/initials/svg?seed=Melasbit&backgroundColor=0f172a',
+          'Owner & direct supplier for digital accounts, working methods & scripts. Bot: @Licenziobot',
+          'Digital Accounts, Working Methods, Automation Scripts, Bulk Deals, Method Exchange',
+          'ADMIN',
+          0.00,
+          0.00
+        )
+        ON CONFLICT (email) DO UPDATE SET role = 'ADMIN'
+        RETURNING id;
+      `, [ownerId]);
+    }
+
+    // Remove any non-official services that have no legacy orders attached
     await client.query(`
-      UPDATE users SET role = 'ADMIN' WHERE LOWER(email) = 'saleminformatiquedev@gmail.com';
+      DELETE FROM services
+      WHERE id NOT IN ('srv_notion_edu_plus_1y', 'srv_adobe_express_6m_script', 'srv_capcut_ready')
+        AND NOT EXISTS (SELECT 1 FROM orders WHERE "serviceId" = services.id);
     `);
 
-    console.log("✅ PostgreSQL database schema verified (production mode, no demo seed data).");
+    // Seed the 3 official methods sold exclusively by saleminformatiquedev@gmail.com (@Melasbit)
+    const coreOffers = [
+      {
+        id: 'srv_notion_edu_plus_1y',
+        title: 'Notion Edu Plus (1 Year)',
+        description: `Complete working method for Notion Edu Plus (1 Year).\n\n• Cost: only $0.02 / mail\n• Price: $10\n• Live Screen-Share: I will share my screen and show you how it works!\n• Direct supplier (@Melasbit) — also open to method exchanges & bulk deals.`,
+        category: 'Methods',
+        price: 10.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCREEN-SHARE',
+        unitCost: 'only $0.02 / mail',
+        durationLabel: '1 Year',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_adobe_express_6m_script',
+        title: 'Adobe Express (6 Months) + Script',
+        description: `Complete working method + automation script for Adobe Express (6 Months).\n\n• Cost: $0.02 / mail & $0.07 / link\n• Price: $15\n• Live Screen-Share: I will share my screen and show you how it works!\n• Direct supplier (@Melasbit) — also open to method exchanges & bulk deals.`,
+        category: 'Methods & Scripts',
+        price: 15.00,
+        difficulty: 'Beginner',
+        formats: 'METHOD,SCRIPT,SCREEN-SHARE',
+        unitCost: '$0.02 / mail & $0.07 / link',
+        durationLabel: '6 Months',
+        offerType: 'METHOD',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      },
+      {
+        id: 'srv_capcut_ready',
+        title: 'CapCut — Ready to use',
+        description: `CapCut ready to use immediately.\n\n• Status: Ready to use\n• Price: $5\n• Live Screen-Share: I will share my screen and show you how it works!\n• Direct supplier (@Melasbit) — also open to method exchanges & bulk deals.`,
+        category: 'Ready to use',
+        price: 5.00,
+        difficulty: 'Beginner',
+        formats: 'READY-TO-USE,SCREEN-SHARE',
+        unitCost: 'Ready to use',
+        durationLabel: 'Ready to use',
+        offerType: 'READY_ACCOUNT',
+        screenShareDemo: true,
+        openToExchange: true,
+        bulkAvailable: true
+      }
+    ];
+
+    for (const offer of coreOffers) {
+      await client.query(`
+        INSERT INTO services (
+          id, "sellerId", title, description, category, price, "deliveryDays",
+          "pageCount", difficulty, formats, "attachments",
+          "unitCost", "durationLabel", "offerType",
+          "screenShareDemo", "openToExchange", "bulkAvailable",
+          "supplierHandle", "whatsappNumber", "telegramBot"
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, 1,
+          10, $7, $8, $9::jsonb,
+          $10, $11, $12,
+          $13, $14, $15,
+          '@Melasbit', '+21627076373', '@Licenziobot'
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          "sellerId" = EXCLUDED."sellerId",
+          title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          category = EXCLUDED.category,
+          price = EXCLUDED.price,
+          formats = EXCLUDED.formats,
+          "unitCost" = EXCLUDED."unitCost",
+          "durationLabel" = EXCLUDED."durationLabel",
+          "offerType" = EXCLUDED."offerType",
+          "screenShareDemo" = EXCLUDED."screenShareDemo",
+          "openToExchange" = EXCLUDED."openToExchange",
+          "bulkAvailable" = EXCLUDED."bulkAvailable",
+          "supplierHandle" = EXCLUDED."supplierHandle",
+          "whatsappNumber" = EXCLUDED."whatsappNumber",
+          "telegramBot" = EXCLUDED."telegramBot";
+      `, [
+        offer.id,
+        ownerId,
+        offer.title,
+        offer.description,
+        offer.category,
+        offer.price,
+        offer.difficulty,
+        offer.formats,
+        defaultAttachments,
+        offer.unitCost,
+        offer.durationLabel,
+        offer.offerType,
+        offer.screenShareDemo,
+        offer.openToExchange,
+        offer.bulkAvailable
+      ]);
+    }
+
+    console.log("✅ PostgreSQL database schema & single-seller store (saleminformatiquedev@gmail.com) verified.");
   } finally {
     client.release();
   }

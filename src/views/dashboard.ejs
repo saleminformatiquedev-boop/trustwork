@@ -243,33 +243,33 @@
         </p>
       </div>
 
-      <!-- Method 2: On-Chain USDT QR Code (TRC20 / BEP20) -->
+      <!-- Method 2: On-Chain USDT QR Code (BEP20 Default / TRC20) -->
       <div class="pt-2 border-t border-slate-200/80 space-y-2">
         <div class="flex items-center justify-between">
-          <span class="text-[11px] font-semibold text-slate-600">2. Or Scan On-Chain USDT Address:</span>
+          <span class="text-[11px] font-semibold text-slate-600">2. Or Scan USDT BEP20 (BSC) Address:</span>
           <div class="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-[10px] font-bold">
-            <button type="button" data-net="TRC20" class="qr-net-btn px-2 py-1 rounded-md bg-slate-900 text-white transition">TRC20</button>
-            <button type="button" data-net="BEP20" class="qr-net-btn px-2 py-1 rounded-md text-slate-600 hover:text-slate-900 transition">BEP20</button>
+            <button type="button" data-net="BEP20" class="qr-net-btn px-2 py-1 rounded-md bg-slate-900 text-white transition">BEP20 (USDT)</button>
+            <button type="button" data-net="TRC20" class="qr-net-btn px-2 py-1 rounded-md text-slate-600 hover:text-slate-900 transition">TRC20</button>
           </div>
         </div>
 
         <div class="relative inline-block mx-auto bg-white p-2 rounded-xl border border-slate-200">
-          <img id="deposit-qr-image" src="<%= typeof trc20QrDataUrl !== 'undefined' ? trc20QrDataUrl : '' %>" alt="USDT Deposit Address QR" class="w-36 h-36 object-contain mx-auto block">
-          <div id="deposit-qr-loader" class="<%= typeof trc20QrDataUrl !== 'undefined' && trc20QrDataUrl ? 'hidden' : '' %> absolute inset-0 bg-white/95 rounded-xl flex items-center justify-center">
+          <img id="deposit-qr-image" src="<%= typeof bep20QrDataUrl !== 'undefined' ? bep20QrDataUrl : '' %>" alt="USDT BEP20 Deposit Address QR" class="w-36 h-36 object-contain mx-auto block">
+          <div id="deposit-qr-loader" class="<%= typeof bep20QrDataUrl !== 'undefined' && bep20QrDataUrl ? 'hidden' : '' %> absolute inset-0 bg-white/95 rounded-xl flex items-center justify-center">
             <i class="fa-solid fa-spinner fa-spin text-lg text-slate-400"></i>
           </div>
         </div>
 
         <div class="text-left space-y-1.5 text-[11px]">
+          <div class="flex items-center justify-between gap-2 bg-amber-50/70 px-2.5 py-2 rounded-lg border border-amber-200/90">
+            <span class="text-amber-900 shrink-0 font-bold">BEP20 (BSC):</span>
+            <code id="deposit-bep20-text" class="font-mono font-bold text-slate-900 truncate select-all"><%= typeof bep20Address !== 'undefined' ? bep20Address : '0x284b2c731c9a9449f88f42bc707c05511bb9b222' %></code>
+            <button type="button" data-copy-target="deposit-bep20-text" class="copy-addr-btn text-[11px] font-bold text-emerald-700 hover:underline shrink-0">Copy</button>
+          </div>
           <div class="flex items-center justify-between gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/70">
             <span class="text-slate-400 shrink-0 font-medium">TRC20:</span>
             <code id="deposit-trc20-text" class="font-mono text-slate-700 truncate select-all"><%= typeof trc20Address !== 'undefined' ? trc20Address : 'TNw9pxbxwf6qtvymRSnr2quaWxVCi5fwqu' %></code>
             <button type="button" data-copy-target="deposit-trc20-text" class="copy-addr-btn text-[11px] font-semibold text-emerald-600 hover:underline shrink-0">Copy</button>
-          </div>
-          <div class="flex items-center justify-between gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/70">
-            <span class="text-slate-400 shrink-0 font-medium">BEP20:</span>
-            <code id="deposit-bep20-text" class="font-mono text-slate-700 truncate select-all"><%= typeof bep20Address !== 'undefined' ? bep20Address : '0x284b2c731c9a9449f88f42bc707c05511bb9b222' %></code>
-            <button type="button" data-copy-target="deposit-bep20-text" class="copy-addr-btn text-[11px] font-semibold text-emerald-600 hover:underline shrink-0">Copy</button>
           </div>
         </div>
       </div>
@@ -363,7 +363,7 @@
   const binancePayHelperMsg = document.getElementById('binance-pay-helper-msg');
 
   let qrDebounceTimeout = null;
-  let currentQrNetwork = 'TRC20';
+  let currentQrNetwork = 'BEP20';
   const preloadedQrMap = {
     TRC20: <%- JSON.stringify(typeof trc20QrDataUrl !== 'undefined' ? trc20QrDataUrl : '') %>,
     BEP20: <%- JSON.stringify(typeof bep20QrDataUrl !== 'undefined' ? bep20QrDataUrl : '') %>

@@ -289,11 +289,23 @@ io.use(async (socket, next) => {
   }
 });
 
-// Global injection of user, total users counter, and unread chat counter in EJS views
+// Pre-generate cached USDT BEP20 QR Code for instant rendering across all pages
+let cachedBep20QrDataUrl = '';
+QRCode.toDataURL(binanceService.DEFAULT_USDT_BEP20, {
+  width: 280,
+  margin: 2,
+  errorCorrectionLevel: 'M',
+  color: { dark: '#0f172a', light: '#ffffff' }
+}).then(url => { cachedBep20QrDataUrl = url; }).catch(() => {});
+
+// Global injection of user, total users counter, unread chat counter & Binance payment details in EJS views
 app.use(async (req, res, next) => {
   res.locals.user = req.user ? normalizeUser(req.user) : null;
   res.locals.unreadChatCount = 0;
   res.locals.totalUsersCount = 0;
+  res.locals.platformBinancePayId = PLATFORM_BINANCE_PAY_ID;
+  res.locals.bep20Address = binanceService.DEFAULT_USDT_BEP20;
+  res.locals.bep20QrDataUrl = cachedBep20QrDataUrl;
   try {
     const countRes = await pool.query('SELECT COUNT(*)::int AS total FROM users');
     res.locals.totalUsersCount = countRes.rows[0]?.total ?? 0;
@@ -738,25 +750,235 @@ io.on('connection', (socket) => {
 // PUBLIC ROUTES (SANITIZED)
 // ==========================================
 
-// Homepage: Guides & Methods Catalog
+const STORE_OWNER_EMAIL = 'saleminformatiquedev@gmail.com';
+function isStoreOwner(user) {
+  if (!user) return false;
+  return user.role === 'ADMIN' || String(user.email || '').toLowerCase() === STORE_OWNER_EMAIL;
+}
+
+// Homepage: Simple Direct Storefront (ONLY saleminformatiquedev@gmail.com sells the 3 methods)
 app.get('/', async (req, res) => {
   try {
     const srvRes = await pool.query(`
       SELECT s.id, s."sellerId", s.title, s.description, s.category, s.price,
              s."deliveryDays", s."pageCount", s.difficulty, s.formats, s."createdAt",
-             u.name as "sellerName", u.avatar as "sellerAvatar",
-             COALESCE(AVG(r.rating), 5.0) as "avgRating",
-             COUNT(r.id) as "reviewsCount"
+             s."unitCost", s."durationLabel", s."offerType",
+             s."screenShareDemo", s."openToExchange", s."bulkAvailable",
+             s."supplierHandle", s."whatsappNumber", s."telegramBot",
+             u.name as "sellerName", u.avatar as "sellerAvatar"
       FROM services s
       JOIN users u ON s."sellerId" = u.id
-      LEFT JOIN reviews r ON s.id = r."serviceId"
-      GROUP BY s.id, u.name, u.avatar
-      ORDER BY s."createdAt" DESC
-    `);
+      WHERE LOWER(u.email) = $1
+      ORDER BY
+        CASE s.id
+          WHEN 'srv_notion_edu_plus_1y' THEN 1
+          WHEN 'srv_adobe_express_6m_script' THEN 2
+          WHEN 'srv_capcut_ready' THEN 3
+          ELSE 4
+        END ASC,
+        s."createdAt" DESC
+    `, [STORE_OWNER_EMAIL]);
     res.render('index', { services: formatRows(srvRes.rows).map(sanitizePublicService) });
   } catch (err) {
     console.error("Homepage error:", err.message);
-    res.status(500).send("Unable to load catalog at the moment.");
+    res.status(500).send("Unable to load methods at the moment.");
+  }
+});
+
+// ==========================================
+// SIMPLE DIRECT STORE API (BUY 1 OR MORE METHODS + EXCHANGE REQUEST)
+// ==========================================
+
+// Submit a direct Binance Pay ID / USDT BEP20 order for 1 or multiple methods
+app.post('/api/store/order', async (req, res) => {
+  try {
+    const { serviceIds, paymentMethod, txId, customerContact, note } = req.body || {};
+
+    if (!Array.isArray(serviceIds) || serviceIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'Please select at least one method.' });
+    }
+
+    const cleanIds = [...new Set(serviceIds.map(id => String(id || '').trim()).filter(Boolean))];
+    if (cleanIds.length === 0 || cleanIds.length > 20) {
+      return res.status(400).json({ success: false, error: 'Invalid method selection.' });
+    }
+
+    const cleanPaymentMethod = paymentMethod === 'USDT_BEP20' ? 'USDT_BEP20' : 'BINANCE_PAY';
+    const cleanTxId = String(txId || '').trim().slice(0, 200);
+    const cleanContact = String(customerContact || '').trim().slice(0, 200);
+    const cleanNote = String(note || '').trim().slice(0, 1000);
+
+    if (!cleanContact) {
+      return res.status(400).json({ success: false, error: 'Please enter your WhatsApp, Telegram, or Email contact.' });
+    }
+    if (!cleanTxId || cleanTxId.length < 4) {
+      return res.status(400).json({ success: false, error: 'Please enter your Binance Pay Order ID or BEP20 TxID.' });
+    }
+
+    // Fetch exact server-side prices from DB
+    const srvRes = await pool.query(
+      `SELECT id, title, price FROM services WHERE id = ANY($1::text[])`,
+      [cleanIds]
+    );
+    if (srvRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Selected method(s) not found.' });
+    }
+
+    const items = srvRes.rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      price: parseFloat(r.price)
+    }));
+    const totalAmount = Math.round(items.reduce((sum, i) => sum + i.price, 0) * 100) / 100;
+
+    // Optional automatic Binance API check if server has API keys configured
+    let initialStatus = 'PENDING';
+    try {
+      if (binanceService.isConfigured()) {
+        const check = await binanceService.verifyIncomingDeposit({ txId: cleanTxId, expectedAmount: totalAmount });
+        if (check && check.verified && check.autoCreditAllowed && check.actualAmount >= totalAmount) {
+          initialStatus = 'PAID';
+        }
+      }
+    } catch (_) {}
+
+    const orderId = 'ord_' + crypto.randomBytes(6).toString('hex');
+    await pool.query(`
+      INSERT INTO store_orders (id, "userId", "customerContact", items, "totalAmount", "paymentMethod", "txId", note, status)
+      VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9)
+    `, [
+      orderId,
+      req.user ? req.user.id : null,
+      cleanContact,
+      JSON.stringify(items),
+      totalAmount,
+      cleanPaymentMethod,
+      cleanTxId,
+      cleanNote || null,
+      initialStatus
+    ]);
+
+    // Notify sole seller (saleminformatiquedev@gmail.com) in real time
+    const ownerRes = await pool.query(`SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1`, [STORE_OWNER_EMAIL]);
+    if (ownerRes.rows[0]) {
+      const titlesStr = items.map(i => i.title).join(', ');
+      io.to(`user_${ownerRes.rows[0].id}`).emit('user_notification', {
+        title: `💰 New Binance Order ($${totalAmount.toFixed(2)})`,
+        body: `${cleanContact} ordered ${titlesStr} via ${cleanPaymentMethod} (TxID: ${cleanTxId})`,
+        url: '/admin/store',
+        type: 'store_order'
+      });
+    }
+
+    return res.json({
+      success: true,
+      order: {
+        id: orderId,
+        items,
+        totalAmount,
+        paymentMethod: cleanPaymentMethod,
+        txId: cleanTxId,
+        customerContact: cleanContact,
+        status: initialStatus
+      }
+    });
+  } catch (err) {
+    console.error('Store order error:', err.message);
+    return res.status(500).json({ success: false, error: 'Unable to submit order right now.' });
+  }
+});
+
+// Submit a Method Exchange Request
+app.post('/api/store/exchange', async (req, res) => {
+  try {
+    const { senderName, contact, offeredMethod, wantedMethods, details } = req.body || {};
+    const cleanName = String(senderName || '').trim().slice(0, 150);
+    const cleanContact = String(contact || '').trim().slice(0, 200);
+    const cleanOffered = String(offeredMethod || '').trim().slice(0, 1000);
+    const cleanWanted = Array.isArray(wantedMethods)
+      ? wantedMethods.map(w => String(w).trim()).filter(Boolean).join(', ').slice(0, 500)
+      : String(wantedMethods || '').trim().slice(0, 500);
+    const cleanDetails = String(details || '').trim().slice(0, 2000);
+
+    if (!cleanName || !cleanContact || !cleanOffered) {
+      return res.status(400).json({ success: false, error: 'Please fill in your name/handle, contact, and the method you offer.' });
+    }
+
+    const reqId = 'exch_' + crypto.randomBytes(6).toString('hex');
+    await pool.query(`
+      INSERT INTO exchange_requests (id, "userId", "senderName", contact, "offeredMethod", "wantedMethods", details, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'NEW')
+    `, [
+      reqId,
+      req.user ? req.user.id : null,
+      cleanName,
+      cleanContact,
+      cleanOffered,
+      cleanWanted || 'Any available method',
+      cleanDetails || null
+    ]);
+
+    const ownerRes = await pool.query(`SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1`, [STORE_OWNER_EMAIL]);
+    if (ownerRes.rows[0]) {
+      io.to(`user_${ownerRes.rows[0].id}`).emit('user_notification', {
+        title: `🔄 New Method Exchange Request`,
+        body: `${cleanName} (${cleanContact}) offers: ${cleanOffered}`,
+        url: '/admin/store',
+        type: 'exchange_request'
+      });
+    }
+
+    return res.json({
+      success: true,
+      exchange: { id: reqId, senderName: cleanName, contact: cleanContact, offeredMethod: cleanOffered, wantedMethods: cleanWanted }
+    });
+  } catch (err) {
+    console.error('Exchange request error:', err.message);
+    return res.status(500).json({ success: false, error: 'Unable to submit exchange request.' });
+  }
+});
+
+// Admin Store Panel (ONLY saleminformatiquedev@gmail.com)
+app.get('/admin/store', ensureAuthenticated, async (req, res) => {
+  if (!isStoreOwner(req.user)) {
+    return res.status(403).send('Access restricted to store owner (saleminformatiquedev@gmail.com).');
+  }
+  try {
+    const ordersRes = await pool.query(`SELECT * FROM store_orders ORDER BY "createdAt" DESC LIMIT 100`);
+    const exchangesRes = await pool.query(`SELECT * FROM exchange_requests ORDER BY "createdAt" DESC LIMIT 100`);
+    res.render('admin-store', {
+      storeOrders: ordersRes.rows,
+      exchangeRequests: exchangesRes.rows
+    });
+  } catch (err) {
+    console.error('Admin store error:', err.message);
+    res.status(500).send('Unable to load admin store panel.');
+  }
+});
+
+app.post('/admin/store/orders/:id/status', ensureAuthenticated, async (req, res) => {
+  if (!isStoreOwner(req.user)) return res.status(403).json({ success: false, error: 'Forbidden' });
+  const allowed = new Set(['PENDING', 'PAID', 'DELIVERED', 'REJECTED']);
+  const nextStatus = String(req.body.status || '').toUpperCase();
+  if (!allowed.has(nextStatus)) return res.status(400).json({ success: false, error: 'Invalid status' });
+  try {
+    await pool.query(`UPDATE store_orders SET status = $1 WHERE id = $2`, [nextStatus, req.params.id]);
+    res.redirect('/admin/store');
+  } catch (err) {
+    res.status(500).send('Unable to update order status.');
+  }
+});
+
+app.post('/admin/store/exchanges/:id/status', ensureAuthenticated, async (req, res) => {
+  if (!isStoreOwner(req.user)) return res.status(403).json({ success: false, error: 'Forbidden' });
+  const allowed = new Set(['NEW', 'IN_PROGRESS', 'ACCEPTED', 'DECLINED']);
+  const nextStatus = String(req.body.status || '').toUpperCase();
+  if (!allowed.has(nextStatus)) return res.status(400).json({ success: false, error: 'Invalid status' });
+  try {
+    await pool.query(`UPDATE exchange_requests SET status = $1 WHERE id = $2`, [nextStatus, req.params.id]);
+    res.redirect('/admin/store');
+  } catch (err) {
+    res.status(500).send('Unable to update exchange status.');
   }
 });
 
@@ -770,20 +992,16 @@ app.get('/login', (req, res) => {
   res.render('login', { msg: req.query.msg || null });
 });
 
-// New Method Form (before /services/:id)
+// New Method Form (restricted strictly to store owner saleminformatiquedev@gmail.com)
 app.get('/services/new', ensureAuthenticated, (req, res) => {
+  if (!isStoreOwner(req.user)) {
+    return res.status(403).send('Only the store owner (saleminformatiquedev@gmail.com) can add methods.');
+  }
   res.render('new-service');
 });
 
-// Detail of a guide/service with reviews (strips private download links before purchase)
+// Detail of a method/account offer with reviews (strips private download links before purchase)
 app.get('/services/:id', async (req, res) => {
-  // Visitors must sign up / sign in first, then land straight back on this exact offer
-  if (!req.isAuthenticated()) {
-    rememberReturnTo(req, res, req.originalUrl);
-    return res.redirect('/login?msg=' + encodeURIComponent(
-      'Create your free account or sign in to view this method — you will be taken straight back to it.'
-    ) + '&next=' + encodeURIComponent(req.originalUrl));
-  }
   try {
     const srvRes = await pool.query(`
       SELECT s.*, u.name as "sellerName", u.avatar as "sellerAvatar", u.bio as "sellerBio", u.skills as "sellerSkills"
@@ -792,7 +1010,7 @@ app.get('/services/:id', async (req, res) => {
       WHERE s.id = $1
     `, [req.params.id]);
 
-    if (srvRes.rows.length === 0) return res.status(404).send("Guide not found");
+    if (srvRes.rows.length === 0) return res.status(404).send("Method not found");
     const service = sanitizePublicService(formatRows(srvRes.rows)[0]);
 
     const reviewsRes = await pool.query(`
@@ -877,9 +1095,19 @@ app.post('/api/upload', ensureAuthenticated, upload.single('file'), (req, res) =
   }
 });
 
-// Publish new multi-format method (PDF, ZIP, Text, Video)
+// Publish new method (strictly restricted to store owner saleminformatiquedev@gmail.com)
 app.post('/services/new', ensureAuthenticated, upload.any(), async (req, res) => {
   try {
+    if (!isStoreOwner(req.user)) {
+      if (req.files && req.files.length > 0) {
+        for (const f of req.files) {
+          if (fs.existsSync(f.path)) {
+            try { fs.unlinkSync(f.path); } catch (_) {}
+          }
+        }
+      }
+      return res.status(403).send("Only the store owner (saleminformatiquedev@gmail.com) can publish methods.");
+    }
     if (isDemoUser(req.user)) {
       if (req.files && req.files.length > 0) {
         for (const f of req.files) {
@@ -890,7 +1118,11 @@ app.post('/services/new', ensureAuthenticated, upload.any(), async (req, res) =>
       }
       return res.status(403).send("Demo test accounts cannot publish new methods to the public catalog. Please sign in with your Google account.");
     }
-    const { title, description, category, price, pageCount, difficulty, videoUrl, formats } = req.body;
+    const {
+      title, description, category, price, pageCount, difficulty, videoUrl, formats,
+      unitCost, durationLabel, offerType, screenShareDemo, openToExchange, bulkAvailable,
+      supplierHandle, whatsappNumber, telegramBot
+    } = req.body;
 
     const cleanTitle = String(title || '').trim();
     const cleanDesc = String(description || '').trim();
@@ -988,27 +1220,55 @@ app.post('/services/new', ensureAuthenticated, upload.any(), async (req, res) =>
       primaryFileSize = '7.5 MB';
     }
 
-    const activeFormats = Array.isArray(formats) ? formats.join(',') : (formats || 'PDF,ZIP,TEXT');
-    const safePages = Math.min(Math.max(parseInt(pageCount, 10) || 40, 1), 5000);
+    const activeFormats = Array.isArray(formats) ? formats.join(',') : (formats || 'METHOD,SCRIPT,SCREEN-SHARE');
+    const safePages = Math.min(Math.max(parseInt(pageCount, 10) || 10, 1), 5000);
+    const cleanUnitCost = unitCost ? String(unitCost).trim().slice(0, 200) : null;
+    const cleanDuration = durationLabel ? String(durationLabel).trim().slice(0, 100) : null;
+    const cleanOfferType = ['METHOD', 'READY_ACCOUNT', 'BULK_DEAL'].includes(offerType) ? offerType : 'METHOD';
+    const hasScreenShare = screenShareDemo === 'on' || screenShareDemo === 'true' || screenShareDemo === true;
+    const isOpenExchange = openToExchange === 'on' || openToExchange === 'true' || openToExchange === true;
+    const hasBulk = bulkAvailable === 'on' || bulkAvailable === 'true' || bulkAvailable === true;
+    const cleanHandle = supplierHandle ? String(supplierHandle).trim().slice(0, 100) : '@Melasbit';
+    const cleanWhatsapp = whatsappNumber ? String(whatsappNumber).trim().slice(0, 40) : '+21627076373';
+    const cleanBot = telegramBot ? String(telegramBot).trim().slice(0, 100) : '@Licenziobot';
 
     await pool.query(`
-      INSERT INTO services (id, "sellerId", title, description, category, price, "deliveryDays", "fileUrl", "fileName", "fileSize", "pageCount", "difficulty", "formats", "videoUrl", "attachments")
-      VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)
+      INSERT INTO services (
+        id, "sellerId", title, description, category, price, "deliveryDays",
+        "fileUrl", "fileName", "fileSize", "pageCount", "difficulty", "formats", "videoUrl", "attachments",
+        "unitCost", "durationLabel", "offerType", "screenShareDemo", "openToExchange", "bulkAvailable",
+        "supplierHandle", "whatsappNumber", "telegramBot"
+      )
+      VALUES (
+        $1, $2, $3, $4, $5, $6, 1,
+        $7, $8, $9, $10, $11, $12, $13, $14::jsonb,
+        $15, $16, $17, $18, $19, $20,
+        $21, $22, $23
+      )
     `, [
       newId,
       req.user.id,
       cleanTitle,
       cleanDesc,
-      category || 'Development Methodology',
+      category || 'Digital Accounts & Methods',
       numericPrice,
       primaryFileUrl,
       primaryFileName,
       primaryFileSize,
       safePages,
-      difficulty || 'Intermediate',
+      difficulty || 'Beginner',
       activeFormats,
       safeVideoUrl,
-      JSON.stringify(attachments)
+      JSON.stringify(attachments),
+      cleanUnitCost,
+      cleanDuration,
+      cleanOfferType,
+      hasScreenShare,
+      isOpenExchange,
+      hasBulk,
+      cleanHandle,
+      cleanWhatsapp,
+      cleanBot
     ]);
 
     res.redirect('/services/' + newId);

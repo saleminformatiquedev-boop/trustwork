@@ -49,81 +49,60 @@
   <!-- Toast Notifications -->
   <div id="toast-container" class="fixed top-20 right-4 left-4 sm:left-auto sm:right-6 sm:w-80 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-  <!-- Minimalist Top Navigation -->
-  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-      
-      <!-- Brand & Total Users Counter -->
-      <div class="flex items-center gap-2.5 min-w-0">
-        <a href="/" class="flex items-center gap-2 font-bold text-base text-slate-900 tracking-tight shrink-0">
-          <span class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center text-xs">
-            <i class="fa-solid fa-layer-group"></i>
-          </span>
-          <span>TrustWork</span>
-        </a>
-        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-[11px] font-bold text-emerald-800 shrink-0" title="Total registered users on TrustWork">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          <i class="fa-solid fa-users text-[10px] text-emerald-600"></i>
-          <span id="header-users-count"><%= typeof totalUsersCount !== 'undefined' ? totalUsersCount : 0 %></span>
-          <span class="font-semibold text-emerald-700">Users</span>
-        </div>
-      </div>
+  <!-- Simple Top Navigation -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+
+      <!-- Brand -->
+      <a href="/" class="flex items-center gap-2.5 font-extrabold text-base text-slate-900 tracking-tight shrink-0">
+        <span class="w-8 h-8 rounded-lg bg-slate-900 text-[#F0B90B] flex items-center justify-center text-xs">
+          <i class="fa-solid fa-bolt"></i>
+        </span>
+        <span>@Melasbit</span>
+      </a>
 
       <!-- Desktop Navigation -->
       <nav class="hidden md:flex items-center gap-1 text-sm font-medium text-slate-600">
-        <a href="/" class="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/80 transition">
-          Explore
+        <a href="/#methods" class="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/80 transition">
+          Methods
         </a>
-        <a href="/services/new" class="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/80 transition">
-          Publish
+        <a href="/#checkout" class="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/80 transition">
+          Buy (Binance)
         </a>
-        <% if (user) { %>
-          <a href="/dashboard" class="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/80 transition">
-            Dashboard
-          </a>
-          <a href="/chat" class="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/80 transition flex items-center gap-1.5">
-            <span>Messages</span>
+        <a href="/#exchange" class="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/80 transition">
+          Exchange
+        </a>
+        <a href="/chat?support=1" class="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/80 transition flex items-center gap-1.5">
+          <span>DM Chat</span>
+          <% if (user) { %>
             <span id="header-unread-badge" class="tw-unread <%= (typeof unreadChatCount !== 'undefined' && unreadChatCount > 0) ? '' : 'hidden' %> px-1.5 py-1 text-[10px] min-w-[20px]">
               <%= typeof unreadChatCount !== 'undefined' ? (unreadChatCount > 9 ? '9+' : unreadChatCount) : 0 %>
             </span>
-          </a>
-        <% } %>
-        <% if (user && user.role === 'ADMIN') { %>
-          <a href="/admin/disputes" class="px-3 py-1.5 rounded-lg text-amber-700 bg-amber-50 hover:bg-amber-100 font-semibold transition">
-            Disputes
-          </a>
-        <% } %>
+          <% } %>
+        </a>
+        <a href="https://t.me/Licenziobot" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg text-sky-700 bg-sky-50 hover:bg-sky-100 font-semibold transition flex items-center gap-1.5">
+          <i class="fa-brands fa-telegram text-xs"></i>
+          <span>@Licenziobot</span>
+        </a>
       </nav>
 
-      <!-- User / Wallet -->
+      <!-- Account / Admin -->
       <div class="flex items-center gap-2">
         <% if (user) { %>
-          <!-- Browser Notification Toggle Button -->
-          <button
-            type="button"
-            id="browser-notif-btn"
-            onclick="window.requestBrowserNotificationPermission(true)"
-            title="Enable Browser Notifications"
-            class="relative w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-600 hover:text-slate-900 flex items-center justify-center transition">
-            <i id="browser-notif-icon" class="fa-regular fa-bell text-xs"></i>
-            <span id="browser-notif-dot" class="hidden absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
-          </button>
-
-          <a href="/dashboard" class="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200/70 transition py-1.5 px-3 rounded-lg text-xs font-semibold text-slate-800">
-            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span id="header-wallet-balance"><%= user.walletBalance.toFixed(2) %></span>
-            <span class="text-slate-500">USDT</span>
+          <% if (user.role === 'ADMIN' || String(user.email || '').toLowerCase() === 'saleminformatiquedev@gmail.com') { %>
+            <a href="/admin/store" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold transition">
+              <i class="fa-solid fa-inbox"></i>
+              <span>Admin Orders</span>
+            </a>
+          <% } %>
+          <a href="/chat?support=1" class="flex items-center gap-2 p-1 rounded-full hover:bg-slate-100 transition" title="<%= user.name %>">
+            <img src="<%= user.avatar || 'https://api.dicebear.com/7.x/initials/svg?seed=' + user.name %>" alt="<%= user.name %>" class="w-8 h-8 rounded-full border border-slate-200 object-cover">
           </a>
-
-          <a href="/dashboard" class="flex items-center gap-2 p-1 rounded-full hover:bg-slate-100 transition" title="<%= user.name %>">
-            <img src="<%= user.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.name %>" alt="<%= user.name %>" class="w-8 h-8 rounded-full border border-slate-200 object-cover">
-          </a>
-
           <a href="/logout" title="Sign out" class="text-slate-400 hover:text-slate-700 transition text-sm p-1.5">
             <i class="fa-solid fa-arrow-right-from-bracket"></i>
           </a>
         <% } else { %>
-          <a href="/login" class="inline-flex items-center justify-center px-4 py-2 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition">
+          <a href="/login" class="inline-flex items-center justify-center px-3.5 py-2 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition">
             Sign In
           </a>
         <% } %>
@@ -134,29 +113,28 @@
 
   <!-- Mobile Bottom Navigation -->
   <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 flex items-center justify-around h-14 px-2">
-    <a href="/" class="flex flex-col items-center justify-center text-[11px] font-medium text-slate-600 hover:text-slate-900 flex-1 py-1">
-      <i class="fa-solid fa-compass text-sm mb-0.5"></i>
-      <span>Explore</span>
+    <a href="/#methods" class="flex flex-col items-center justify-center text-[11px] font-medium text-slate-600 hover:text-slate-900 flex-1 py-1">
+      <i class="fa-solid fa-layer-group text-sm mb-0.5"></i>
+      <span>Methods</span>
     </a>
-    <a href="/services/new" class="flex flex-col items-center justify-center text-[11px] font-medium text-slate-600 hover:text-slate-900 flex-1 py-1">
-      <i class="fa-solid fa-plus text-sm mb-0.5"></i>
-      <span>Publish</span>
+    <a href="/#checkout" class="flex flex-col items-center justify-center text-[11px] font-medium text-slate-600 hover:text-slate-900 flex-1 py-1">
+      <i class="fa-solid fa-coins text-sm mb-0.5 text-amber-500"></i>
+      <span>Binance</span>
     </a>
-    <% if (user) { %>
-      <% const hasUnreadNav = (typeof unreadChatCount !== 'undefined' && unreadChatCount > 0); %>
-      <a id="bottom-messages-link" href="/chat" class="flex flex-col items-center justify-center text-[11px] <%= hasUnreadNav ? 'font-bold text-slate-900' : 'font-medium text-slate-600' %> hover:text-slate-900 flex-1 py-1 relative">
-        <div class="relative">
-          <i id="bottom-messages-icon" class="<%= hasUnreadNav ? 'fa-solid text-red-500' : 'fa-regular' %> fa-comment text-base mb-0.5"></i>
+    <a href="/#exchange" class="flex flex-col items-center justify-center text-[11px] font-medium text-slate-600 hover:text-slate-900 flex-1 py-1">
+      <i class="fa-solid fa-arrows-rotate text-sm mb-0.5"></i>
+      <span>Exchange</span>
+    </a>
+    <a id="bottom-messages-link" href="/chat?support=1" class="flex flex-col items-center justify-center text-[11px] font-medium text-slate-600 hover:text-slate-900 flex-1 py-1 relative">
+      <div class="relative">
+        <i id="bottom-messages-icon" class="fa-regular fa-comment text-base mb-0.5"></i>
+        <% if (user) { %>
           <span id="bottom-unread-badge" class="tw-unread <%= (typeof unreadChatCount !== 'undefined' && unreadChatCount > 0) ? '' : 'hidden' %> absolute -top-2 -right-4 px-1 py-[3px] text-[10px] min-w-[18px]">
             <%= typeof unreadChatCount !== 'undefined' ? (unreadChatCount > 9 ? '9+' : unreadChatCount) : 0 %>
           </span>
-        </div>
-        <span>Messages</span>
-      </a>
-    <% } %>
-    <a href="<%= user ? '/dashboard' : '/login' %>" class="flex flex-col items-center justify-center text-[11px] font-medium text-slate-600 hover:text-slate-900 flex-1 py-1">
-      <i class="fa-regular fa-user text-sm mb-0.5"></i>
-      <span><%= user ? 'Account' : 'Sign In' %></span>
+        <% } %>
+      </div>
+      <span>DM Chat</span>
     </a>
   </nav>
 

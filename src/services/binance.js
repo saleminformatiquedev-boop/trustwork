@@ -3,7 +3,8 @@ const crypto = require('crypto');
 require('dotenv').config();
 
 const BINANCE_API_BASE = 'https://api.binance.com';
-const PLATFORM_BINANCE_PAY_ID = process.env.PLATFORM_BINANCE_PAY_ID || process.env.BINANCE_PAY_ID || '1229901779';
+const rawPayId = (process.env.PLATFORM_BINANCE_PAY_ID || process.env.BINANCE_PAY_ID || '').trim();
+const PLATFORM_BINANCE_PAY_ID = (!rawPayId || rawPayId === 'BINANCE-PAY-789456') ? '1229901779' : rawPayId;
 const DEFAULT_USDT_TRC20 = process.env.USDT_TRC20_ADDRESS || 'TNw9pxbxwf6qtvymRSnr2quaWxVCi5fwqu';
 const DEFAULT_USDT_BEP20 = process.env.USDT_BEP20_ADDRESS || '0x284b2c731c9a9449f88f42bc707c05511bb9b222';
 // Reject any historical Binance transaction created before the platform API integration

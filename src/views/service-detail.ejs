@@ -1,128 +1,262 @@
 <%- include('partials/header', { title: service.title }) %>
 
+<%
+  const supplierHandle = service.supplierHandle || service.sellerName || '@Melasbit';
+  const whatsappRaw = service.whatsappNumber || '+21627076373';
+  const whatsappClean = String(whatsappRaw).replace(/[^0-9]/g, '');
+  const telegramBot = service.telegramBot || '@Licenziobot';
+  const telegramBotSlug = String(telegramBot).replace(/^@/, '');
+  const waOrderUrl = `https://wa.me/${whatsappClean}?text=${encodeURIComponent(`Hello ${supplierHandle}! I want to order: ${service.title} ($${service.price.toFixed(0)}). Can we do a quick screen-share demo?`)}`;
+  const waExchangeUrl = `https://wa.me/${whatsappClean}?text=${encodeURIComponent(`Hello ${supplierHandle}! I'm a supplier and I'd like to propose a method exchange for: ${service.title}.`)}`;
+%>
+
 <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-  
+
   <a href="/" class="inline-flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-900 mb-6 transition">
-    <i class="fa-solid fa-arrow-left text-[10px]"></i> Back to catalog
+    <i class="fa-solid fa-arrow-left text-[10px]"></i> Back to available methods
   </a>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-    
-    <!-- Main Column: Method Overview -->
+
+    <!-- Main Column: Method & Cost Overview -->
     <div class="lg:col-span-2 bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/90 space-y-6">
-      
+
       <div>
-        <span class="text-xs font-medium text-slate-400"><%= service.category %> • <%= service.pageCount || 40 %> pages • <%= service.difficulty || 'Intermediate' %></span>
+        <div class="flex flex-wrap items-center gap-2 mb-2">
+          <span class="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-md">
+            <%= service.category %>
+          </span>
+          <% if (service.durationLabel) { %>
+            <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md">
+              <%= service.durationLabel %>
+            </span>
+          <% } %>
+          <% if (service.screenShareDemo !== false) { %>
+            <span class="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1">
+              <i class="fa-solid fa-display text-[10px]"></i> Live Screen-Share Demo
+            </span>
+          <% } %>
+        </div>
+
         <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1.5 leading-snug">
           <%= service.title %>
         </h1>
       </div>
 
-      <!-- Author & Direct Contact -->
-      <div class="flex items-center justify-between py-4 border-y border-slate-100 gap-4">
-        <a href="/profile/<%= service.sellerId %>" class="flex items-center gap-3 min-w-0 group">
-          <img src="<%= service.sellerAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + service.sellerName %>" class="w-10 h-10 rounded-full border border-slate-200 object-cover flex-shrink-0">
-          <div class="min-w-0">
-            <div class="font-semibold text-slate-900 text-sm group-hover:underline truncate"><%= service.sellerName %></div>
-            <div class="text-xs text-slate-400 truncate"><%= service.sellerBio || 'Verified Author' %></div>
+      <!-- Highlighted Cost Breakdown -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="p-3.5 rounded-xl bg-slate-900 text-white">
+          <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold block">Method Price</span>
+          <div class="text-xl font-extrabold text-white mt-0.5">
+            $<%= Number.isInteger(service.price) ? service.price : service.price.toFixed(2) %>
+            <span class="text-xs font-medium text-slate-400">USDT</span>
           </div>
-        </a>
-        <% if (!user || user.id !== service.sellerId) { %>
-        <a href="/chat?recipientId=<%= encodeURIComponent(service.sellerId) %>&serviceId=<%= encodeURIComponent(service.id) %>" class="text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 flex-shrink-0">
-          <i class="fa-regular fa-comments"></i> Chat with seller
-        </a>
-        <% } %>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200/80">
+          <span class="text-[11px] uppercase tracking-wider text-emerald-700 font-semibold block">Operating Cost</span>
+          <div class="text-sm font-extrabold text-emerald-900 mt-1">
+            <%= service.unitCost || 'Included / Ready to use' %>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-indigo-50 border border-indigo-200/80">
+          <span class="text-[11px] uppercase tracking-wider text-indigo-700 font-semibold block">Live Proof</span>
+          <div class="text-sm font-extrabold text-indigo-900 mt-1">
+            <%= service.screenShareDemo !== false ? 'Screen-Share Included' : 'Guide & Support' %>
+          </div>
+        </div>
       </div>
 
-      <!-- Syllabus / Description -->
+      <!-- Direct Supplier Card -->
+      <div class="flex flex-wrap items-center justify-between py-4 border-y border-slate-100 gap-4">
+        <a href="/profile/<%= service.sellerId %>" class="flex items-center gap-3 min-w-0 group">
+          <img src="<%= service.sellerAvatar || 'https://api.dicebear.com/7.x/initials/svg?seed=' + supplierHandle %>" class="w-10 h-10 rounded-full border border-slate-200 object-cover flex-shrink-0">
+          <div class="min-w-0">
+            <div class="font-bold text-slate-900 text-sm group-hover:underline truncate"><%= supplierHandle %></div>
+            <div class="text-xs text-slate-500 truncate"><%= service.sellerBio || 'Direct Supplier • Digital Accounts & Tools' %></div>
+          </div>
+        </a>
+        <div class="flex items-center gap-2">
+          <% if (!user || user.id !== service.sellerId) { %>
+            <a href="/chat?recipientId=<%= encodeURIComponent(service.sellerId) %>&serviceId=<%= encodeURIComponent(service.id) %>" class="text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 flex-shrink-0">
+              <i class="fa-regular fa-comments"></i> In-App Chat
+            </a>
+          <% } %>
+          <a href="<%= waOrderUrl %>" target="_blank" rel="noopener noreferrer" class="text-xs font-bold text-white bg-[#25D366] hover:bg-[#1ebe5d] px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 flex-shrink-0">
+            <i class="fa-brands fa-whatsapp text-sm"></i> WhatsApp
+          </a>
+        </div>
+      </div>
+
+      <!-- Method Details -->
       <div>
-        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">What You Will Learn & Build</h2>
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">Method Details &amp; Operating Logic</h2>
         <div class="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
           <%= service.description %>
         </div>
       </div>
 
-      <!-- Included Files -->
+      <!-- Included Benefits -->
       <div class="pt-4 border-t border-slate-100">
-        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Included in This Package</h2>
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">What's Included</h2>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
           <div class="p-3 rounded-xl bg-[#FAFAFA] border border-slate-200/80">
-            <i class="fa-solid fa-file-pdf text-rose-500 mb-1 block"></i>
-            <strong class="text-slate-800 block">PDF Guide</strong>
-            <span class="text-slate-400 text-[11px]"><%= service.pageCount || 40 %> pages</span>
+            <i class="fa-solid fa-display text-indigo-600 mb-1 block"></i>
+            <strong class="text-slate-800 block">Screen-Share</strong>
+            <span class="text-slate-500 text-[11px]">Live walkthrough</span>
           </div>
           <div class="p-3 rounded-xl bg-[#FAFAFA] border border-slate-200/80">
-            <i class="fa-solid fa-file-zipper text-amber-500 mb-1 block"></i>
-            <strong class="text-slate-800 block">ZIP Archive</strong>
-            <span class="text-slate-400 text-[11px]">Code & templates</span>
+            <i class="fa-solid fa-code text-emerald-600 mb-1 block"></i>
+            <strong class="text-slate-800 block">Method / Script</strong>
+            <span class="text-slate-500 text-[11px]">Ready to run</span>
           </div>
           <div class="p-3 rounded-xl bg-[#FAFAFA] border border-slate-200/80">
-            <i class="fa-solid fa-terminal text-blue-500 mb-1 block"></i>
-            <strong class="text-slate-800 block">TXT Scripts</strong>
-            <span class="text-slate-400 text-[11px]">Ready commands</span>
+            <i class="fa-solid fa-boxes-stacked text-amber-600 mb-1 block"></i>
+            <strong class="text-slate-800 block">Bulk Deals</strong>
+            <span class="text-slate-500 text-[11px]"><%= service.bulkAvailable !== false ? 'Wholesale rates' : 'Single license' %></span>
           </div>
           <div class="p-3 rounded-xl bg-[#FAFAFA] border border-slate-200/80">
-            <i class="fa-solid fa-play text-purple-500 mb-1 block"></i>
-            <strong class="text-slate-800 block">Video</strong>
-            <span class="text-slate-400 text-[11px]">Walkthrough</span>
+            <i class="fa-solid fa-arrows-rotate text-sky-600 mb-1 block"></i>
+            <strong class="text-slate-800 block">Exchange</strong>
+            <span class="text-slate-500 text-[11px]"><%= service.openToExchange !== false ? 'Open to suppliers' : 'Direct sale only' %></span>
           </div>
         </div>
       </div>
 
     </div>
 
-    <!-- Side Column: Instant Escrow Checkout -->
+    <!-- Side Column: Direct Order, WhatsApp & USDT Escrow -->
     <div class="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200/90 sticky top-24 space-y-5">
-      
+
       <div>
-        <span class="text-xs text-slate-400 font-medium">Instant full package access</span>
+        <span class="text-xs text-slate-400 font-medium">Direct Supplier Price</span>
         <div class="text-3xl font-extrabold text-slate-900 mt-0.5">
-          <%= service.price.toFixed(2) %> <span class="text-sm font-semibold text-slate-500">USDT</span>
+          $<%= Number.isInteger(service.price) ? service.price : service.price.toFixed(2) %>
+          <span class="text-sm font-semibold text-slate-500">USDT</span>
+        </div>
+        <% if (service.unitCost) { %>
+          <p class="text-xs font-semibold text-emerald-700 mt-1">
+            Cost: <%= service.unitCost %>
+          </p>
+        <% } %>
+      </div>
+
+      <!-- Direct Binance Payment (Binance Pay ID & USDT BEP20) -->
+      <div class="p-4 rounded-xl bg-amber-50/70 border border-amber-200/90 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-extrabold uppercase tracking-wider text-amber-900">
+            <i class="fa-solid fa-coins text-amber-600 mr-1"></i> Pay via Binance (USDT)
+          </span>
+          <span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">0% Fee / BEP20</span>
+        </div>
+
+        <!-- Binance Pay ID -->
+        <div class="bg-white px-3 py-2 rounded-lg border border-amber-200/80 flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <span class="text-[10px] text-slate-400 uppercase font-semibold block">Binance Pay ID</span>
+            <code id="detail-binance-id" class="font-mono font-extrabold text-xs text-slate-900 select-all"><%= typeof platformBinancePayId !== 'undefined' ? platformBinancePayId : '1229901779' %></code>
+          </div>
+          <button type="button" onclick="copyDetailPay('detail-binance-id', 'Binance Pay ID')" class="px-2 py-1 rounded bg-[#F0B90B] hover:bg-[#FCD535] text-slate-950 font-bold text-[11px] shrink-0 transition">Copy ID</button>
+        </div>
+
+        <!-- USDT BEP20 -->
+        <div class="bg-white p-2.5 rounded-lg border border-slate-200 space-y-2">
+          <div class="flex items-center justify-between text-[10px]">
+            <span class="font-bold text-slate-700 uppercase">USDT BEP20 (BNB Smart Chain)</span>
+          </div>
+          <% if (typeof bep20QrDataUrl !== 'undefined' && bep20QrDataUrl) { %>
+            <div class="flex justify-center">
+              <img src="<%= bep20QrDataUrl %>" alt="USDT BEP20 QR" class="w-28 h-28 object-contain rounded border border-slate-100 p-1">
+            </div>
+          <% } %>
+          <div class="flex items-center justify-between gap-1.5 bg-slate-50 px-2 py-1.5 rounded border border-slate-200/80">
+            <code id="detail-bep20-addr" class="font-mono text-[10px] font-bold text-slate-800 truncate select-all"><%= typeof bep20Address !== 'undefined' ? bep20Address : '0x284b2c731c9a9449f88f42bc707c05511bb9b222' %></code>
+            <button type="button" onclick="copyDetailPay('detail-bep20-addr', 'USDT BEP20 Address')" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] shrink-0 transition">Copy</button>
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <input type="text" id="detail-txid-input" placeholder="Paste Binance Order ID or BEP20 TxID..." class="w-full px-2.5 py-2 text-[11px] font-mono bg-white border border-amber-200 rounded-lg focus:border-slate-900 focus:outline-none">
+          <button type="button" id="detail-wa-paid-btn" class="w-full py-2 px-3 rounded-lg bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold text-xs transition flex items-center justify-center gap-1.5">
+            <i class="fa-brands fa-whatsapp text-sm"></i>
+            <span>I Paid — Send Proof on WhatsApp</span>
+          </button>
         </div>
       </div>
 
-      <% if (user) { %>
-        <% if (user.id === service.sellerId) { %>
-          <div class="p-3 bg-slate-100 rounded-xl text-xs text-slate-600 text-center font-medium">
-            You are the author of this method.
-          </div>
-        <% } else { %>
-          <form action="/orders/create" method="POST" class="space-y-3">
-            <input type="hidden" name="serviceId" value="<%= service.id %>">
-            <input type="hidden" name="requirements" value="Instant purchase of package: <%= service.title %>">
-
-            <button type="submit" <%= user.walletBalance < service.price ? 'disabled' : '' %> class="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-2">
-              <span>Buy & Download Now</span>
-            </button>
-
-            <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
-              <span>Your balance:</span>
-              <span class="font-semibold <%= user.walletBalance >= service.price ? 'text-emerald-600' : 'text-rose-600' %>">
-                <%= user.walletBalance.toFixed(2) %> USDT
-              </span>
-            </div>
-
-            <% if (user.walletBalance < service.price) { %>
-              <a href="/dashboard" class="block text-center text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 py-2 rounded-lg transition">
-                Top up balance via Binance Pay →
-              </a>
-            <% } %>
-          </form>
-        <% } %>
-      <% } else { %>
-        <a href="/login" class="w-full inline-flex items-center justify-center py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm rounded-xl transition">
-          Sign in to purchase
+      <!-- Direct WhatsApp Order / Screen-Share CTA -->
+      <div class="space-y-2.5">
+        <a href="<%= waOrderUrl %>" target="_blank" rel="noopener noreferrer"
+           class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2">
+          <i class="fa-brands fa-whatsapp text-sm text-[#25D366]"></i>
+          <span>Ask for Live Screen-Share First</span>
         </a>
-      <% } %>
 
-      <div class="pt-4 border-t border-slate-100 space-y-3 text-xs text-slate-500 leading-relaxed">
+        <% if (service.openToExchange !== false) { %>
+          <a href="<%= waExchangeUrl %>" target="_blank" rel="noopener noreferrer"
+             class="w-full py-2.5 px-4 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span>Propose Method Exchange</span>
+          </a>
+        <% } %>
+
+        <a href="https://t.me/<%= telegramBotSlug %>" target="_blank" rel="noopener noreferrer"
+           class="w-full py-2.5 px-4 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-2">
+          <i class="fa-brands fa-telegram text-sm"></i>
+          <span>All Products: <%= telegramBot %></span>
+        </a>
+      </div>
+
+      <!-- Automated USDT Escrow Checkout -->
+      <div class="pt-4 border-t border-slate-100 space-y-3">
+        <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Or Buy via Automated USDT Escrow</div>
+
+        <% if (user) { %>
+          <% if (user.id === service.sellerId) { %>
+            <div class="p-3 bg-slate-100 rounded-xl text-xs text-slate-600 text-center font-medium">
+              You are the supplier of this offer.
+            </div>
+          <% } else { %>
+            <form action="/orders/create" method="POST" class="space-y-3">
+              <input type="hidden" name="serviceId" value="<%= service.id %>">
+              <input type="hidden" name="requirements" value="Escrow purchase of: <%= service.title %>">
+
+              <button type="submit" <%= user.walletBalance < service.price ? 'disabled' : '' %> class="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-shield-halved text-xs"></i>
+                <span>Buy with Escrow ($<%= service.price.toFixed(2) %>)</span>
+              </button>
+
+              <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
+                <span>Your balance:</span>
+                <span class="font-semibold <%= user.walletBalance >= service.price ? 'text-emerald-600' : 'text-rose-600' %>">
+                  <%= user.walletBalance.toFixed(2) %> USDT
+                </span>
+              </div>
+
+              <% if (user.walletBalance < service.price) { %>
+                <a href="/dashboard" class="block text-center text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 py-2 rounded-lg transition">
+                  Top up balance via Binance Pay →
+                </a>
+              <% } %>
+            </form>
+          <% } %>
+        <% } else { %>
+          <a href="/login?next=<%= encodeURIComponent('/services/' + service.id) %>" class="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition">
+            <i class="fa-solid fa-shield-halved text-[11px]"></i>
+            <span>Sign in to Buy with USDT Escrow</span>
+          </a>
+        <% } %>
+      </div>
+
+      <div class="pt-4 border-t border-slate-100 space-y-2.5 text-xs text-slate-500 leading-relaxed">
+        <div class="flex items-start gap-2">
+          <i class="fa-solid fa-display text-indigo-600 mt-0.5"></i>
+          <span><strong>Live Screen-Share:</strong> <%= supplierHandle %> will share screen and show you how it works!</span>
+        </div>
         <div class="flex items-start gap-2">
           <i class="fa-solid fa-shield-halved text-emerald-600 mt-0.5"></i>
-          <span><strong>Escrow protection:</strong> your USDT stays safely locked until you download and approve the files.</span>
-        </div>
-        <div class="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900 flex items-start gap-2">
-          <i class="fa-regular fa-clock text-amber-600 mt-0.5 shrink-0"></i>
-          <span><strong>Only 2 days to validate:</strong> You have <strong>2 days (48 hours)</strong> to validate if the method is good or not. After 2 days, the review will be for the <strong>Admin</strong>.</span>
+          <span><strong>48h Escrow Protection:</strong> Funds stay safely locked until you validate the method.</span>
         </div>
       </div>
 
@@ -131,5 +265,27 @@
   </div>
 
 </div>
+
+<script>
+  function copyDetailPay(id, label) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const val = el.textContent.trim();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(val).then(() => {
+        if (window.showToast) window.showToast(`${label} copied!`, 'success');
+      }).catch(() => {});
+    }
+  }
+
+  const detailPaidBtn = document.getElementById('detail-wa-paid-btn');
+  if (detailPaidBtn) {
+    detailPaidBtn.addEventListener('click', () => {
+      const txId = (document.getElementById('detail-txid-input').value || '').trim();
+      const msg = `Hello <%= supplierHandle %>! I just paid $<%= service.price.toFixed(2) %> USDT via Binance for: <%= service.title %>.${txId ? '\nOrder ID / TxID: ' + txId : ''}\nPlease confirm and start screen-share!`;
+      window.open(`https://wa.me/<%= whatsappClean %>?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+    });
+  }
+</script>
 
 <%- include('partials/footer') %>
