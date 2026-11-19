@@ -217,7 +217,7 @@ async function initDatabase() {
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "includesScript" BOOLEAN DEFAULT FALSE;
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "supplierHandle" VARCHAR(128) DEFAULT '@Melasbit';
       ALTER TABLE services ADD COLUMN IF NOT EXISTS "whatsappNumber" VARCHAR(64) DEFAULT '+21627076373';
-      ALTER TABLE services ADD COLUMN IF NOT EXISTS "telegramBot" VARCHAR(128) DEFAULT '@Licenziobot';
+      ALTER TABLE services ADD COLUMN IF NOT EXISTS "telegramBot" VARCHAR(128) DEFAULT '@LicenzioChannel';
       
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS "fileUrl" TEXT;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS "fileName" TEXT;
@@ -299,7 +299,7 @@ async function initDatabase() {
           'saleminformatiquedev@gmail.com',
           '@Melasbit',
           'https://api.dicebear.com/7.x/initials/svg?seed=Melasbit&backgroundColor=0f172a',
-          'Owner & direct supplier for digital accounts, working methods & scripts. Bot: @Licenziobot',
+          'Owner & direct supplier for digital accounts, working methods & scripts. Channel: @LicenzioChannel',
           'Digital Accounts, Working Methods, Automation Scripts, Bulk Deals, Method Exchange',
           'ADMIN',
           0.00,
@@ -682,7 +682,7 @@ async function initDatabase() {
           10, $7, $8, $9::jsonb,
           $10, $11, $12,
           $13, $14, $15,
-          '@Melasbit', '+21627076373', '@Licenziobot'
+          '@Melasbit', '+21627076373', '@LicenzioChannel'
         )
         ON CONFLICT (id) DO UPDATE SET
           "sellerId" = EXCLUDED."sellerId",

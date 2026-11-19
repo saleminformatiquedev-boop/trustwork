@@ -1253,7 +1253,7 @@ app.post('/services/new', ensureAuthenticated, upload.any(), async (req, res) =>
     const hasBulk = bulkAvailable === 'on' || bulkAvailable === 'true' || bulkAvailable === true;
     const cleanHandle = supplierHandle ? String(supplierHandle).trim().slice(0, 100) : '@Melasbit';
     const cleanWhatsapp = whatsappNumber ? String(whatsappNumber).trim().slice(0, 40) : '+21627076373';
-    const cleanBot = telegramBot ? String(telegramBot).trim().slice(0, 100) : '@Licenziobot';
+    const cleanBot = telegramBot ? String(telegramBot).trim().slice(0, 100) : '@LicenzioChannel';
 
     await pool.query(`
       INSERT INTO services (

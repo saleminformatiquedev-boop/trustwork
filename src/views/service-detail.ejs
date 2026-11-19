@@ -4,7 +4,7 @@
   const supplierHandle = service.supplierHandle || service.sellerName || '@Melasbit';
   const whatsappRaw = service.whatsappNumber || '+21627076373';
   const whatsappClean = String(whatsappRaw).replace(/[^0-9]/g, '');
-  const telegramBot = service.telegramBot || '@Licenziobot';
+  const telegramBot = service.telegramBot || '@LicenzioChannel';
   const telegramBotSlug = String(telegramBot).replace(/^@/, '');
   const waOrderUrl = `https://wa.me/${whatsappClean}?text=${encodeURIComponent(`Hello ${supplierHandle}! I want to order: ${service.title} ($${service.price.toFixed(0)}). Can we do a quick screen-share demo?`)}`;
   const waExchangeUrl = `https://wa.me/${whatsappClean}?text=${encodeURIComponent(`Hello ${supplierHandle}! I'm a supplier and I'd like to propose a method exchange for: ${service.title}.`)}`;
