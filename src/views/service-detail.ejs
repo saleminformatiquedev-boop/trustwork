@@ -21,6 +21,13 @@
     <!-- Main Column: Method & Cost Overview -->
     <div class="lg:col-span-2 bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/90 space-y-6">
 
+      <% if (['srv_notion_edu_plus_1y', 'srv_adobe_express_6m_script', 'srv_capcut_ready'].includes(service.id)) { %>
+        <div class="px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs sm:text-sm font-extrabold tracking-wide flex items-center justify-center gap-2 shadow-sm">
+          <i class="fa-solid fa-flag text-[#F0B90B]"></i>
+          <span>Tested by the admin @Melasbit</span>
+        </div>
+      <% } %>
+
       <div>
         <div class="flex flex-wrap items-center gap-2 mb-2">
           <span class="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-md">

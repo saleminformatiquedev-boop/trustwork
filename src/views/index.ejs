@@ -71,6 +71,7 @@
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="methods-list">
     <% if (services && services.length > 0) { %>
       <% services.forEach((service, idx) => { %>
+        <% const isAdminTested = ['srv_notion_edu_plus_1y', 'srv_adobe_express_6m_script', 'srv_capcut_ready'].includes(service.id); %>
         <div
           class="method-select-card cursor-pointer bg-white rounded-2xl border-2 <%= idx === 0 ? 'border-slate-900 ring-2 ring-slate-900/10' : 'border-slate-200 hover:border-slate-400' %> p-5 transition flex flex-col justify-between select-none"
           data-id="<%= service.id %>"
@@ -79,6 +80,13 @@
           data-selected="<%= idx === 0 ? 'true' : 'false' %>">
 
           <div>
+            <% if (isAdminTested) { %>
+              <div class="mb-3 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-extrabold tracking-wide flex items-center justify-center gap-2 shadow-sm">
+                <i class="fa-solid fa-flag text-[#F0B90B]"></i>
+                <span>Tested by the admin @Melasbit</span>
+              </div>
+            <% } %>
+
             <div class="flex items-center justify-between gap-2 mb-3">
               <span class="method-check inline-flex items-center gap-1.5 text-xs font-bold <%= idx === 0 ? 'text-emerald-700' : 'text-slate-400' %>">
                 <i class="<%= idx === 0 ? 'fa-solid fa-circle-check text-emerald-600' : 'fa-regular fa-circle text-slate-300' %> text-base"></i>
