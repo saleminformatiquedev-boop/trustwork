@@ -133,7 +133,7 @@
 
     </div>
 
-    <!-- Side Column: Direct Order, WhatsApp & USDT Escrow -->
+    <!-- Side Column: Direct Order, WhatsApp & Binance Payment -->
     <div class="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200/90 sticky top-24 space-y-5">
 
       <div>
@@ -215,55 +215,10 @@
         </a>
       </div>
 
-      <!-- Automated USDT Escrow Checkout -->
-      <div class="pt-4 border-t border-slate-100 space-y-3">
-        <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Or Buy via Automated USDT Escrow</div>
-
-        <% if (user) { %>
-          <% if (user.id === service.sellerId) { %>
-            <div class="p-3 bg-slate-100 rounded-xl text-xs text-slate-600 text-center font-medium">
-              You are the supplier of this offer.
-            </div>
-          <% } else { %>
-            <form action="/orders/create" method="POST" class="space-y-3">
-              <input type="hidden" name="serviceId" value="<%= service.id %>">
-              <input type="hidden" name="requirements" value="Escrow purchase of: <%= service.title %>">
-
-              <button type="submit" <%= user.walletBalance < service.price ? 'disabled' : '' %> class="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-2">
-                <i class="fa-solid fa-shield-halved text-xs"></i>
-                <span>Buy with Escrow ($<%= service.price.toFixed(2) %>)</span>
-              </button>
-
-              <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
-                <span>Your balance:</span>
-                <span class="font-semibold <%= user.walletBalance >= service.price ? 'text-emerald-600' : 'text-rose-600' %>">
-                  <%= user.walletBalance.toFixed(2) %> USDT
-                </span>
-              </div>
-
-              <% if (user.walletBalance < service.price) { %>
-                <a href="/dashboard" class="block text-center text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 py-2 rounded-lg transition">
-                  Top up balance via Binance Pay →
-                </a>
-              <% } %>
-            </form>
-          <% } %>
-        <% } else { %>
-          <a href="/login?next=<%= encodeURIComponent('/services/' + service.id) %>" class="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition">
-            <i class="fa-solid fa-shield-halved text-[11px]"></i>
-            <span>Sign in to Buy with USDT Escrow</span>
-          </a>
-        <% } %>
-      </div>
-
       <div class="pt-4 border-t border-slate-100 space-y-2.5 text-xs text-slate-500 leading-relaxed">
         <div class="flex items-start gap-2">
           <i class="fa-solid fa-display text-indigo-600 mt-0.5"></i>
           <span><strong>Live Screen-Share:</strong> <%= supplierHandle %> will share screen and show you how it works!</span>
-        </div>
-        <div class="flex items-start gap-2">
-          <i class="fa-solid fa-shield-halved text-emerald-600 mt-0.5"></i>
-          <span><strong>48h Escrow Protection:</strong> Funds stay safely locked until you validate the method.</span>
         </div>
       </div>
 

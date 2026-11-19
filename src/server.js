@@ -751,12 +751,18 @@ io.on('connection', (socket) => {
 // ==========================================
 
 const STORE_OWNER_EMAIL = 'saleminformatiquedev@gmail.com';
+const ADMIN_TESTED_IDS = new Set([
+  'srv_notion_edu_plus_1y',
+  'srv_adobe_express_6m_script',
+  'srv_capcut_ready'
+]);
 function isStoreOwner(user) {
   if (!user) return false;
   return user.role === 'ADMIN' || String(user.email || '').toLowerCase() === STORE_OWNER_EMAIL;
 }
 
-// Homepage: Simple Direct Storefront (ONLY saleminformatiquedev@gmail.com sells the 3 methods)
+// Homepage: Simple Direct Storefront
+// Unauthenticated visitors/crawlers ONLY see unverified $1.50 methods; logged-in users see all methods including Admin-Tested (@Melasbit)
 app.get('/', async (req, res) => {
   try {
     const srvRes = await pool.query(`
@@ -778,7 +784,14 @@ app.get('/', async (req, res) => {
         END ASC,
         s.title ASC
     `, [STORE_OWNER_EMAIL]);
-    res.render('index', { services: formatRows(srvRes.rows).map(sanitizePublicService) });
+    const isLogged = req.isAuthenticated();
+    const visibleRows = isLogged
+      ? srvRes.rows
+      : srvRes.rows.filter(r => !ADMIN_TESTED_IDS.has(r.id));
+    res.render('index', {
+      services: formatRows(visibleRows).map(sanitizePublicService),
+      hiddenVerifiedCount: isLogged ? 0 : ADMIN_TESTED_IDS.size
+    });
   } catch (err) {
     console.error("Homepage error:", err.message);
     res.status(500).send("Unable to load methods at the moment.");
@@ -801,7 +814,14 @@ app.get('/exchange', async (req, res) => {
           ELSE 4
         END ASC
     `, [STORE_OWNER_EMAIL]);
-    res.render('exchange', { services: formatRows(srvRes.rows) });
+    const isLogged = req.isAuthenticated();
+    const visibleRows = isLogged
+      ? srvRes.rows
+      : srvRes.rows.filter(r => !ADMIN_TESTED_IDS.has(r.id));
+    res.render('exchange', {
+      services: formatRows(visibleRows),
+      hiddenVerifiedCount: isLogged ? 0 : ADMIN_TESTED_IDS.size
+    });
   } catch (err) {
     console.error("Exchange page error:", err.message);
     res.status(500).send("Unable to load exchange page.");
@@ -1023,8 +1043,12 @@ app.get('/services/new', ensureAuthenticated, (req, res) => {
   res.render('new-service');
 });
 
-// Detail of a method/account offer with reviews (strips private download links before purchase)
+// Detail of a method/account offer with reviews (admin-tested methods require login)
 app.get('/services/:id', async (req, res) => {
+  if (!req.isAuthenticated() && ADMIN_TESTED_IDS.has(req.params.id)) {
+    rememberReturnTo(req, res, req.originalUrl);
+    return res.redirect('/login?msg=' + encodeURIComponent('Sign in to view admin-tested methods.') + '&next=' + encodeURIComponent(req.originalUrl));
+  }
   try {
     const srvRes = await pool.query(`
       SELECT s.*, u.name as "sellerName", u.avatar as "sellerAvatar", u.bio as "sellerBio", u.skills as "sellerSkills"

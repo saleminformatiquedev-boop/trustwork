@@ -52,7 +52,7 @@
 
 <!-- STEP 1: Select 1 or More Methods -->
 <section id="methods" class="max-w-4xl mx-auto px-4 sm:px-6 pt-10 pb-6">
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
     <div>
       <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Step 1</span>
       <h2 class="text-xl font-extrabold text-slate-900">🚀 Available Methods (<%= services ? services.length : 0 %>) — Select 1 or More</h2>
@@ -63,10 +63,28 @@
         <input type="text" id="method-search-input" placeholder="Search method..." class="text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:border-slate-900 focus:outline-none w-44 sm:w-52">
       </div>
       <a href="#checkout" id="jump-checkout-btn" class="text-xs font-extrabold text-slate-950 bg-[#F0B90B] hover:bg-[#FCD535] px-3 py-1.5 rounded-lg transition whitespace-nowrap">
-        Pay ($10) ↓
+        Pay ↓
       </a>
     </div>
   </div>
+
+  <% if (!user) { %>
+    <div class="mb-4 p-3.5 rounded-xl bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+      <div class="flex items-center gap-2.5 text-xs">
+        <span class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+          <i class="fa-solid fa-lock"></i>
+        </span>
+        <div>
+          <strong class="text-white block">Login to see more methods (Tested by Admin @Melasbit)</strong>
+          <span class="text-slate-300 text-[11px]">Sign in with Google to unlock our exclusive admin-verified methods &amp; automation scripts.</span>
+        </div>
+      </div>
+      <a href="/login?next=/" class="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-[#F0B90B] hover:bg-[#FCD535] text-slate-950 font-extrabold text-xs transition shrink-0">
+        <i class="fa-solid fa-right-to-bracket"></i>
+        <span>Login to see more methods</span>
+      </a>
+    </div>
+  <% } %>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5" id="methods-list">
     <% if (services && services.length > 0) { %>
@@ -97,7 +115,7 @@
               </h3>
             </div>
             <span class="text-xs font-extrabold text-slate-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md shrink-0">
-              $<%= Number.isInteger(service.price) ? service.price : service.price.toFixed(2) %>
+              $<%= Number.isInteger(service.price) ? service.price : service.price.toFixed(2).replace(/0$/, '') %>
             </span>
           </div>
 
@@ -289,18 +307,22 @@
       }));
   }
 
+  function formatUsd(n) {
+    return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, '');
+  }
+
   function renderCart() {
     const selected = getSelectedItems();
     const total = selected.reduce((s, item) => s + item.price, 0);
     if (totalDisplay) totalDisplay.textContent = `$${total.toFixed(2)} USDT`;
-    if (jumpCheckoutBtn) jumpCheckoutBtn.textContent = `Pay (${selected.length} • $${total.toFixed(0)}) ↓`;
+    if (jumpCheckoutBtn) jumpCheckoutBtn.textContent = `Pay (${selected.length} • $${formatUsd(total)}) ↓`;
 
     if (summaryEl) {
       if (selected.length === 0) {
         summaryEl.innerHTML = `<span class="text-rose-600 font-semibold">Please select at least 1 method above.</span>`;
       } else {
         summaryEl.innerHTML = `<span class="text-slate-400 font-semibold">Selected:</span> ` +
-          selected.map(i => `<span class="inline-flex items-center gap-1 bg-slate-100 text-slate-800 font-bold px-2.5 py-1 rounded-lg">${i.title} <span class="text-emerald-700">$${i.price.toFixed(0)}</span></span>`).join('');
+          selected.map(i => `<span class="inline-flex items-center gap-1 bg-slate-100 text-slate-800 font-bold px-2.5 py-1 rounded-lg">${i.title} <span class="text-emerald-700">$${formatUsd(i.price)}</span></span>`).join('');
       }
     }
 

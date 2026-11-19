@@ -67,7 +67,14 @@
           </div>
 
           <div>
-            <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">Which Method(s) Do You Want?</label>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-[11px] font-semibold text-slate-300">Which Method(s) Do You Want?</label>
+              <% if (!user) { %>
+                <a href="/login?next=/exchange" class="text-[11px] font-bold text-[#F0B90B] hover:underline">
+                  <i class="fa-solid fa-lock text-[10px] mr-1"></i>Login to see more methods
+                </a>
+              <% } %>
+            </div>
             <div class="flex flex-wrap gap-2 text-xs">
               <% if (services && services.length > 0) { %>
                 <% services.forEach((service, idx) => { %>
