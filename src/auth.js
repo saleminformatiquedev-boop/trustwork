@@ -412,8 +412,10 @@ function setupAuth(app, pool, io = null) {
   // Same-origin Firebase Hosting OAuth Bridge (avoids redirect_uri_mismatch & mobile popup/third-party storage blocks)
   app.get('/auth/google', (req, res) => {
     const host = (req.get('host') || '').toLowerCase();
-    let origin = 'https://trustwork.duckdns.org';
-    if (host.includes('methods.13-63-233-163.sslip.io')) {
+    let origin = 'https://methods.duckdns.org';
+    if (host.includes('methods.duckdns.org')) {
+      origin = 'https://methods.duckdns.org';
+    } else if (host.includes('methods.13-63-233-163.sslip.io')) {
       origin = 'https://methods.13-63-233-163.sslip.io';
     } else if (host.includes('51.20.182.245.sslip.io')) {
       origin = 'https://51.20.182.245.sslip.io';
