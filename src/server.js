@@ -170,7 +170,7 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Hardened Session Configuration (shared with Socket.io)
 const sessionMiddleware = session({
-  name: 'trustwork.sid',
+  name: 'methods.sid',
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
@@ -208,13 +208,13 @@ function parseCookie(req, name) {
 
 // Synchronizer + HMAC-Bound Cookie CSRF Protection (Prevents MemoryStore DoS on unauthenticated requests)
 app.use((req, res, next) => {
-  let csrfSeed = parseCookie(req, 'trustwork.csrf');
+  let csrfSeed = parseCookie(req, 'methods.csrf');
   if (!csrfSeed || !/^[a-f0-9]{32,64}$/.test(csrfSeed)) {
     csrfSeed = crypto.randomBytes(24).toString('hex');
     const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
     res.setHeader(
       'Set-Cookie',
-      `trustwork.csrf=${csrfSeed}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`
+      `methods.csrf=${csrfSeed}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`
     );
   }
 

@@ -147,7 +147,7 @@ function getAdminEmail() {
 }
 
 // ---- "Return to the page I came from" after sign-in (open-redirect safe) ----
-const RETURN_COOKIE = 'trustwork.next';
+const RETURN_COOKIE = 'methods.next';
 
 // Only same-site relative paths are ever accepted (never //host, http://, backslashes or control chars)
 function safeReturnPath(p) {
@@ -199,6 +199,7 @@ function wantsJson(req) {
 
 function destroySessionAndReply(req, res, message) {
   const done = () => {
+    res.clearCookie('methods.sid');
     res.clearCookie('trustwork.sid');
     if (wantsJson(req)) {
       return res.status(401).json({ success: false, error: message, reauth: true });
@@ -423,7 +424,7 @@ function setupAuth(app, pool, io = null) {
       origin = 'http://localhost:3000';
     }
     const state = createBridgeState();
-    const bridgeUrl = `https://salemsaccounts.firebaseapp.com/trustwork-auth.html?start=1&origin=${encodeURIComponent(origin)}&state=${encodeURIComponent(state)}`;
+    const bridgeUrl = `https://salemsaccounts.firebaseapp.com/methods-auth.html?start=1&origin=${encodeURIComponent(origin)}&state=${encodeURIComponent(state)}`;
     return res.redirect(bridgeUrl);
   });
 
@@ -475,12 +476,14 @@ function setupAuth(app, pool, io = null) {
       if (err) return next(err);
       if (req.session) {
         req.session.destroy(() => {
-          res.clearCookie('trustwork.sid');
+          res.clearCookie('methods.sid');
+    res.clearCookie('trustwork.sid');
           res.clearCookie('connect.sid');
           res.redirect('/');
         });
       } else {
-        res.clearCookie('trustwork.sid');
+        res.clearCookie('methods.sid');
+    res.clearCookie('trustwork.sid');
         res.clearCookie('connect.sid');
         res.redirect('/');
       }
