@@ -785,6 +785,29 @@ app.get('/', async (req, res) => {
   }
 });
 
+// Dedicated Method Exchange Page (no Binance checkout section)
+app.get('/exchange', async (req, res) => {
+  try {
+    const srvRes = await pool.query(`
+      SELECT s.id, s.title, s.price, s."unitCost", s."durationLabel"
+      FROM services s
+      JOIN users u ON s."sellerId" = u.id
+      WHERE LOWER(u.email) = $1
+      ORDER BY
+        CASE s.id
+          WHEN 'srv_notion_edu_plus_1y' THEN 1
+          WHEN 'srv_adobe_express_6m_script' THEN 2
+          WHEN 'srv_capcut_ready' THEN 3
+          ELSE 4
+        END ASC
+    `, [STORE_OWNER_EMAIL]);
+    res.render('exchange', { services: formatRows(srvRes.rows) });
+  } catch (err) {
+    console.error("Exchange page error:", err.message);
+    res.status(500).send("Unable to load exchange page.");
+  }
+});
+
 // ==========================================
 // SIMPLE DIRECT STORE API (BUY 1 OR MORE METHODS + EXCHANGE REQUEST)
 // ==========================================
