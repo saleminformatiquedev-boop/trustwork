@@ -78,16 +78,20 @@
   </div>
 </section>
 
-<section id="checkout" class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-  <div class="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-sm space-y-5">
+<div id="checkout" class="hidden fixed inset-0 z-50 bg-slate-900/70 overflow-y-auto">
+  <div class="min-h-full flex items-start justify-center p-3 sm:p-6">
+  <div class="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-2xl space-y-5 w-full max-w-4xl my-4">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
       <div>
         <h2 class="text-xl font-extrabold text-slate-900">Checkout</h2>
         <p id="selected-label" class="text-xs text-slate-500 mt-0.5">Click one or more products above to add them.</p>
       </div>
-      <div class="bg-slate-900 text-white px-5 py-3 rounded-2xl text-right">
-        <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">Total</span>
-        <div id="total" class="text-2xl font-extrabold text-[#F0B90B]">$0.00 USDT</div>
+      <div class="flex items-center gap-3">
+        <div class="bg-slate-900 text-white px-5 py-3 rounded-2xl text-right">
+          <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">Total</span>
+          <div id="total" class="text-2xl font-extrabold text-[#F0B90B]">$0.00 USDT</div>
+        </div>
+        <button type="button" id="close-checkout" aria-label="Close" class="w-10 h-10 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100 text-lg font-bold">&times;</button>
       </div>
     </div>
 
@@ -130,7 +134,22 @@
       </form>
     </div>
   </div>
-</section>
+  </div>
+</div>
+
+<div id="checkout-bar" class="hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900 text-white border-t border-slate-700 shadow-2xl">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+    <div class="min-w-0">
+      <div id="bar-count" class="text-xs text-slate-300 font-semibold"></div>
+      <div id="bar-total" class="text-lg font-extrabold text-[#F0B90B]"></div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <button type="button" id="bar-clear" class="px-3 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white">Clear</button>
+      <button type="button" id="bar-checkout" class="px-5 py-2.5 rounded-xl bg-[#F0B90B] hover:bg-[#FCD535] text-slate-950 font-extrabold text-sm">Checkout &rarr;</button>
+    </div>
+  </div>
+</div>
+<div id="bar-spacer" class="hidden h-20"></div>
 
 <script>
 (function () {
@@ -170,8 +189,31 @@
     $('selected-label').textContent = selected.size
       ? selected.size + ' product' + (selected.size > 1 ? 's' : '') + ' selected'
       : 'Click one or more products above to add them.';
-    $('clear-sel') && ($('clear-sel').style.display = selected.size ? '' : 'none');
+    const has = selected.size > 0;
+    $('checkout-bar').classList.toggle('hidden', !has);
+    $('bar-spacer').classList.toggle('hidden', !has);
+    $('bar-count').textContent = selected.size + ' product' + (selected.size > 1 ? 's' : '') + ' selected';
+    $('bar-total').textContent = '$' + money(total) + ' USDT';
   }
+
+  function clearSelection() {
+    Array.from(selected.values()).forEach(toggle);
+  }
+  $('bar-clear').addEventListener('click', clearSelection);
+  function openCheckout() {
+    if (!selected.size) return;
+    $('checkout').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => $('contact').focus({ preventScroll: true }), 100);
+  }
+  function closeCheckout() {
+    $('checkout').classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+  $('bar-checkout').addEventListener('click', openCheckout);
+  $('close-checkout').addEventListener('click', closeCheckout);
+  $('checkout').addEventListener('click', e => { if (e.target === $('checkout') || e.target === $('checkout').firstElementChild) closeCheckout(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCheckout(); });
 
   function toggle(card) {
     if (card.dataset.available !== 'true') return;
