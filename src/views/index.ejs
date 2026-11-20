@@ -194,6 +194,8 @@
     $('bar-spacer').classList.toggle('hidden', !has);
     $('bar-count').textContent = selected.size + ' product' + (selected.size > 1 ? 's' : '') + ' selected';
     $('bar-total').textContent = '$' + money(total) + ' USDT';
+    const wa = $('wa-float');
+    if (wa) wa.style.bottom = has ? '5.5rem' : '';
   }
 
   function clearSelection() {
