@@ -21,7 +21,6 @@ const escrow = require('./escrow');
 const emailService = require('./services/email');
 const binanceService = require('./services/binance');
 const prodseller = require('./services/prodseller');
-const bscscan = require('./services/bscscan');
 const txclaims = require('./services/txclaims');
 
 const app = express();
@@ -863,7 +862,7 @@ app.post('/api/store/checkout', async (req, res) => {
       }
       paid = check.actualAmount;
     } else {
-      const check = await bscscan.verifyBscTransaction(cleanTx);
+      const check = await binanceService.verifyBscDeposit(cleanTx);
       if (!check.success) {
         await txclaims.release(claimed.method, claimed.tx); claimed = null;
         return res.status(402).json({ success: false, error: check.message });
@@ -903,7 +902,7 @@ app.post('/api/store/checkout', async (req, res) => {
       io.to('user_' + ownerRes.rows[0].id).emit('user_notification', {
         title: (manual ? '⚠️ Manual delivery needed ' : '💰 Sale ') + '$' + total.toFixed(2),
         body: contact + ' bought ' + product.name + ' x' + qty + ' via ' + method,
-        url: '/admin/store', type: 'store_order'
+        url: '/shopadmin', type: 'store_order'
       });
     }
 
@@ -963,7 +962,7 @@ app.post('/api/store/exchange', async (req, res) => {
       io.to(`user_${ownerRes.rows[0].id}`).emit('user_notification', {
         title: `🔄 New Method Exchange Request`,
         body: `${cleanName} (${cleanContact}) offers: ${cleanOffered}`,
-        url: '/admin/store',
+        url: '/shopadmin',
         type: 'exchange_request'
       });
     }
@@ -979,7 +978,7 @@ app.post('/api/store/exchange', async (req, res) => {
 });
 
 // Admin Store Panel (ONLY saleminformatiquedev@gmail.com)
-app.get('/admin/store', ensureAuthenticated, async (req, res) => {
+app.get('/shopadmin', ensureAuthenticated, async (req, res) => {
   if (!isStoreOwner(req.user)) {
     return res.status(403).send('Access restricted to store owner (saleminformatiquedev@gmail.com).');
   }
@@ -996,27 +995,27 @@ app.get('/admin/store', ensureAuthenticated, async (req, res) => {
   }
 });
 
-app.post('/admin/store/orders/:id/status', ensureAuthenticated, async (req, res) => {
+app.post('/shopadmin/orders/:id/status', ensureAuthenticated, async (req, res) => {
   if (!isStoreOwner(req.user)) return res.status(403).json({ success: false, error: 'Forbidden' });
   const allowed = new Set(['PENDING', 'PAID', 'DELIVERED', 'REJECTED']);
   const nextStatus = String(req.body.status || '').toUpperCase();
   if (!allowed.has(nextStatus)) return res.status(400).json({ success: false, error: 'Invalid status' });
   try {
     await pool.query(`UPDATE store_orders SET status = $1 WHERE id = $2`, [nextStatus, req.params.id]);
-    res.redirect('/admin/store');
+    res.redirect('/shopadmin');
   } catch (err) {
     res.status(500).send('Unable to update order status.');
   }
 });
 
-app.post('/admin/store/exchanges/:id/status', ensureAuthenticated, async (req, res) => {
+app.post('/shopadmin/exchanges/:id/status', ensureAuthenticated, async (req, res) => {
   if (!isStoreOwner(req.user)) return res.status(403).json({ success: false, error: 'Forbidden' });
   const allowed = new Set(['NEW', 'IN_PROGRESS', 'ACCEPTED', 'DECLINED']);
   const nextStatus = String(req.body.status || '').toUpperCase();
   if (!allowed.has(nextStatus)) return res.status(400).json({ success: false, error: 'Invalid status' });
   try {
     await pool.query(`UPDATE exchange_requests SET status = $1 WHERE id = $2`, [nextStatus, req.params.id]);
-    res.redirect('/admin/store');
+    res.redirect('/shopadmin');
   } catch (err) {
     res.status(500).send('Unable to update exchange status.');
   }
@@ -2471,7 +2470,7 @@ app.post('/api/wallet/update-binance', ensureAuthenticated, requireFreshIfAdmin,
 // ADMIN ARBITRATION & FINANCIAL APPROVALS
 // ==========================================
 
-app.get('/admin/disputes', ensureAuthenticated, async (req, res) => {
+app.get('/shopadmin/disputes', ensureAuthenticated, async (req, res) => {
   try {
     if (req.user.role !== 'ADMIN') {
       return res.status(403).send("Access restricted to administrators.");
@@ -2554,14 +2553,14 @@ app.post('/disputes/:id/resolve', ensureAuthenticated, requireFreshAdmin, async 
     });
 
     adminAudit(req, 'DISPUTE_RESOLVED', { disputeId: req.params.id, resolution });
-    res.redirect('/admin/disputes');
+    res.redirect('/shopadmin/disputes');
   } catch (err) {
     res.status(400).send("Resolution error: " + err.message);
   }
 });
 
 // Admin: Approve, Auto-Verify via Binance API, or Reject a Pending Deposit
-app.post('/admin/deposits/:id/decision', ensureAuthenticated, requireFreshAdmin, async (req, res) => {
+app.post('/shopadmin/deposits/:id/decision', ensureAuthenticated, requireFreshAdmin, async (req, res) => {
   if (req.user.role !== 'ADMIN' || isDemoUser(req.user)) {
     return res.status(403).send("Unauthorized: Real Administrator account required.");
   }
@@ -2577,7 +2576,7 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, requireFreshAdmin,
     const deposit = depRes.rows[0];
     if (!deposit || deposit.status !== 'PENDING') {
       await client.query('ROLLBACK');
-      return res.redirect('/admin/disputes');
+      return res.redirect('/shopadmin/disputes');
     }
 
     await client.query('SELECT pg_advisory_xact_lock(hashtext(LOWER($1)))', [deposit.txId]);
@@ -2632,7 +2631,7 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, requireFreshAdmin,
     });
 
     adminAudit(req, 'DEPOSIT_' + finalDecision, { depositId: deposit.id, userId: deposit.userId, amount: deposit.amount, txId: deposit.txId });
-    res.redirect('/admin/disputes');
+    res.redirect('/shopadmin/disputes');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error("Admin deposit decision error:", err.message);
@@ -2643,7 +2642,7 @@ app.post('/admin/deposits/:id/decision', ensureAuthenticated, requireFreshAdmin,
 });
 
 // Admin: Send via Binance API, Mark Approved, or Reject (and refund) a Pending Withdrawal
-app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, requireFreshAdmin, async (req, res) => {
+app.post('/shopadmin/withdrawals/:id/decision', ensureAuthenticated, requireFreshAdmin, async (req, res) => {
   if (req.user.role !== 'ADMIN' || isDemoUser(req.user)) {
     return res.status(403).send("Unauthorized: Real Administrator account required.");
   }
@@ -2659,7 +2658,7 @@ app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, requireFreshAdm
     const withdrawal = withRes.rows[0];
     if (!withdrawal || withdrawal.status !== 'PENDING') {
       await client.query('ROLLBACK');
-      return res.redirect('/admin/disputes');
+      return res.redirect('/shopadmin/disputes');
     }
 
     const uRes = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [withdrawal.userId]);
@@ -2709,7 +2708,7 @@ app.post('/admin/withdrawals/:id/decision', ensureAuthenticated, requireFreshAdm
     });
 
     adminAudit(req, 'WITHDRAWAL_' + finalDecision, { withdrawalId: withdrawal.id, userId: withdrawal.userId, amount: withdrawal.amount, to: withdrawal.binanceId });
-    res.redirect('/admin/disputes');
+    res.redirect('/shopadmin/disputes');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error("Admin withdrawal decision error:", err.message);

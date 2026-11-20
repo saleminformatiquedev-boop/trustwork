@@ -57,15 +57,15 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-1.5 shrink-0">
-              <form action="/admin/store/orders/<%= ord.id %>/status" method="POST">
+              <form action="/shopadmin/orders/<%= ord.id %>/status" method="POST">
                 <input type="hidden" name="status" value="PAID">
                 <button type="submit" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition">Mark Paid</button>
               </form>
-              <form action="/admin/store/orders/<%= ord.id %>/status" method="POST">
+              <form action="/shopadmin/orders/<%= ord.id %>/status" method="POST">
                 <input type="hidden" name="status" value="DELIVERED">
                 <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition">Delivered</button>
               </form>
-              <form action="/admin/store/orders/<%= ord.id %>/status" method="POST">
+              <form action="/shopadmin/orders/<%= ord.id %>/status" method="POST">
                 <input type="hidden" name="status" value="REJECTED">
                 <button type="submit" class="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold transition">Reject</button>
               </form>
@@ -111,11 +111,11 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-1.5 shrink-0">
-              <form action="/admin/store/exchanges/<%= ex.id %>/status" method="POST">
+              <form action="/shopadmin/exchanges/<%= ex.id %>/status" method="POST">
                 <input type="hidden" name="status" value="ACCEPTED">
                 <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition">Accept</button>
               </form>
-              <form action="/admin/store/exchanges/<%= ex.id %>/status" method="POST">
+              <form action="/shopadmin/exchanges/<%= ex.id %>/status" method="POST">
                 <input type="hidden" name="status" value="DECLINED">
                 <button type="submit" class="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold transition">Decline</button>
               </form>

@@ -225,6 +225,52 @@ async function verifyIncomingDeposit({ txId, expectedAmount }) {
 }
 
 /**
+ * Verify a BEP20 (BSC) USDT deposit through the Binance API deposit history.
+ * Only fully credited deposits (status 1) on the BSC network are accepted.
+ * Returns { success, amount, message } and never trusts user-supplied amounts.
+ */
+async function verifyBscDeposit(txHash) {
+  const hash = String(txHash || '').trim().toLowerCase();
+  if (!/^0x[a-f0-9]{64}$/.test(hash)) {
+    return { success: false, message: 'Invalid TxID format. It must start with 0x.' };
+  }
+  if (!isConfigured()) {
+    return { success: false, message: 'Payment verification is temporarily unavailable.' };
+  }
+  try {
+    const list = await signedBinanceRequest('GET', '/sapi/v1/capital/deposit/hisrec', {
+      coin: 'USDT',
+      txId: hash,
+      limit: 100
+    });
+    const deposits = Array.isArray(list) ? list : [];
+    const dep = deposits.find(d => String(d.txId || '').trim().toLowerCase() === hash);
+    if (!dep) {
+      return { success: false, message: 'Deposit not found on Binance yet. BEP20 deposits can take a few minutes, please retry.' };
+    }
+    if (String(dep.coin || '').toUpperCase() !== 'USDT') {
+      return { success: false, message: 'This deposit is not USDT.' };
+    }
+    if (String(dep.network || '').toUpperCase() !== 'BSC') {
+      return { success: false, message: 'This deposit was not made on the BEP20 (BSC) network.' };
+    }
+    const insertTime = Number(dep.insertTime || 0);
+    if (insertTime < MIN_DEPOSIT_TIMESTAMP || Date.now() - insertTime > MAX_DEPOSIT_AGE_MS) {
+      return { success: false, message: 'This deposit is older than 48 hours. Contact support with your TxID.' };
+    }
+    if (dep.status !== 1) {
+      return { success: false, message: 'Deposit detected, waiting for network confirmations. Please retry in a few minutes.' };
+    }
+    const amount = Math.round(parseFloat(dep.amount || 0) * 100) / 100;
+    if (!(amount > 0)) return { success: false, message: 'Invalid deposit amount.' };
+    return { success: true, amount };
+  } catch (err) {
+    console.warn('[Binance API] BEP20 deposit check error:', err.message);
+    return { success: false, message: 'Unable to verify with Binance right now. Please retry shortly.' };
+  }
+}
+
+/**
  * Detect blockchain network from destination address or explicit network string
  */
 function resolveWithdrawalNetwork(address, preferredNetwork) {
@@ -325,6 +371,7 @@ module.exports = {
   DEFAULT_USDT_BEP20,
   isConfigured,
   verifyIncomingDeposit,
+  verifyBscDeposit,
   executeUsdtWithdrawal,
   getApiStatus
 };

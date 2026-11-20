@@ -418,6 +418,8 @@ function setupAuth(app, pool, io = null) {
       origin = 'https://methods.duckdns.org';
     } else if (host.includes('methods.13-63-233-163.sslip.io')) {
       origin = 'https://methods.13-63-233-163.sslip.io';
+    } else if (host === '13-63-233-163.sslip.io') {
+      origin = 'https://13-63-233-163.sslip.io';
     } else if (host.includes('51.20.182.245.sslip.io')) {
       origin = 'https://51.20.182.245.sslip.io';
     } else if (host.startsWith('localhost:') || host.startsWith('127.0.0.1:')) {
@@ -461,7 +463,7 @@ function setupAuth(app, pool, io = null) {
           return res.redirect('/login?msg=' + encodeURIComponent('Session error during sign-in.'));
         }
         const defaultDest = (user.role === 'ADMIN' || String(user.email || '').toLowerCase() === getAdminEmail())
-          ? '/admin/store'
+          ? '/shopadmin'
           : '/';
         return res.redirect(consumeReturnTo(req, res) || defaultDest);
       });

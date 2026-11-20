@@ -281,7 +281,7 @@ async function notifyDisputeOpened({ order, dispute, initiator, otherParty }) {
         <strong>Details:</strong> ${dispute.details}
       `,
       ctaText: 'Arbitrate Case',
-      ctaUrl: `${BASE_URL}/admin/disputes`
+      ctaUrl: `${BASE_URL}/shopadmin/disputes`
     })
   });
 }

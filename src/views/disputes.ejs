@@ -55,19 +55,19 @@
             </div>
             <% if (dep.status === 'PENDING') { %>
               <div class="flex flex-wrap items-center gap-2">
-                <form action="/admin/deposits/<%= dep.id %>/decision" method="POST">
+                <form action="/shopadmin/deposits/<%= dep.id %>/decision" method="POST">
                   <input type="hidden" name="action" value="VERIFY_API">
                   <button type="submit" class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl transition">
                     Verify via Binance API
                   </button>
                 </form>
-                <form action="/admin/deposits/<%= dep.id %>/decision" method="POST">
+                <form action="/shopadmin/deposits/<%= dep.id %>/decision" method="POST">
                   <input type="hidden" name="action" value="APPROVE">
                   <button type="submit" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition">
                     Approve Manually
                   </button>
                 </form>
-                <form action="/admin/deposits/<%= dep.id %>/decision" method="POST">
+                <form action="/shopadmin/deposits/<%= dep.id %>/decision" method="POST">
                   <input type="hidden" name="action" value="REJECT">
                   <button type="submit" class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold rounded-xl transition">
                     Reject
@@ -106,19 +106,19 @@
             </div>
             <% if (w.status === 'PENDING') { %>
               <div class="flex flex-wrap items-center gap-2">
-                <form action="/admin/withdrawals/<%= w.id %>/decision" method="POST">
+                <form action="/shopadmin/withdrawals/<%= w.id %>/decision" method="POST">
                   <input type="hidden" name="action" value="SEND_API">
                   <button type="submit" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition">
                     Send via Binance API
                   </button>
                 </form>
-                <form action="/admin/withdrawals/<%= w.id %>/decision" method="POST">
+                <form action="/shopadmin/withdrawals/<%= w.id %>/decision" method="POST">
                   <input type="hidden" name="action" value="APPROVE">
                   <button type="submit" class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl transition">
                     Mark Sent
                   </button>
                 </form>
-                <form action="/admin/withdrawals/<%= w.id %>/decision" method="POST">
+                <form action="/shopadmin/withdrawals/<%= w.id %>/decision" method="POST">
                   <input type="hidden" name="action" value="REJECT">
                   <button type="submit" class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold rounded-xl transition">
                     Reject & Refund
