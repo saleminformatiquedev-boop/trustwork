@@ -762,18 +762,33 @@ function isStoreOwner(user) {
 app.get('/', async (req, res) => {
   try {
     const products = await prodseller.getProducts();
-    res.render('index', { products: products.map(publicProduct) });
+    const list = products.map(publicProduct);
+    const categories = [...new Set(list.map(p => p.category))].sort();
+    res.render('index', { products: list, categories });
   } catch (err) {
     console.error("Homepage error:", err.message);
     res.status(500).send("Unable to load products at the moment.");
   }
 });
 
+const PRODUCT_CATEGORIES = [
+  ['AI & API', /claude|codex|kimi|deepseek|gemini|chatgpt|elevenlabs|eleven labs|replit|lovable|framer|\bapi\b/i],
+  ['VPN & Proxy', /vpn|proxy|v2ray/i],
+  ['Video & Design', /capcut|adobe|figma|miro|autodesk|canva/i],
+  ['Streaming', /prime video|apple tv|shahid|spotify|netflix|scribd/i],
+  ['Learning & Productivity', /notion|ilovepdf|pdf2go|edx|jetbrains|udemy|zoom|office|ms365/i]
+];
+function productCategory(name) {
+  const hit = PRODUCT_CATEGORIES.find(([, re]) => re.test(name));
+  return hit ? hit[0] : 'Accounts & Other';
+}
+
 function publicProduct(p) {
   const stock = p.stock !== undefined && p.stock !== null ? Number(p.stock) : null;
   return {
     id: String(p.id || p._id),
-    name: String(p.name || ''),
+    name: String(p.name || '').trim(),
+    category: productCategory(String(p.name || '')),
     description: String(p.description || '').slice(0, 400),
     imageUrl: /^https:\/\//.test(p.imageUrl || '') ? p.imageUrl : '',
     price: Number(p.price) || 0,
@@ -814,19 +829,27 @@ app.get('/exchange', async (req, res) => {
 // SIMPLE DIRECT STORE API (BUY 1 OR MORE METHODS + EXCHANGE REQUEST)
 // ==========================================
 
-// Buy a ProdSeller product: verify the Binance payment, order from the supplier, deliver the keys
+// Buy one or more ProdSeller products with a single payment: verify it, order from the supplier, deliver the keys
 app.post('/api/store/checkout', async (req, res) => {
   let claimed = null;
   try {
-    const { productId, quantity, paymentMethod, txId, customerContact } = req.body || {};
+    const { cart, paymentMethod, txId, customerContact } = req.body || {};
     const method = paymentMethod === 'USDT_BEP20' ? 'USDT_BEP20' : 'BINANCE_PAY';
-    const cleanId = String(productId || '').trim();
-    const qty = Math.floor(Number(quantity) || 1);
     const cleanTx = String(txId || '').trim();
     const contact = String(customerContact || '').trim().slice(0, 200);
 
-    if (!/^[A-Za-z0-9_-]{6,64}$/.test(cleanId)) return res.status(400).json({ success: false, error: 'Invalid product.' });
-    if (qty < 1 || qty > 100) return res.status(400).json({ success: false, error: 'Invalid quantity.' });
+    // Merge duplicate lines, validate shape
+    const wanted = new Map();
+    if (!Array.isArray(cart) || cart.length === 0 || cart.length > 20) {
+      return res.status(400).json({ success: false, error: 'Please select 1 to 20 products.' });
+    }
+    for (const line of cart) {
+      const id = String((line && line.productId) || '').trim();
+      const qty = Math.floor(Number(line && line.quantity) || 0);
+      if (!/^[A-Za-z0-9_-]{6,64}$/.test(id)) return res.status(400).json({ success: false, error: 'Invalid product.' });
+      if (qty < 1 || qty > 100) return res.status(400).json({ success: false, error: 'Invalid quantity.' });
+      wanted.set(id, (wanted.get(id) || 0) + qty);
+    }
     if (!contact) return res.status(400).json({ success: false, error: 'Please enter your Telegram, WhatsApp or email contact.' });
     if (method === 'BINANCE_PAY' && !/^\d{10,25}$/.test(cleanTx)) {
       return res.status(400).json({ success: false, error: 'Binance Pay Order ID must be 10-25 digits.' });
@@ -836,15 +859,24 @@ app.post('/api/store/checkout', async (req, res) => {
     }
     if (!prodseller.isConfigured()) return res.status(503).json({ success: false, error: 'Shop temporarily unavailable.' });
 
-    const product = await prodseller.getProduct(cleanId);
-    if (!product) return res.status(404).json({ success: false, error: 'Product not found.' });
-    if (!prodseller.isAvailable(product)) return res.status(409).json({ success: false, error: 'Out of stock.' });
-    if (product.stock !== undefined && product.stock !== null && qty > Number(product.stock)) {
-      return res.status(409).json({ success: false, error: 'Only ' + Number(product.stock) + ' in stock.' });
+    // Price everything on the server from fresh supplier data
+    const lines = [];
+    for (const [id, qty] of wanted) {
+      const product = await prodseller.getProduct(id);
+      if (!product) return res.status(404).json({ success: false, error: 'A selected product was not found.' });
+      const name = String(product.name || '').trim();
+      if (!prodseller.isAvailable(product)) return res.status(409).json({ success: false, error: name + ' is out of stock.' });
+      if (product.stock !== undefined && product.stock !== null && qty > Number(product.stock)) {
+        return res.status(409).json({ success: false, error: name + ': only ' + Number(product.stock) + ' in stock.' });
+      }
+      lines.push({
+        id, qty, name,
+        total: Math.round(prodseller.getUnitPrice(product, qty) * qty * 100) / 100,
+        cost: Math.round((Number(product.apiPrice) || 0) * qty * 100) / 100
+      });
     }
-
-    const total = Math.round(prodseller.getUnitPrice(product, qty) * qty * 100) / 100;
-    const apiCost = Math.round((Number(product.apiPrice) || 0) * qty * 100) / 100;
+    const total = Math.round(lines.reduce((sum, l) => sum + l.total, 0) * 100) / 100;
+    const apiCost = Math.round(lines.reduce((sum, l) => sum + l.cost, 0) * 100) / 100;
 
     if (!(await txclaims.claim(method, cleanTx.toLowerCase()))) {
       return res.status(409).json({ success: false, error: 'This transaction was already used.' });
@@ -877,23 +909,41 @@ app.post('/api/store/checkout', async (req, res) => {
 
     const orderId = 'ord_' + crypto.randomBytes(6).toString('hex');
     const receiptToken = crypto.randomBytes(24).toString('hex');
-    const items = [{ id: cleanId, title: product.name, price: total, quantity: qty }];
-    const supplier = await prodseller.createOrder(cleanId, orderId, qty);
 
-    if (!supplier) {
+    // Supplier orders, one per line. A delivered line, or a supplier out of balance (manual fulfilment),
+    // consumes the payment for good; it is only released when nothing at all was ordered.
+    const keyBlocks = [];
+    const pending = [];
+    let consumed = false;
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      const supplier = await prodseller.createOrder(l.id, orderId + '_' + i, l.qty);
+      if (supplier && !supplier.insufficientSupplierBalance) {
+        consumed = true;
+        keyBlocks.push('=== ' + l.name + (l.qty > 1 ? ' x' + l.qty : '') + ' ===\n' + prodseller.extractKeys(supplier).join('\n'));
+      } else {
+        if (supplier && supplier.insufficientSupplierBalance) consumed = true;
+        pending.push(l.name + ' x' + l.qty);
+      }
+    }
+
+    if (!consumed) {
       await txclaims.release(claimed.method, claimed.tx); claimed = null;
       return res.status(502).json({ success: false, error: 'Supplier error. Your payment was not consumed, please retry.' });
     }
 
-    const manual = Boolean(supplier.insufficientSupplierBalance);
-    const keys = manual ? '' : prodseller.extractKeys(supplier).join('\n');
+    const manual = pending.length > 0;
+    const notes = [];
+    if (paid > total + 0.001) notes.push('Overpaid: received ' + paid.toFixed(2) + ' USDT');
+    if (manual) notes.push('MANUAL DELIVERY NEEDED: ' + pending.join(', '));
+    const items = lines.map(l => ({ id: l.id, title: l.name, price: l.total, quantity: l.qty }));
     await pool.query(
       `INSERT INTO store_orders (id, "userId", "customerContact", items, "totalAmount", "paymentMethod", "txId", note, status,
                                  "deliveredKeys", "receiptToken", "supplierProductId", "supplierCost")
        VALUES ($1, NULL, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [orderId, contact, JSON.stringify(items), total, method, cleanTx,
-       paid > total + 0.001 ? 'Overpaid: received ' + paid.toFixed(2) + ' USDT' : null,
-       manual ? 'PAID' : 'DELIVERED', keys || null, receiptToken, cleanId, apiCost]
+       notes.join(' | ') || null, manual ? 'PAID' : 'DELIVERED', keyBlocks.join('\n\n') || null,
+       receiptToken, lines.map(l => l.id).join(','), apiCost]
     );
     claimed = null;
 
@@ -901,7 +951,7 @@ app.post('/api/store/checkout', async (req, res) => {
     if (ownerRes.rows[0]) {
       io.to('user_' + ownerRes.rows[0].id).emit('user_notification', {
         title: (manual ? '⚠️ Manual delivery needed ' : '💰 Sale ') + '$' + total.toFixed(2),
-        body: contact + ' bought ' + product.name + ' x' + qty + ' via ' + method,
+        body: contact + ' bought ' + lines.map(l => l.name + ' x' + l.qty).join(', ') + ' via ' + method,
         url: '/shopadmin', type: 'store_order'
       });
     }

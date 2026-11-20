@@ -187,7 +187,8 @@ async function initDatabase() {
 
       ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS "deliveredKeys" TEXT;
       ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS "receiptToken" VARCHAR(64);
-      ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS "supplierProductId" VARCHAR(64);
+      ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS "supplierProductId" TEXT;
+      ALTER TABLE store_orders ALTER COLUMN "supplierProductId" TYPE TEXT;
       ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS "supplierCost" NUMERIC(14, 2);
       CREATE INDEX IF NOT EXISTS idx_store_orders_receipt ON store_orders("receiptToken");
 

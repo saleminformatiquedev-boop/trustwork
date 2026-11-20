@@ -13,20 +13,46 @@
 </section>
 
 <section class="max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-4">
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-    <h2 class="text-xl font-extrabold text-slate-900">Products (<%= products.length %>)</h2>
-    <input type="text" id="search" placeholder="Search..." class="text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:border-slate-900 focus:outline-none w-full sm:w-60">
+  <div class="flex items-center justify-between gap-3 mb-3">
+    <h2 class="text-xl font-extrabold text-slate-900">Products (<span id="count"><%= products.length %></span>)</h2>
+    <button type="button" id="reset" class="text-xs font-bold text-sky-600 hover:underline">Reset filters</button>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-2xl p-3 mb-4 space-y-3">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <input type="text" id="search" placeholder="Search..." class="col-span-2 text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:border-slate-900 focus:outline-none">
+      <select id="sort" class="text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg">
+        <option value="default">Sort: default</option>
+        <option value="price-asc">Price: low to high</option>
+        <option value="price-desc">Price: high to low</option>
+        <option value="name">Name A-Z</option>
+        <option value="sold">Best sellers</option>
+      </select>
+      <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 px-3 py-2 border border-slate-200 rounded-lg cursor-pointer">
+        <input type="checkbox" id="instock" checked> In stock only
+      </label>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="button" data-cat="" class="cat-chip px-3 py-1.5 rounded-full text-[11px] font-bold border bg-slate-900 text-white border-slate-900">All</button>
+      <% categories.forEach(c => { %>
+        <button type="button" data-cat="<%= c %>" class="cat-chip px-3 py-1.5 rounded-full text-[11px] font-bold border bg-white text-slate-700 border-slate-200"><%= c %></button>
+      <% }) %>
+      <span class="ml-auto flex items-center gap-1 text-[11px] text-slate-500">
+        Max price $<input type="number" id="maxprice" min="0" step="0.5" placeholder="any" class="w-16 text-xs px-2 py-1 border border-slate-200 rounded-lg">
+      </span>
+    </div>
   </div>
   <% if (products.length === 0) { %>
     <p class="text-sm text-slate-500">Catalogue temporarily unavailable, please retry in a minute.</p>
   <% } %>
+  <p id="empty" class="hidden text-sm text-slate-500 py-6 text-center">No product matches these filters.</p>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" id="grid">
-    <% products.forEach(p => { %>
+    <% products.forEach((p, i) => { %>
       <div class="card bg-white rounded-xl border-2 border-slate-200 p-3 flex flex-col gap-2 <%= p.available ? 'cursor-pointer hover:border-slate-400' : 'opacity-60' %>"
-           data-id="<%- p.id %>" data-name="<%= p.name %>" data-price="<%= p.price %>" data-stock="<%= p.stock === null ? '' : p.stock %>"
+           data-id="<%- p.id %>" data-name="<%= p.name %>" data-category="<%= p.category %>" data-price="<%= p.price %>" data-sold="<%= p.sold %>" data-order="<%= i %>"
+           data-stock="<%= p.stock === null ? '' : p.stock %>"
            data-bulk="<%= JSON.stringify(p.bulkPricing) %>" data-available="<%= p.available %>">
         <div class="flex items-start gap-2">
-          <% if (p.imageUrl) { %><img src="<%= p.imageUrl %>" alt="" loading="lazy" referrerpolicy="no-referrer" class="w-10 h-10 rounded-lg object-cover bg-slate-100 shrink-0"><% } %>
+          <% if (p.imageUrl) { %><img src="<%= p.imageUrl %>" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" class="w-10 h-10 rounded-lg object-cover bg-slate-100 shrink-0"><% } %>
           <div class="min-w-0 flex-1">
             <h3 class="font-extrabold text-slate-900 text-[13px] leading-tight"><%= p.name %></h3>
             <p class="text-[11px] text-slate-500 line-clamp-2 mt-0.5"><%= p.description %></p>
@@ -37,8 +63,16 @@
           <span class="<%= p.available ? 'text-emerald-700' : 'text-rose-600' %> font-bold">
             <%= p.available ? '🟢 In stock' + (p.stock !== null ? ' (' + p.stock + ')' : '') : '🔴 Out of stock' %>
           </span>
-          <span class="text-slate-400"><%= p.sold %> sold</span>
+          <span class="text-slate-400"><%= p.category %> · <%= p.sold %> sold</span>
         </div>
+        <% if (p.available) { %>
+          <div class="sel-row hidden items-center justify-between pt-1 border-t border-slate-100">
+            <span class="text-[11px] font-bold text-emerald-700">✓ Selected</span>
+            <span class="flex items-center gap-1 text-[11px] text-slate-600">Qty
+              <input type="number" min="1" value="1" class="line-qty w-14 text-xs px-2 py-1 border border-slate-300 rounded-lg">
+            </span>
+          </div>
+        <% } %>
       </div>
     <% }) %>
   </div>
@@ -49,7 +83,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
       <div>
         <h2 class="text-xl font-extrabold text-slate-900">Checkout</h2>
-        <p id="selected-label" class="text-xs text-slate-500 mt-0.5">Select a product above.</p>
+        <p id="selected-label" class="text-xs text-slate-500 mt-0.5">Click one or more products above to add them.</p>
       </div>
       <div class="bg-slate-900 text-white px-5 py-3 rounded-2xl text-right">
         <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">Total</span>
@@ -82,10 +116,7 @@
       </div>
 
       <form id="order-form" class="space-y-3">
-        <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Quantity</label>
-          <input type="number" id="qty" min="1" value="1" class="w-full text-sm px-3.5 py-2.5 bg-[#FAFAFA] border border-slate-200 rounded-xl">
-        </div>
+        <div id="cart" class="space-y-1 text-xs"></div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Your contact (Telegram, WhatsApp or email)</label>
           <input type="text" id="contact" required class="w-full text-sm px-3.5 py-2.5 bg-[#FAFAFA] border border-slate-200 rounded-xl">
@@ -104,8 +135,11 @@
 <script>
 (function () {
   const cards = Array.from(document.querySelectorAll('.card'));
-  let current = null, method = 'BINANCE_PAY';
+  const grid = document.getElementById('grid');
+  const selected = new Map();
+  let method = 'BINANCE_PAY', cat = '';
   const $ = id => document.getElementById(id);
+  const money = n => (Math.round(n * 100) / 100).toFixed(2);
 
   function unit(card, q) {
     let price = parseFloat(card.dataset.price) || 0;
@@ -114,25 +148,89 @@
     tiers.forEach(t => { if (q >= t.minQuantity && t.unitPrice <= price) price = t.unitPrice; });
     return price;
   }
-  function render() {
-    cards.forEach(c => c.classList.toggle('border-slate-900', c === current));
-    if (!current) { $('total').textContent = '$0.00 USDT'; return; }
-    const q = Math.max(1, parseInt($('qty').value) || 1);
-    const stock = current.dataset.stock;
-    $('qty').max = stock || 100;
-    $('selected-label').textContent = current.dataset.name;
-    $('total').textContent = '$' + (Math.round(unit(current, q) * q * 100) / 100).toFixed(2) + ' USDT';
+  function qtyOf(card) {
+    const input = card.querySelector('.line-qty');
+    let q = Math.max(1, parseInt(input && input.value) || 1);
+    const stock = parseInt(card.dataset.stock);
+    if (stock > 0 && q > stock) q = stock;
+    return Math.min(q, 100);
   }
-  cards.forEach(c => c.addEventListener('click', () => {
-    if (c.dataset.available !== 'true') return;
-    current = c; render();
-    $('checkout').scrollIntoView({ behavior: 'smooth' });
-  }));
-  $('qty').addEventListener('input', render);
-  $('search').addEventListener('input', e => {
-    const q = e.target.value.toLowerCase().trim();
-    cards.forEach(c => c.style.display = !q || c.dataset.name.toLowerCase().includes(q) ? '' : 'none');
+
+  function renderCart() {
+    let total = 0;
+    const lines = [];
+    selected.forEach(card => {
+      const q = qtyOf(card), line = Math.round(unit(card, q) * q * 100) / 100;
+      total += line;
+      lines.push('<div class="flex justify-between gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5"><span class="truncate">' +
+        card.dataset.name.replace(/</g, '&lt;') + ' x' + q + '</span><b>$' + money(line) + '</b></div>');
+    });
+    $('cart').innerHTML = lines.join('');
+    $('total').textContent = '$' + money(total) + ' USDT';
+    $('selected-label').textContent = selected.size
+      ? selected.size + ' product' + (selected.size > 1 ? 's' : '') + ' selected'
+      : 'Click one or more products above to add them.';
+    $('clear-sel') && ($('clear-sel').style.display = selected.size ? '' : 'none');
+  }
+
+  function toggle(card) {
+    if (card.dataset.available !== 'true') return;
+    const row = card.querySelector('.sel-row');
+    if (selected.has(card.dataset.id)) {
+      selected.delete(card.dataset.id);
+      card.classList.remove('border-slate-900'); row.classList.add('hidden'); row.classList.remove('flex');
+    } else {
+      selected.set(card.dataset.id, card);
+      card.classList.add('border-slate-900'); row.classList.remove('hidden'); row.classList.add('flex');
+    }
+    renderCart();
+  }
+  cards.forEach(c => {
+    c.addEventListener('click', e => { if (e.target.closest('.line-qty')) return; toggle(c); });
+    const qi = c.querySelector('.line-qty');
+    if (qi) qi.addEventListener('input', renderCart);
   });
+
+  function applyFilters() {
+    const q = $('search').value.toLowerCase().trim();
+    const max = parseFloat($('maxprice').value);
+    const inStock = $('instock').checked;
+    const sort = $('sort').value;
+    let shown = 0;
+    cards.forEach(c => {
+      const ok = (!q || c.dataset.name.toLowerCase().includes(q) || c.dataset.category.toLowerCase().includes(q))
+        && (!cat || c.dataset.category === cat)
+        && (!inStock || c.dataset.available === 'true')
+        && (isNaN(max) || parseFloat(c.dataset.price) <= max);
+      c.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    const by = {
+      'default': (a, b) => a.dataset.order - b.dataset.order,
+      'price-asc': (a, b) => a.dataset.price - b.dataset.price,
+      'price-desc': (a, b) => b.dataset.price - a.dataset.price,
+      'name': (a, b) => a.dataset.name.trim().localeCompare(b.dataset.name.trim()),
+      'sold': (a, b) => b.dataset.sold - a.dataset.sold
+    }[sort];
+    cards.slice().sort(by).forEach(c => grid.appendChild(c));
+    $('count').textContent = shown;
+    $('empty').classList.toggle('hidden', shown !== 0 || cards.length === 0);
+  }
+  ['search', 'maxprice'].forEach(id => $(id).addEventListener('input', applyFilters));
+  ['sort', 'instock'].forEach(id => $(id).addEventListener('change', applyFilters));
+  document.querySelectorAll('.cat-chip').forEach(b => b.addEventListener('click', () => {
+    cat = b.dataset.cat;
+    document.querySelectorAll('.cat-chip').forEach(x => {
+      const on = x === b;
+      x.className = 'cat-chip px-3 py-1.5 rounded-full text-[11px] font-bold border ' + (on ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200');
+    });
+    applyFilters();
+  }));
+  $('reset').addEventListener('click', () => {
+    $('search').value = ''; $('maxprice').value = ''; $('sort').value = 'default'; $('instock').checked = true;
+    document.querySelector('.cat-chip[data-cat=""]').click();
+  });
+
   document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => {
     navigator.clipboard && navigator.clipboard.writeText($(b.dataset.copy).textContent.trim());
     b.textContent = 'Copied';
@@ -152,14 +250,14 @@
   $('order-form').addEventListener('submit', async e => {
     e.preventDefault();
     $('msg').textContent = '';
-    if (!current) { $('msg').textContent = 'Please select a product first.'; return; }
+    if (!selected.size) { $('msg').textContent = 'Please select at least one product.'; return; }
     const btn = $('submit');
     btn.disabled = true; btn.textContent = 'Verifying payment...';
     try {
       const res = await fetch('/api/store/checkout', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          productId: current.dataset.id, quantity: parseInt($('qty').value) || 1,
+          cart: Array.from(selected.values()).map(c => ({ productId: c.dataset.id, quantity: qtyOf(c) })),
           paymentMethod: method, txId: $('txid').value.trim(), customerContact: $('contact').value.trim()
         })
       });
@@ -169,7 +267,8 @@
     } catch (_) { $('msg').textContent = 'Network error, please retry.'; }
     btn.disabled = false; btn.textContent = 'Verify payment & get my keys';
   });
-  render();
+  applyFilters();
+  renderCart();
 })();
 </script>
 
