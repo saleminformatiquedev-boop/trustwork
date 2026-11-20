@@ -20,6 +20,9 @@ const {
 const escrow = require('./escrow');
 const emailService = require('./services/email');
 const binanceService = require('./services/binance');
+const prodseller = require('./services/prodseller');
+const bscscan = require('./services/bscscan');
+const txclaims = require('./services/txclaims');
 
 const app = express();
 const server = http.createServer(app);
@@ -756,38 +759,31 @@ function isStoreOwner(user) {
   return user.role === 'ADMIN' || String(user.email || '').toLowerCase() === STORE_OWNER_EMAIL;
 }
 
-// Homepage: Simple Direct Storefront
-// All methods are public; no sign-in required
+// Homepage: live ProdSeller catalogue
 app.get('/', async (req, res) => {
   try {
-    const srvRes = await pool.query(`
-      SELECT s.id, s."sellerId", s.title, s.description, s.category, s.price,
-             s."deliveryDays", s."pageCount", s.difficulty, s.formats, s."createdAt",
-             s."unitCost", s."durationLabel", s."offerType",
-             s."screenShareDemo", s."openToExchange", s."bulkAvailable",
-             s."supplierHandle", s."whatsappNumber", s."telegramBot",
-             u.name as "sellerName", u.avatar as "sellerAvatar"
-      FROM services s
-      JOIN users u ON s."sellerId" = u.id
-      WHERE LOWER(u.email) = $1
-        AND s.category <> 'Simple Methods ($1.5)'
-      ORDER BY
-        CASE s.id
-          WHEN 'srv_notion_edu_plus_1y' THEN 1
-          WHEN 'srv_adobe_express_6m_script' THEN 2
-          WHEN 'srv_capcut_ready' THEN 3
-          ELSE 4
-        END ASC,
-        s.title ASC
-    `, [STORE_OWNER_EMAIL]);
-    res.render('index', {
-      services: formatRows(srvRes.rows).map(sanitizePublicService)
-    });
+    const products = await prodseller.getProducts();
+    res.render('index', { products: products.map(publicProduct) });
   } catch (err) {
     console.error("Homepage error:", err.message);
-    res.status(500).send("Unable to load methods at the moment.");
+    res.status(500).send("Unable to load products at the moment.");
   }
 });
+
+function publicProduct(p) {
+  const stock = p.stock !== undefined && p.stock !== null ? Number(p.stock) : null;
+  return {
+    id: String(p.id || p._id),
+    name: String(p.name || ''),
+    description: String(p.description || '').slice(0, 400),
+    imageUrl: /^https:\/\//.test(p.imageUrl || '') ? p.imageUrl : '',
+    price: Number(p.price) || 0,
+    bulkPricing: Array.isArray(p.bulkPricing) ? p.bulkPricing : [],
+    stock,
+    available: prodseller.isAvailable(p),
+    sold: Number(p.sold) || 0
+  };
+}
 
 // Dedicated Method Exchange Page (no Binance checkout section)
 app.get('/exchange', async (req, res) => {
@@ -819,102 +815,116 @@ app.get('/exchange', async (req, res) => {
 // SIMPLE DIRECT STORE API (BUY 1 OR MORE METHODS + EXCHANGE REQUEST)
 // ==========================================
 
-// Submit a direct Binance Pay ID / USDT BEP20 order for 1 or multiple methods
-app.post('/api/store/order', async (req, res) => {
+// Buy a ProdSeller product: verify the Binance payment, order from the supplier, deliver the keys
+app.post('/api/store/checkout', async (req, res) => {
+  let claimed = null;
   try {
-    const { serviceIds, paymentMethod, txId, customerContact, note } = req.body || {};
+    const { productId, quantity, paymentMethod, txId, customerContact } = req.body || {};
+    const method = paymentMethod === 'USDT_BEP20' ? 'USDT_BEP20' : 'BINANCE_PAY';
+    const cleanId = String(productId || '').trim();
+    const qty = Math.floor(Number(quantity) || 1);
+    const cleanTx = String(txId || '').trim();
+    const contact = String(customerContact || '').trim().slice(0, 200);
 
-    if (!Array.isArray(serviceIds) || serviceIds.length === 0) {
-      return res.status(400).json({ success: false, error: 'Please select at least one method.' });
+    if (!/^[A-Za-z0-9_-]{6,64}$/.test(cleanId)) return res.status(400).json({ success: false, error: 'Invalid product.' });
+    if (qty < 1 || qty > 100) return res.status(400).json({ success: false, error: 'Invalid quantity.' });
+    if (!contact) return res.status(400).json({ success: false, error: 'Please enter your Telegram, WhatsApp or email contact.' });
+    if (method === 'BINANCE_PAY' && !/^\d{10,25}$/.test(cleanTx)) {
+      return res.status(400).json({ success: false, error: 'Binance Pay Order ID must be 10-25 digits.' });
+    }
+    if (method === 'USDT_BEP20' && !/^0x[A-Fa-f0-9]{64}$/.test(cleanTx)) {
+      return res.status(400).json({ success: false, error: 'BEP20 TxID must start with 0x (66 characters).' });
+    }
+    if (!prodseller.isConfigured()) return res.status(503).json({ success: false, error: 'Shop temporarily unavailable.' });
+
+    const product = await prodseller.getProduct(cleanId);
+    if (!product) return res.status(404).json({ success: false, error: 'Product not found.' });
+    if (!prodseller.isAvailable(product)) return res.status(409).json({ success: false, error: 'Out of stock.' });
+    if (product.stock !== undefined && product.stock !== null && qty > Number(product.stock)) {
+      return res.status(409).json({ success: false, error: 'Only ' + Number(product.stock) + ' in stock.' });
     }
 
-    const cleanIds = [...new Set(serviceIds.map(id => String(id || '').trim()).filter(Boolean))];
-    if (cleanIds.length === 0 || cleanIds.length > 20) {
-      return res.status(400).json({ success: false, error: 'Invalid method selection.' });
+    const total = Math.round(prodseller.getUnitPrice(product, qty) * qty * 100) / 100;
+    const apiCost = Math.round((Number(product.apiPrice) || 0) * qty * 100) / 100;
+
+    if (!(await txclaims.claim(method, cleanTx.toLowerCase()))) {
+      return res.status(409).json({ success: false, error: 'This transaction was already used.' });
     }
+    claimed = { method, tx: cleanTx.toLowerCase() };
 
-    const cleanPaymentMethod = paymentMethod === 'USDT_BEP20' ? 'USDT_BEP20' : 'BINANCE_PAY';
-    const cleanTxId = String(txId || '').trim().slice(0, 200);
-    const cleanContact = String(customerContact || '').trim().slice(0, 200);
-    const cleanNote = String(note || '').trim().slice(0, 1000);
-
-    if (!cleanContact) {
-      return res.status(400).json({ success: false, error: 'Please enter your WhatsApp, Telegram, or Email contact.' });
-    }
-    if (!cleanTxId || cleanTxId.length < 4) {
-      return res.status(400).json({ success: false, error: 'Please enter your Binance Pay Order ID or BEP20 TxID.' });
-    }
-
-    // Fetch exact server-side prices from DB
-    const srvRes = await pool.query(
-      `SELECT id, title, price FROM services WHERE id = ANY($1::text[])`,
-      [cleanIds]
-    );
-    if (srvRes.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Selected method(s) not found.' });
-    }
-
-    const items = srvRes.rows.map(r => ({
-      id: r.id,
-      title: r.title,
-      price: parseFloat(r.price)
-    }));
-    const totalAmount = Math.round(items.reduce((sum, i) => sum + i.price, 0) * 100) / 100;
-
-    // Optional automatic Binance API check if server has API keys configured
-    let initialStatus = 'PENDING';
-    try {
-      if (binanceService.isConfigured()) {
-        const check = await binanceService.verifyIncomingDeposit({ txId: cleanTxId, expectedAmount: totalAmount });
-        if (check && check.verified && check.autoCreditAllowed && check.actualAmount >= totalAmount) {
-          initialStatus = 'PAID';
-        }
+    let paid = 0;
+    if (method === 'BINANCE_PAY') {
+      if (!binanceService.isConfigured()) throw Object.assign(new Error('Binance not configured'), { code: 'CFG' });
+      const check = await binanceService.verifyIncomingDeposit({ txId: cleanTx, expectedAmount: total });
+      if (!check.verified || check.method !== 'BINANCE_PAY' || !check.autoCreditAllowed) {
+        await txclaims.release(claimed.method, claimed.tx); claimed = null;
+        const reason = String(check.reason || '').replace(/\s*Saved as PENDING.*$/i, '').trim();
+        return res.status(402).json({ success: false, error: (reason || 'Payment not found.') + ' Check the Order ID and retry in 1-2 minutes.' });
       }
-    } catch (_) {}
+      paid = check.actualAmount;
+    } else {
+      const check = await bscscan.verifyBscTransaction(cleanTx);
+      if (!check.success) {
+        await txclaims.release(claimed.method, claimed.tx); claimed = null;
+        return res.status(402).json({ success: false, error: check.message });
+      }
+      paid = Math.round(check.amount * 100) / 100;
+    }
+
+    if (paid + 0.001 < total) {
+      await txclaims.release(claimed.method, claimed.tx); claimed = null;
+      return res.status(402).json({ success: false, error: 'Amount received ' + paid.toFixed(2) + ' USDT is lower than the required ' + total.toFixed(2) + ' USDT. Contact support with your TxID.' });
+    }
 
     const orderId = 'ord_' + crypto.randomBytes(6).toString('hex');
-    await pool.query(`
-      INSERT INTO store_orders (id, "userId", "customerContact", items, "totalAmount", "paymentMethod", "txId", note, status)
-      VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9)
-    `, [
-      orderId,
-      req.user ? req.user.id : null,
-      cleanContact,
-      JSON.stringify(items),
-      totalAmount,
-      cleanPaymentMethod,
-      cleanTxId,
-      cleanNote || null,
-      initialStatus
-    ]);
+    const receiptToken = crypto.randomBytes(24).toString('hex');
+    const items = [{ id: cleanId, title: product.name, price: total, quantity: qty }];
+    const supplier = await prodseller.createOrder(cleanId, orderId, qty);
 
-    // Notify sole seller (saleminformatiquedev@gmail.com) in real time
-    const ownerRes = await pool.query(`SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1`, [STORE_OWNER_EMAIL]);
+    if (!supplier) {
+      await txclaims.release(claimed.method, claimed.tx); claimed = null;
+      return res.status(502).json({ success: false, error: 'Supplier error. Your payment was not consumed, please retry.' });
+    }
+
+    const manual = Boolean(supplier.insufficientSupplierBalance);
+    const keys = manual ? '' : prodseller.extractKeys(supplier).join('\n');
+    await pool.query(
+      `INSERT INTO store_orders (id, "userId", "customerContact", items, "totalAmount", "paymentMethod", "txId", note, status,
+                                 "deliveredKeys", "receiptToken", "supplierProductId", "supplierCost")
+       VALUES ($1, NULL, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [orderId, contact, JSON.stringify(items), total, method, cleanTx,
+       paid > total + 0.001 ? 'Overpaid: received ' + paid.toFixed(2) + ' USDT' : null,
+       manual ? 'PAID' : 'DELIVERED', keys || null, receiptToken, cleanId, apiCost]
+    );
+    claimed = null;
+
+    const ownerRes = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1', [STORE_OWNER_EMAIL]);
     if (ownerRes.rows[0]) {
-      const titlesStr = items.map(i => i.title).join(', ');
-      io.to(`user_${ownerRes.rows[0].id}`).emit('user_notification', {
-        title: `💰 New Binance Order ($${totalAmount.toFixed(2)})`,
-        body: `${cleanContact} ordered ${titlesStr} via ${cleanPaymentMethod} (TxID: ${cleanTxId})`,
-        url: '/admin/store',
-        type: 'store_order'
+      io.to('user_' + ownerRes.rows[0].id).emit('user_notification', {
+        title: (manual ? '⚠️ Manual delivery needed ' : '💰 Sale ') + '$' + total.toFixed(2),
+        body: contact + ' bought ' + product.name + ' x' + qty + ' via ' + method,
+        url: '/admin/store', type: 'store_order'
       });
     }
 
-    return res.json({
-      success: true,
-      order: {
-        id: orderId,
-        items,
-        totalAmount,
-        paymentMethod: cleanPaymentMethod,
-        txId: cleanTxId,
-        customerContact: cleanContact,
-        status: initialStatus
-      }
-    });
+    return res.json({ success: true, manual, receiptUrl: '/order/' + receiptToken });
   } catch (err) {
-    console.error('Store order error:', err.message);
-    return res.status(500).json({ success: false, error: 'Unable to submit order right now.' });
+    console.error('Checkout error:', err.message);
+    if (claimed && err.code === 'CFG') { try { await txclaims.release(claimed.method, claimed.tx); } catch (_) {} }
+    return res.status(500).json({ success: false, error: 'Unable to complete the order. If you paid, contact support with your TxID.' });
+  }
+});
+
+// Order receipt with delivered keys (unguessable token)
+app.get('/order/:token', async (req, res) => {
+  try {
+    if (!/^[a-f0-9]{48}$/.test(req.params.token)) return res.status(404).send('Order not found.');
+    const r = await pool.query('SELECT * FROM store_orders WHERE "receiptToken" = $1', [req.params.token]);
+    if (!r.rows[0]) return res.status(404).send('Order not found.');
+    res.setHeader('Cache-Control', 'no-store');
+    res.render('receipt', { order: r.rows[0] });
+  } catch (err) {
+    res.status(500).send('Unable to load order.');
   }
 });
 

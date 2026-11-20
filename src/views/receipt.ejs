@@ -1,0 +1,21 @@
+<%- include('partials/header', { title: 'Order ' + order.id }) %>
+<section class="max-w-2xl mx-auto px-4 sm:px-6 py-10">
+  <div class="bg-white rounded-3xl border border-slate-200 p-6 space-y-4">
+    <h1 class="text-xl font-extrabold text-slate-900">Order #<%= order.id %></h1>
+    <% const items = Array.isArray(order.items) ? order.items : []; %>
+    <p class="text-sm text-slate-600"><%= items.map(i => i.title + (i.quantity > 1 ? ' x' + i.quantity : '')).join(', ') %> — $<%= Number(order.totalAmount).toFixed(2) %> USDT</p>
+    <% if (order.deliveredKeys) { %>
+      <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-2">
+        <div class="font-extrabold text-emerald-800 text-sm">Delivered — save these keys now</div>
+        <pre class="text-xs font-mono whitespace-pre-wrap break-all bg-white border border-emerald-200 rounded-xl p-3 select-all"><%= order.deliveredKeys %></pre>
+      </div>
+    <% } else { %>
+      <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-900">
+        Payment received. Your order will be delivered manually shortly. Contact <a class="font-bold underline" href="https://t.me/Melasbit">@Melasbit</a> with this order number.
+      </div>
+    <% } %>
+    <p class="text-[11px] text-slate-400">Keep this page's link private: anyone with it can see your keys.</p>
+    <a href="/" class="inline-block text-xs font-bold text-sky-600 hover:underline">&larr; Back to shop</a>
+  </div>
+</section>
+<%- include('partials/footer') %>
